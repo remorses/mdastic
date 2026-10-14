@@ -1,0 +1,9 @@
+[
+  { "name": "heading", "input": "# Hello *world*\n", "syntax": [] },
+  { "name": "paragraphs", "input": "a\nb\n\nc", "syntax": [] },
+  { "name": "list", "input": "- a\n- b\n\n  c\n", "syntax": [] },
+  { "name": "gfm table", "input": "| a | b |\n| - | :-: |\n| 1 | 2 |\n", "syntax": ["gfm"] },
+  { "name": "mdx jsx", "input": "<Note title=\"x\" n={1}>\n  Hi **there**\n</Note>\n", "syntax": ["mdx", "frontmatter", "gfm"] },
+  { "name": "mdx esm", "input": "import A from './a'\n\n# {1 + 1}\n", "syntax": ["mdx", "frontmatter", "gfm"] },
+  { "name": "frontmatter", "input": "---\ntitle: x\n---\n\nbody\n", "syntax": ["mdx", "frontmatter", "gfm"] }
+]

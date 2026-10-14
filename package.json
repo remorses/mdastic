@@ -1,0 +1,11 @@
+{
+  "name": "mdastic-monorepo",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^25.9.2",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.4"
+  }
+}

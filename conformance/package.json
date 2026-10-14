@@ -1,0 +1,32 @@
+{
+  "name": "conformance",
+  "private": true,
+  "type": "module",
+  "description": "Differential conformance tests and benchmarks: mdastic vs the real remark stack (the oracle).",
+  "scripts": {
+    "test": "vitest",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "mdastic": "workspace:^"
+  },
+  "devDependencies": {
+    "@types/mdast": "^4.0.4",
+    "markdown-it": "^14.1.0",
+    "mdast-util-from-markdown": "2.0.3",
+    "mdast-util-frontmatter": "2.0.1",
+    "mdast-util-gfm": "3.1.0",
+    "mdast-util-mdx": "3.0.0",
+    "mdast-util-to-markdown": "2.1.2",
+    "micromark-extension-frontmatter": "2.0.0",
+    "micromark-extension-gfm": "3.0.0",
+    "micromark-extension-mdxjs": "3.0.0",
+    "remark": "15.0.1",
+    "remark-frontmatter": "5.0.0",
+    "remark-gfm": "4.0.1",
+    "remark-mdx": "3.1.1",
+    "remark-stringify": "11.0.0",
+    "satteri": "0.10.5",
+    "unified": "11.0.5"
+  }
+}

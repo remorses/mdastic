@@ -1,0 +1,70 @@
+{
+  "name": "mdastic",
+  "version": "0.0.2",
+  "description": "Fast markdown and MDX parser and serializer that outputs the exact same mdast as remark. MDX, GFM and frontmatter built in.",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/remorses/mdastic",
+    "directory": "mdastic"
+  },
+  "homepage": "https://github.com/remorses/mdastic",
+  "bugs": "https://github.com/remorses/mdastic/issues",
+  "keywords": [
+    "markdown",
+    "mdx",
+    "mdast",
+    "remark",
+    "parser",
+    "commonmark",
+    "gfm",
+    "fast"
+  ],
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./mdx": {
+      "types": "./dist/mdx.d.ts",
+      "default": "./dist/mdx.js"
+    },
+    "./gfm": {
+      "types": "./dist/gfm.d.ts",
+      "default": "./dist/gfm.js"
+    },
+    "./frontmatter": {
+      "types": "./dist/frontmatter.d.ts",
+      "default": "./dist/frontmatter.js"
+    },
+    "./src": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./src/*": {
+      "types": "./src/*.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "files": [
+    "src",
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest",
+    "prepublishOnly": "rimraf dist \"*.tsbuildinfo\" && pnpm build"
+  },
+  "dependencies": {
+    "@types/estree": "^1.0.9",
+    "acorn": "^8.15.0",
+    "acorn-jsx": "^5.3.2"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.1"
+  }
+}

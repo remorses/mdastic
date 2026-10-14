@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "ESNext",
+    "lib": ["ESNext"],
+    "types": ["node"],
+    "declaration": true,
+    "declarationMap": true,
+    "noEmit": false,
+    "strict": true,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "useUnknownInCatchVariables": false
+  },
+  "include": ["src"]
+}
