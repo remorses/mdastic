@@ -169,6 +169,19 @@ export function acornProgram(
 
 // Acorn's tokenizer tracks strings, templates, regular expressions and JSX without parsing.
 function candidate(source: string, start: number, syntax: MdxSyntax): number {
+  // Fast path: with no brace, quote, template or slash before it, the first `}` closes.
+  for (let i = start; i < source.length; i++) {
+    const c = source.charCodeAt(i)
+    if (c === Char.RightBrace) return i
+    if (
+      c === Char.LeftBrace ||
+      c === Char.DoubleQuote ||
+      c === Char.SingleQuote ||
+      c === Char.Backtick ||
+      c === Char.Slash
+    )
+      break
+  }
   try {
     const tokens = syntax.acorn.tokenizer(source.slice(start), options)
     let braces = 0
