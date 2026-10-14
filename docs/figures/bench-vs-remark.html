@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="/skill/claude-style/style.css" />
+  </head>
+  <body>
+    <div class="canvas" id="diagram"></div>
+    <script type="module">
+      import { barChart } from '/skill/charts.ts'
+      const ms = (v) => `${v} ms`
+      barChart('#diagram', {
+        series: ['remark', 'mdastic'],
+        ratioHeader: 'Faster',
+        axisTitle: 'Median time for the whole corpus, Node 24, Apple M5 Pro',
+        charts: [
+          {
+            title: 'Parse',
+            legend: true,
+            max: 800,
+            ticks: [0, 200, 400, 600, 800],
+            unit: ms,
+            rows: [
+              { label: 'Markdown + GFM, 2.6 MB', values: [703.4, 24.65], text: ['703 ms', '24.7 ms'], ratio: '×28.5' },
+              { label: 'MDX with estree, 1 MB', values: [289.3, 16.83], text: ['289 ms', '16.8 ms'], ratio: '×17.2' },
+            ],
+          },
+          {
+            title: 'Stringify',
+            max: 800,
+            ticks: [0, 200, 400, 600, 800],
+            unit: ms,
+            rows: [
+              { label: 'Markdown + GFM, 2.6 MB', values: [253.1, 42.7], text: ['253 ms', '42.7 ms'], ratio: '×5.9' },
+              { label: 'MDX, 1 MB', values: [100.6, 16.68], text: ['101 ms', '16.7 ms'], ratio: '×6.0' },
+            ],
+          },
+          {
+            title: 'Round trip (parse + stringify)',
+            max: 800,
+            ticks: [0, 200, 400, 600, 800],
+            unit: ms,
+            rows: [
+              { label: 'MDX, 1 MB', values: [401.95, 33.89], text: ['402 ms', '33.9 ms'], ratio: '×11.9' },
+            ],
+          },
+        ],
+      })
+    </script>
+  </body>
+</html>

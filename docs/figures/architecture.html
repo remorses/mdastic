@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="/skill/claude-style/style.css" />
+  </head>
+  <body>
+    <div class="canvas" id="diagram">
+      <div class="section">
+        <div class="section-label">parse(source, { syntax })</div>
+        <div class="flow" style="justify-content: space-between">
+          <div class="box green" id="source" style="grid-area: 1 / 1">Source</div>
+          <div class="box blue node" id="scan" style="grid-area: 1 / 2">
+            <div class="mono">scan.ts</div>
+            <div class="sub">Line index</div>
+          </div>
+          <div class="box blue node" id="block" style="grid-area: 1 / 3">
+            <div class="mono">block.ts</div>
+            <div class="sub">Containers</div>
+          </div>
+          <div class="box blue node" id="inline" style="grid-area: 1 / 4">
+            <div class="mono">inline.ts</div>
+            <div class="sub">Delimiters</div>
+          </div>
+          <div class="box green" id="mdast" style="grid-area: 1 / 5">mdast</div>
+
+          <div class="box node purple" id="mdx" style="grid-area: 2 / 3">
+            <div class="mono">mdastic/mdx</div>
+            <div class="sub">JSX, ESM, {expressions}<br />one Acorn parse each</div>
+          </div>
+          <div class="box node amber" id="arena" style="grid-area: 2 / 4">
+            <div class="mono">tree.ts</div>
+            <div class="sub">Reused typed-array arena</div>
+          </div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-label">stringify(tree, { syntax })</div>
+        <div class="flow" style="justify-content: space-between">
+          <div class="box green" id="tree2" style="grid-area: 1 / 1">mdast Root</div>
+          <div class="box blue node" id="stringify" style="grid-area: 1 / 3">
+            <div class="mono">stringify.ts</div>
+            <div class="sub">Handlers per node type</div>
+          </div>
+          <div class="box blue node" id="safe" style="grid-area: 1 / 4">
+            <div class="mono">stringify-safe.ts</div>
+            <div class="sub">Escape tables, one pass</div>
+          </div>
+          <div class="box green" id="out" style="grid-area: 1 / 5">Markdown string</div>
+        </div>
+      </div>
+    </div>
+    <script type="module">
+      import { connect } from '/skill/diagram.ts'
+      connect('source', 'scan', { color: 'green' })
+      connect('scan', 'block')
+      connect('block', 'inline', { label: 'Views' })
+      connect('inline', 'arena', { color: 'amber', label: 'Nodes', mask: true })
+      connect('arena', 'mdast', { from: 'right', to: 'bottom', color: 'accent', label: 'One pass' })
+      connect('mdx', 'block', { color: 'purple', dashed: true, label: 'Flow + inline hooks', mask: true })
+      connect('tree2', 'stringify', { color: 'green' })
+      connect('stringify', 'safe')
+      connect('safe', 'out', { color: 'accent' })
+    </script>
+  </body>
+</html>

@@ -38,6 +38,11 @@ Do not recursively call `parseDocument` from a hook: the arena is reused. Use th
   same errors as remark. Flow JSX parents redirect block nodes through `flowParent`.
 - `positions: false` only removes mdast positions. MDX still indexes lines for ESTree and errors.
 
+## README figures
+
+`docs/figures/*.html` are rendered to the PNGs next to them with the `diagrams-and-charts` skill.
+Update the benchmark numbers in both the html and `README.md` after a perf change.
+
 ## Verification
 
 ```text

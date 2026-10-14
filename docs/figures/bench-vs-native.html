@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="/skill/claude-style/style.css" />
+  </head>
+  <body>
+    <div class="canvas" id="diagram"></div>
+    <script type="module">
+      import { barChart } from '/skill/charts.ts'
+      const ms = (v) => `${v} ms`
+      barChart('#diagram', {
+        series: ['Markdown + GFM, 2.6 MB', 'MDX, 1 MB'],
+        colors: ['blue', 'purple'],
+        axisTitle: 'Median parse time for the whole corpus, Node 24, Apple M5 Pro',
+        charts: [
+          {
+            title: 'Parse',
+            legend: true,
+            max: 40,
+            ticks: [0, 10, 20, 30, 40],
+            unit: ms,
+            rows: [
+              { label: 'markdown-it (tokens only)', values: [36.72, 0], text: ['36.7 ms', 'no MDX'] },
+              { label: 'mdastic (TypeScript)', values: [24.65, 16.83], text: ['24.7 ms', '16.8 ms'] },
+              { label: 'Sätteri (Rust, napi)', values: [20.45, 10.62], text: ['20.5 ms', '10.6 ms, no estree'] },
+            ],
+          },
+        ],
+      })
+    </script>
+  </body>
+</html>
