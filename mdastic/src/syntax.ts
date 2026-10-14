@@ -46,18 +46,18 @@ export function resolveConfig(syntax: readonly Syntax[] = [], positions = true):
 export class MdxParseError extends Error {
   readonly name = 'MdxParseError'
   readonly reason: string
-  readonly place: Point
-  readonly line: number
-  readonly column: number
+  readonly place: Point | undefined
+  readonly line: number | undefined
+  readonly column: number | undefined
   readonly ruleId: string
   readonly source: string
   readonly url: string | undefined
-  constructor(options: { reason: string; place: Point; ruleId: string; source: string; url?: string; cause?: unknown }) {
-    super(`${options.place.line}:${options.place.column}: ${options.reason}`, { cause: options.cause })
+  constructor(options: { reason: string; place?: Point; ruleId: string; source: string; url?: string; cause?: unknown }) {
+    super(options.place ? `${options.place.line}:${options.place.column}: ${options.reason}` : options.reason, { cause: options.cause })
     this.reason = options.reason
     this.place = options.place
-    this.line = options.place.line
-    this.column = options.place.column
+    this.line = options.place?.line
+    this.column = options.place?.column
     this.ruleId = options.ruleId
     this.source = options.source
     this.url = options.url
