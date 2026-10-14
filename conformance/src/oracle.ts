@@ -17,6 +17,14 @@ export type Fixture = {
   syntax: SyntaxName[]
 }
 
+/** A hand-built tree from an upstream toMarkdown test. `options` never contains `extensions`. */
+export type StringifyTreeFixture = {
+  name: string
+  tree: unknown
+  options: Record<string, unknown>
+  syntax: SyntaxName[]
+}
+
 export type OracleError = {
   message: string
   line?: number
@@ -60,6 +68,11 @@ export function oracleParse(input: string, syntax: SyntaxName[]): Root | OracleE
 
 export function oracleStringify(tree: Root, syntax: SyntaxName[]): string {
   return toMarkdown(tree, { extensions: extensions(syntax).to })
+}
+
+/** toMarkdown with extra options (bullet, emphasis, listItemIndent…). `extensions` comes from `syntax`. */
+export function oracleStringifyWith(tree: Root, syntax: SyntaxName[], options: Record<string, unknown> = {}): string {
+  return toMarkdown(tree, { ...options, extensions: extensions(syntax).to })
 }
 
 export function toOracleError(error: any): OracleError {

@@ -6,18 +6,54 @@ import { parse, stringify, type Syntax } from 'mdastic/src'
 import { gfm } from 'mdastic/src/gfm'
 import { mdx } from 'mdastic/src/mdx'
 import { frontmatter } from 'mdastic/src/frontmatter'
-import { normalize, oracleParse, oracleStringify, toOracleError, type Fixture, type SyntaxName } from './oracle.ts'
+import {
+  normalize,
+  oracleParse,
+  oracleStringify,
+  oracleStringifyWith,
+  toOracleError,
+  type Fixture,
+  type StringifyTreeFixture,
+  type SyntaxName,
+} from './oracle.ts'
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url))
 export const fixturesDir = path.resolve(__dirname, '../fixtures')
+export const stringifyFixturesDir = path.resolve(__dirname, '../stringify-fixtures')
 
-export function loadFixtureFiles(): { file: string; fixtures: Fixture[] }[] {
-  if (!fs.existsSync(fixturesDir)) return []
+function loadJsonDir<T>(dir: string): { file: string; fixtures: T[] }[] {
+  if (!fs.existsSync(dir)) return []
   return fs
-    .readdirSync(fixturesDir)
+    .readdirSync(dir)
     .filter((f) => f.endsWith('.json'))
     .sort()
-    .map((file) => ({ file, fixtures: JSON.parse(fs.readFileSync(path.join(fixturesDir, file), 'utf8')) as Fixture[] }))
+    .map((file) => ({ file, fixtures: JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8')) as T[] }))
+}
+
+export function loadFixtureFiles(): { file: string; fixtures: Fixture[] }[] {
+  return loadJsonDir<Fixture>(fixturesDir)
+}
+
+/** Hand-built mdast trees captured from the upstream toMarkdown test suites. */
+export function loadStringifyTreeFiles(): { file: string; fixtures: StringifyTreeFixture[] }[] {
+  return loadJsonDir<StringifyTreeFixture>(stringifyFixturesDir)
+}
+
+/** Same tree + options through mdastic and the oracle. A thrown error becomes `THROWS: <message>` on both sides. */
+export function stringifyTreePair(fixture: StringifyTreeFixture) {
+  let expected: string
+  try {
+    expected = oracleStringifyWith(structuredClone(fixture.tree) as any, fixture.syntax, structuredClone(fixture.options))
+  } catch (error) {
+    expected = 'THROWS: ' + String((error as Error)?.message ?? error)
+  }
+  let actual: string
+  try {
+    actual = stringify(structuredClone(fixture.tree) as any, { ...structuredClone(fixture.options), syntax: toSyntax(fixture.syntax) } as any)
+  } catch (error) {
+    actual = 'THROWS: ' + String((error as Error)?.message ?? error)
+  }
+  return { expected, actual }
 }
 
 const syntaxCache = new Map<string, Syntax[]>()
