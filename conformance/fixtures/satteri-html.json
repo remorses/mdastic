@@ -1,0 +1,7 @@
+[
+{"name":"HTML conformance: list spread detection > nested blockquote ordered list with blank continuation","input":"   > > 1.  one\n>>\n>>     two\n","syntax":["gfm"]},
+{"name":"HTML conformance: list spread detection > list item with sublist and trailing content becomes loose","input":"* foo\n  * bar\n\n  baz\n","syntax":["gfm"]},
+{"name":"HTML conformance: HTML block in list item > code block followed by HTML block in list item","input":"*\n      <div>\n     <div>\n","syntax":["gfm"]},
+{"name":"HTML conformance: leading BOM > a leading BOM never renders","input":"﻿# h\n\ntext\n","syntax":["gfm"]},
+{"name":"HTML conformance: leading BOM > a leading BOM never renders","input":"﻿- one\n- two\n","syntax":["gfm"]}
+]

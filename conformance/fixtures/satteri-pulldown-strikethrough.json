@@ -1,0 +1,17 @@
+[
+{"name":"strikethrough.rs:strikethrough_test_1","input":"~~This is *stricken out*~~\n","syntax":["gfm"]},
+{"name":"strikethrough.rs:strikethrough_test_1","input":"~~This is \\~\\~stricken~~\n","syntax":["gfm"]},
+{"name":"strikethrough.rs:strikethrough_test_1","input":"This~~is~~stricken\n","syntax":["gfm"]},
+{"name":"strikethrough.rs:strikethrough_test_1","input":"~~This~~is~~stricken~~\n","syntax":["gfm"]},
+{"name":"strikethrough.rs:strikethrough_test_1","input":"Here I strike out an exclamation point~~!~~.\n","syntax":["gfm"]},
+{"name":"strikethrough.rs:strikethrough_test_1","input":"~This is stricken out~\n","syntax":["gfm"]},
+{"name":"strikethrough.rs:strikethrough_test_1","input":"~This is \\~stricken~\n","syntax":["gfm"]},
+{"name":"strikethrough.rs:strikethrough_test_1","input":"This~is~nothing\n","syntax":["gfm"]},
+{"name":"strikethrough.rs:strikethrough_test_1","input":"~This~is~nothing~\n","syntax":["gfm"]},
+{"name":"strikethrough.rs:strikethrough_test_1","input":"Here I fail to strike out an exclamation point~!~.\n","syntax":["gfm"]},
+{"name":"strikethrough.rs:strikethrough_test_1","input":"Here I fail to strike out a tilde ~~~.\n","syntax":["gfm"]},
+{"name":"strikethrough.rs:strikethrough_test_1","input":"Here I fail to match up ~~tildes~.\n","syntax":["gfm"]},
+{"name":"strikethrough.rs:strikethrough_test_1","input":"Here I fail to match up ~tildes~~.\n","syntax":["gfm"]},
+{"name":"strikethrough.rs:strikethrough_test_1","input":"~~This ~is stricken.~~\n","syntax":["gfm"]},
+{"name":"strikethrough.rs:strikethrough_test_1","input":"~This ~~is stricken.~\n","syntax":["gfm"]}
+]

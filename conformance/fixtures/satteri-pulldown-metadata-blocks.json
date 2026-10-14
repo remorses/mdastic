@@ -1,0 +1,13 @@
+[
+{"name":"metadata_blocks.rs:metadata_blocks_test_1","input":"---\ntitle: example\nanother_field: 0\n---\n","syntax":["frontmatter"]},
+{"name":"metadata_blocks.rs:metadata_blocks_test_1","input":"---\ntitle: example\nanother_field: 0\n","syntax":["frontmatter"]},
+{"name":"metadata_blocks.rs:metadata_blocks_test_1","input":"---\n---\n","syntax":["frontmatter"]},
+{"name":"metadata_blocks.rs:metadata_blocks_test_1","input":"---\n\ntitle: example\nanother_field: 0\n---\n","syntax":["frontmatter"]},
+{"name":"metadata_blocks.rs:metadata_blocks_test_1","input":"My paragraph here.\n\n---\ntitle: example\nanother_field: 0\n---\n","syntax":["frontmatter"]},
+{"name":"metadata_blocks.rs:metadata_blocks_test_1","input":"---    \ntitle: example\nanother_field: 0\n---\n\n--- -\ntitle: example\nanother_field: 0\n---\n","syntax":["frontmatter"]},
+{"name":"metadata_blocks.rs:metadata_blocks_test_1","input":"---\ntitle: example\nanother_field: 0\n---        \n\n---\ntitle: example\nanother_field: 0\n---a\n","syntax":["frontmatter"]},
+{"name":"metadata_blocks.rs:metadata_blocks_test_1","input":"---\ntitle: example\nanother_field: 0\n...\n","syntax":["frontmatter"]},
+{"name":"metadata_blocks.rs:metadata_blocks_test_1","input":"+++\ntitle: example\nanother_field: 0\n+++\n","syntax":["frontmatter"]},
+{"name":"metadata_blocks.rs:metadata_blocks_test_1","input":"    ---\n    Things\n    ---\n","syntax":["frontmatter"]},
+{"name":"metadata_blocks.rs:metadata_blocks_test_1","input":"---\n- Item 1\n- Item 2\n---\n","syntax":["frontmatter"]}
+]

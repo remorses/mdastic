@@ -1,0 +1,7 @@
+[
+{"name":"frontmatterToMarkdown > should serialize empty yaml","tree":{"type":"root","children":[{"type":"yaml","value":""}]},"options":{},"syntax":["frontmatter"]},
+{"name":"frontmatterToMarkdown > should support content in yaml","tree":{"type":"root","children":[{"type":"yaml","value":"a\nb"}]},"options":{},"syntax":["frontmatter"]},
+{"name":"frontmatterToMarkdown > should support blank lines in yaml","tree":{"type":"root","children":[{"type":"yaml","value":"a\n\nb"}]},"options":{},"syntax":["frontmatter"]},
+{"name":"frontmatterToMarkdown > should support blank lines in yaml","tree":{"type":"root","children":[{"type":"toml","value":"a\n\nb"}]},"options":{},"syntax":["frontmatter"]},
+{"name":"frontmatterToMarkdown > should escape what would otherwise be custom matter","tree":{"type":"root","children":[{"type":"text","value":"<<<\na\n\nb\n>>>"}]},"options":{},"syntax":["frontmatter"]}
+]

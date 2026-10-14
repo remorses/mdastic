@@ -1,0 +1,6 @@
+[
+{"name":"misc_zero.rs:10","input":"","syntax":[]},
+{"name":"misc_zero.rs:13","input":"asd\u0000asd","syntax":[]},
+{"name":"misc_zero.rs:19","input":"&#0;","syntax":[]},
+{"name":"misc_zero.rs:27","input":"\\0","syntax":[]}
+]

@@ -1,0 +1,5 @@
+[
+{"name":"text.rs:7","input":"hello $.;'there","syntax":[]},
+{"name":"text.rs:13","input":"Foo χρῆν","syntax":[]},
+{"name":"text.rs:19","input":"Multiple     spaces","syntax":[]}
+]

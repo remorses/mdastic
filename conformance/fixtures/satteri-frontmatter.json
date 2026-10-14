@@ -1,0 +1,14 @@
+[
+{"name":"Frontmatter MDAST conformance > basic YAML frontmatter","input":"---\ntitle: Hello\n---\n\nContent","syntax":["frontmatter","gfm"]},
+{"name":"Frontmatter MDAST conformance > YAML with multiple fields","input":"---\ntitle: Test\ndate: 2024-01-01\ntags:\n  - a\n  - b\n---\n\nBody","syntax":["frontmatter","gfm"]},
+{"name":"Frontmatter MDAST conformance > empty YAML frontmatter","input":"---\n---\n\nContent","syntax":["frontmatter","gfm"]},
+{"name":"Frontmatter MDAST conformance > YAML frontmatter only","input":"---\ntitle: Hello\n---","syntax":["frontmatter","gfm"]},
+{"name":"Frontmatter MDAST conformance > TOML frontmatter","input":"+++\ntitle = \"Hello\"\n+++\n\nContent","syntax":["frontmatter","gfm"]},
+{"name":"Frontmatter MDAST conformance > no frontmatter","input":"Just a paragraph","syntax":["frontmatter","gfm"]},
+{"name":"Frontmatter MDAST conformance > thematic break not confused with frontmatter","input":"Paragraph\n\n---\n\nAnother paragraph","syntax":["frontmatter","gfm"]},
+{"name":"Frontmatter MDAST conformance > frontmatter with blank lines in value","input":"---\ndescription: |\n  Line one\n  Line two\n---\n\nContent","syntax":["frontmatter","gfm"]},
+{"name":"Frontmatter MDAST conformance > frontmatter with blank line as first content line","input":"---\n\ntitle: test\n---\n","syntax":["frontmatter","gfm"]},
+{"name":"Frontmatter MDAST conformance > frontmatter with multiple blank lines","input":"---\n\n\ntitle: test\n---\n","syntax":["frontmatter","gfm"]},
+{"name":"Frontmatter MDAST conformance > frontmatter preserves CRLF line endings in value","input":"---\r\ntitle: X\r\nauthor: Y\r\n---\r\n","syntax":["frontmatter","gfm"]},
+{"name":"Frontmatter MDAST conformance > frontmatter still opens the document after a BOM","input":"﻿---\ntitle: Hello\n---\n\nContent\n","syntax":["frontmatter","gfm"]}
+]

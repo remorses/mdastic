@@ -1,0 +1,7 @@
+[
+{"name":"mdx_swc.rs:19","input":"{'}'}","syntax":["mdx"]},
+{"name":"mdx_swc.rs:25","input":"a {'}'} b","syntax":["mdx"]},
+{"name":"mdx_swc.rs:31","input":"<a {...a/*}*/} />","syntax":["mdx"]},
+{"name":"mdx_swc.rs:37","input":"<a b={'}'} />","syntax":["mdx"]},
+{"name":"mdx_swc.rs:43","input":"import a from 'b'\n\nexport {a}\n\n# c","syntax":["mdx"]}
+]

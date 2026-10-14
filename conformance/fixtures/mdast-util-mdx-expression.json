@@ -1,0 +1,16 @@
+[
+{"name":"mdxExpressionFromMarkdown() > should support a flow expression (agnostic)","input":"{1 + 1}","syntax":["mdx"]},
+{"name":"mdxExpressionFromMarkdown() > should support an indented flow expression (agnostic)","input":"{\n  1 + 1\n}","syntax":["mdx"]},
+{"name":"mdxExpressionFromMarkdown() > should support an empty flow expression (agnostic)","input":"{\t \n}","syntax":["mdx"]},
+{"name":"mdxExpressionFromMarkdown() > should support an balanced braces in a flow expression (agnostic)","input":"{ a { b } c }","syntax":["mdx"]},
+{"name":"mdxExpressionFromMarkdown() > should support a commented-out unbalanced brace in a flow expression (gnostic)","input":"{ a /* { */ }","syntax":["mdx"]},
+{"name":"mdxExpressionFromMarkdown() > should support a text expression (agnostic)","input":"a {1 + 1} b","syntax":["mdx"]},
+{"name":"mdxExpressionFromMarkdown() > should support an empty text expression (agnostic)","input":"a {\t \n} c","syntax":["mdx"]},
+{"name":"mdxExpressionFromMarkdown() > should support an balanced braces in a flow expression (agnostic)","input":"{ a { b } c }.","syntax":["mdx"]},
+{"name":"mdxExpressionFromMarkdown() > should support a commented-out unbalanced brace in a flow expression (gnostic)","input":"{ a /* { */ }.","syntax":["mdx"]},
+{"name":"mdxExpressionFromMarkdown() > should add a `data.estree` if `addResult` was used in the syntax extension","input":"{a}.","syntax":["mdx"]},
+{"name":"mdxExpressionFromMarkdown() > should support comments in expressions","input":"A {/*b*/ c // d\n} e {/* f */}.","syntax":["mdx"]},
+{"name":"roundtrip > should strip superfluous whitespace depending on the opening prefix, when roundtripping expressions (flow)","input":"  {`\n a\n `}","syntax":["mdx"]},
+{"name":"roundtrip > should *not* strip superfluous whitespace (if there is more) when roundtripping expressions (flow)","input":"  {`\n    a\n  `}","syntax":["mdx"]},
+{"name":"roundtrip > should not strip consecutive lines in expressions (text)","input":"a {`\n    b\n  `} c","syntax":["mdx"]}
+]

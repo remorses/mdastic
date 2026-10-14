@@ -1,0 +1,5 @@
+[
+{"name":"gfm_strikethrough.rs:gfm_strikethrough_test_1","input":"~~Hi~~ Hello, ~there~ world!\n","syntax":["gfm"]},
+{"name":"gfm_strikethrough.rs:gfm_strikethrough_test_1","input":"This ~~has a\n\nnew paragraph~~.\n","syntax":["gfm"]},
+{"name":"gfm_strikethrough.rs:gfm_strikethrough_test_1","input":"This will ~~~not~~~ strike.\n","syntax":["gfm"]}
+]

@@ -1,0 +1,7 @@
+[
+  { "name": "unknown character references cannot read object prototypes", "input": "&constructor; &toString; &valueOf; &__proto__;\n", "syntax": [] },
+  { "name": "NUL preprocessing preserves offsets in literal blocks", "input": "---\na: \u0000\n---\n\n`b\u0000`\n\n```\nc\u0000\n```\n\n<!-- d\u0000 -->\n", "syntax": ["frontmatter", "gfm"] },
+  { "name": "footnote labels use markdown whitespace rather than Unicode whitespace", "input": "[^a\u00a0b] [^v\u000bt]\n\n[^a\u00a0b]: note one\n\n[^v\u000bt]: note two\n", "syntax": ["gfm"] },
+  { "name": "remark classifies surrogate code units in delimiters and literal domains", "input": "a*😀*b\n\nhttp://😀\n", "syntax": ["gfm"] },
+  { "name": "a backslash cannot escape whitespace in a footnote label", "input": "[^a\\ b]: note\n\n[^a\\ b]\n", "syntax": ["gfm"] }
+]

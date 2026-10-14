@@ -1,0 +1,20 @@
+[
+{"name":"frontmatterFromMarkdown > should not support a single yaml fence (thematic break)","input":"---","syntax":["frontmatter"]},
+{"name":"frontmatterFromMarkdown > should parse empty yaml","input":"---\n---","syntax":["frontmatter"]},
+{"name":"frontmatterFromMarkdown > should not support a prefix (indent) before a yaml opening fence","input":" ---\n---","syntax":["frontmatter"]},
+{"name":"frontmatterFromMarkdown > should not support a prefix (indent) before a yaml closing fence","input":"---\n ---","syntax":["frontmatter"]},
+{"name":"frontmatterFromMarkdown > should parse an arbitrary suffix after the opening and closing fence of yaml","input":"---  \n---\t ","syntax":["frontmatter"]},
+{"name":"frontmatterFromMarkdown > should not support other characters after the suffix on the opening fence of yaml","input":"--- --\n---","syntax":["frontmatter"]},
+{"name":"frontmatterFromMarkdown > should not support other characters after the suffix on the closing fence of yaml","input":"---\n--- x","syntax":["frontmatter"]},
+{"name":"frontmatterFromMarkdown > should not support an opening yaml fence of more than 3 characters","input":"----\n---","syntax":["frontmatter"]},
+{"name":"frontmatterFromMarkdown > should not support a closing yaml fence of more than 3 characters","input":"---\n----","syntax":["frontmatter"]},
+{"name":"frontmatterFromMarkdown > should not support an opening yaml fence of less than 3 characters","input":"--\n---","syntax":["frontmatter"]},
+{"name":"frontmatterFromMarkdown > should not support a closing yaml fence of less than 3 characters","input":"---\n--","syntax":["frontmatter"]},
+{"name":"frontmatterFromMarkdown > should support content in yaml","input":"---\na\nb\n---","syntax":["frontmatter"]},
+{"name":"frontmatterFromMarkdown > should support blank lines in yaml","input":"---\na\n\nb\n---","syntax":["frontmatter"]},
+{"name":"frontmatterFromMarkdown > should support toml","input":"+++\na\n\nb\n+++","syntax":["frontmatter"]},
+{"name":"frontmatterFromMarkdown > should support a custom matter (1)","input":"<<<\na\n\nb\n>>>","syntax":["frontmatter"]},
+{"name":"frontmatterFromMarkdown > should support a custom matter (2)","input":"{\na\n\nb\n}","syntax":["frontmatter"]},
+{"name":"frontmatterFromMarkdown > should not support yaml frontmatter in the middle","input":"# Hello\n---\na\n\nb\n---\n+++","syntax":["frontmatter"]},
+{"name":"frontmatterFromMarkdown > should support regexp special characters as markers","input":"***\na\n***\n\n*a","syntax":["frontmatter"]}
+]

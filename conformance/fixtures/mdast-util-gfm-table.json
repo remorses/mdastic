@@ -1,0 +1,7 @@
+[
+{"name":"gfmTableFromMarkdown() > should support tables","input":"| a\n| -","syntax":["gfm"]},
+{"name":"gfmTableFromMarkdown() > should support alignment","input":"| a | b | c | d |\n| - | :- | -: | :-: |","syntax":["gfm"]},
+{"name":"gfmTableFromMarkdown() > should support an escaped pipe in code in a table cell","input":"| `\\|` |\n | --- |","syntax":["gfm"]},
+{"name":"gfmTableFromMarkdown() > should not support an escaped pipe in code *not* in a table cell","input":"`\\|`","syntax":["gfm"]},
+{"name":"gfmTableFromMarkdown() > should not support an escaped escape in code in a table cell","input":"| `\\\\|`\\\\` b |\n | --- | --- |","syntax":["gfm"]}
+]

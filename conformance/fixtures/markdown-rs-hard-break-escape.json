@@ -1,0 +1,9 @@
+[
+{"name":"hard_break_escape.rs:12","input":"foo\\\nbaz","syntax":[]},
+{"name":"hard_break_escape.rs:18","input":"foo\\\n     bar","syntax":[]},
+{"name":"hard_break_escape.rs:24","input":"*foo\\\nbar*","syntax":[]},
+{"name":"hard_break_escape.rs:30","input":"``code\\\ntext``","syntax":[]},
+{"name":"hard_break_escape.rs:36","input":"foo\\","syntax":[]},
+{"name":"hard_break_escape.rs:42","input":"### foo\\","syntax":[]},
+{"name":"hard_break_escape.rs:66","input":"a\\\nb.","syntax":[]}
+]

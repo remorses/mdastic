@@ -1,0 +1,11 @@
+[
+{"name":"gfm_table.rs:gfm_table_test_1","input":"| foo | bar |\n| --- | --- |\n| baz | bim |\n","syntax":["gfm"]},
+{"name":"gfm_table.rs:gfm_table_test_1","input":"| abc | defghi |\n:-: | -----------:\nbar | baz\n","syntax":["gfm"]},
+{"name":"gfm_table.rs:gfm_table_test_1","input":"| f\\|oo  |\n| ------ |\n| b `\\|` az |\n| b **\\|** im |\n","syntax":["gfm"]},
+{"name":"gfm_table.rs:gfm_table_test_1","input":"| abc | def |\n| --- | --- |\n| bar | baz |\n> bar\n","syntax":["gfm"]},
+{"name":"gfm_table.rs:gfm_table_test_1","input":"| abc | def |\n| --- | --- |\n| bar | baz |\nbar\n\nbar\n","syntax":["gfm"]},
+{"name":"gfm_table.rs:gfm_table_test_1","input":"| abc | def |\n| --- |\n| bar |\n","syntax":["gfm"]},
+{"name":"gfm_table.rs:gfm_table_test_1","input":"| abc | def |\n| --- | --- |\n| bar |\n| bar | baz | boo |\n","syntax":["gfm"]},
+{"name":"gfm_table.rs:gfm_table_test_1","input":"| abc | def |\n| --- | --- |\n","syntax":["gfm"]},
+{"name":"gfm_table.rs:gfm_table_test_1","input":"Hello World\n| abc | def |\n| --- | --- |\n| bar | baz |\n","syntax":["gfm"]}
+]

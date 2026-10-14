@@ -1,0 +1,7 @@
+[
+{"name":"remark-mdx: parse > should parse a self-closing tag","input":"Alpha <b/> charlie.","syntax":["mdx"]},
+{"name":"remark-mdx: parse > should parse an opening and a closing tag","input":"Alpha <b></b> charlie.","syntax":["mdx"]},
+{"name":"remark-mdx: parse > should parse fragments","input":"Alpha <></> charlie.","syntax":["mdx"]},
+{"name":"remark-mdx: parse > should parse markdown inside tags","input":"Alpha <b>*bravo*</b> charlie.","syntax":["mdx"]},
+{"name":"remark-mdx: parse > should parse expressions","input":"Alpha {1 + 1} charlie.","syntax":["mdx"]}
+]

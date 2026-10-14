@@ -1,0 +1,9 @@
+[
+{"name":"gfm_task_list_item.rs:12","input":"* [x] y.","syntax":[]},
+{"name":"gfm_task_list_item.rs:18","input":"* [x] y.","syntax":["gfm"]},
+{"name":"gfm_task_list_item.rs:24","input":"* [ ] z.","syntax":["gfm"]},
+{"name":"gfm_task_list_item.rs:45","input":"*\n    [x]","syntax":["gfm"]},
+{"name":"gfm_task_list_item.rs:51","input":"*\n[x]","syntax":["gfm"]},
+{"name":"gfm_task_list_item.rs:258","input":"* [x] a\n* [ ] b\n* c","syntax":["gfm"]},
+{"name":"gfm_task_list_item.rs:310","input":"* [x]\r\n  a\n* [ ]   b\n* [x]\t \r*c*","syntax":["gfm"]}
+]

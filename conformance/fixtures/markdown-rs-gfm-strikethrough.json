@@ -1,0 +1,18 @@
+[
+{"name":"gfm_strikethrough.rs:17","input":"a ~b~ c","syntax":[]},
+{"name":"gfm_strikethrough.rs:23","input":"a ~b~","syntax":["gfm"]},
+{"name":"gfm_strikethrough.rs:29","input":"a ~~b~~","syntax":["gfm"]},
+{"name":"gfm_strikethrough.rs:35","input":"a ~~~b~~~","syntax":["gfm"]},
+{"name":"gfm_strikethrough.rs:41","input":"a \\~~~b~~ c","syntax":["gfm"]},
+{"name":"gfm_strikethrough.rs:47","input":"a ~~b ~~c~~ d~~ e","syntax":["gfm"]},
+{"name":"gfm_strikethrough.rs:53","input":"a ~-1~ b","syntax":["gfm"]},
+{"name":"gfm_strikethrough.rs:59","input":"a ~b.~ c","syntax":["gfm"]},
+{"name":"gfm_strikethrough.rs:65","input":"~b.~.","syntax":["gfm"]},
+{"name":"gfm_strikethrough.rs:71","input":"\n# Balanced\n\na ~one~ b\n\na ~~two~~ b\n\na ~~~three~~~ b\n\na ~~~~four~~~~ b\n\n# Unbalanced\n\na ~one/two~~ b\n\na ~one/three~~~ b\n\na ~one/four~~~~ b\n\n***\n\na ~~two/one~ b\n\na ~~two/three~~~ b\n\na ~~two/four~~~~ b\n\n***\n\na ~~~three/one~ b\n\na ~~~three/two~~ b\n\na ~~~three/four~~~~ b\n\n***\n\na ~~~~four/one~ b\n\na ~~~~four/two~~ b\n\na ~~~~four/three~~~ b\n\n## Multiple\n\na ~one b one~ c one~ d\n\na ~one b two~~ c one~ d\n\na ~one b one~ c two~~ d\n\na ~~two b two~~ c two~~ d\n\na ~~two b one~ c two~~ d\n\na ~~two b two~~ c one~ d\n","syntax":["gfm"]},
+{"name":"gfm_strikethrough.rs:164","input":"\n# Flank\n\na oneRight~ b oneRight~ c oneRight~ d\n\na oneRight~ b oneRight~ c ~oneLeft d\n\na oneRight~ b ~oneLeft c oneRight~ d\n\na ~oneLeft b oneRight~ c oneRight~ d\n\na ~oneLeft b oneRight~ c ~oneLeft d\n\na ~oneLeft b ~oneLeft c oneRight~ d\n\na ~oneLeft b ~oneLeft c ~oneLeft d\n\n***\n\na twoRight~~ b twoRight~~ c twoRight~~ d\n\na twoRight~~ b twoRight~~ c ~~twoLeft d\n\na twoRight~~ b ~~twoLeft c twoRight~~ d\n\na ~~twoLeft b twoRight~~ c twoRight~~ d\n\na ~~twoLeft b twoRight~~ c ~~twoLeft d\n\na ~~twoLeft b ~~twoLeft c twoRight~~ d\n\na ~~twoLeft b ~~twoLeft c ~~twoLeft d\n","syntax":["gfm"]},
+{"name":"gfm_strikethrough.rs:221","input":"\n# Interlpay\n\n## Interleave with attention\n\na ~~two *emphasis* two~~ b\n\na ~~two **strong** two~~ b\n\na *marker ~~two marker* two~~ b\n\na ~~two *marker two~~ marker* b\n\n## Interleave with links\n\na ~~two [resource](#) two~~ b\n\na ~~two [reference][#] two~~ b\n\na [label start ~~two label end](#) two~~ b\n\na ~~two [label start two~~ label end](#) b\n\na ~~two [label start ~one one~ label end](#) two~~ b\n\na ~one [label start ~~two two~~ label end](#) one~ b\n\na ~one [label start ~one one~ label end](#) one~ b\n\na ~~two [label start ~~two two~~ label end](#) two~~ b\n\n[#]: #\n\n## Interleave with code (text)\n\na ~~two `code` two~~ b\n\na ~~two `code two~~` b\n\na `code start ~~two code end` two~~ b\n\na ~~two `code start two~~ code end` b\n\na ~~two `code start ~one one~ code end` two~~ b\n\na ~one `code start ~~two two~~ code end` one~ b\n\na ~one `code start ~one one~ code end` one~ b\n\na ~~two `code start ~~two two~~ code end` two~~ b\n\n## Emphasis/strong/strikethrough interplay\n\na ***~~xxx~~*** zzz\n\nb ***xxx***zzz\n\nc **xxx**zzz\n\nd *xxx*zzz\n\ne ***~~xxx~~***yyy\n\nf **~~xxx~~**yyy\n\ng *~~xxx~~*yyy\n\nh ***~~xxx~~*** zzz\n\ni **~~xxx~~** zzz\n\nj *~~xxx~~* zzz\n\nk ~~~**xxx**~~~ zzz\n\nl ~~~xxx~~~zzz\n\nm ~~xxx~~zzz\n\nn ~xxx~zzz\n\no ~~~**xxx**~~~yyy\n\np ~~**xxx**~~yyy\n\nr ~**xxx**~yyy\n\ns ~~~**xxx**~~~ zzz\n\nt ~~**xxx**~~ zzz\n\nu ~**xxx**~ zzz\n","syntax":["gfm"]},
+{"name":"gfm_strikethrough.rs:367","input":"a*~b~*c\n\na*.b.*c","syntax":["gfm"]},
+{"name":"gfm_strikethrough.rs:373","input":"a*~b~*c\n\na*.b.*c","syntax":[]},
+{"name":"gfm_strikethrough.rs:394","input":"a ~b~ ~~c~~ d","syntax":["gfm"]},
+{"name":"gfm_strikethrough.rs:409","input":"a ~~alpha~~ b.","syntax":["gfm"]}
+]

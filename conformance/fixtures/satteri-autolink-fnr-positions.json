@@ -1,0 +1,16 @@
+[
+{"name":"find-and-replace autolink positions > a value identical to its source","input":"[www.a.com/x","syntax":["gfm"]},
+{"name":"find-and-replace autolink positions > a match spanning a character reference covers it whole","input":"[www.a.com/&amp;b","syntax":["gfm"]},
+{"name":"find-and-replace autolink positions > a match starting at a character reference starts at the `&`","input":"[&#104;ttp://x.y","syntax":["gfm"]},
+{"name":"find-and-replace autolink positions > a `www` trigger supplied by a character reference","input":"[&#119;ww.x.y","syntax":["gfm"]},
+{"name":"find-and-replace autolink positions > an `@` trigger supplied by a character reference","input":"[a&#64;b.com","syntax":["gfm"]},
+{"name":"find-and-replace autolink positions > a backslash escape inside the match","input":"[www.x.y/a\\_b","syntax":["gfm"]},
+{"name":"find-and-replace autolink positions > a table cell maps through pipe unescaping","input":"| a |\n| - |\n| [www.x.y\\|z |","syntax":["gfm"]},
+{"name":"find-and-replace autolink positions > a match on a continuation line reports that line","input":"[a\nwww.x.y","syntax":["gfm"]},
+{"name":"find-and-replace autolink positions > a continuation prefix belongs to neither neighbour","input":"> [a\n> www.x.y","syntax":["gfm"]},
+{"name":"find-and-replace autolink positions > a lone carriage return ends the line the prefix follows","input":"> [a\r> www.x.y","syntax":["gfm"]},
+{"name":"find-and-replace autolink positions > a multi-character reference is included whole or not at all","input":"[www.a.com/&fjlig;b","syntax":["gfm"]},
+{"name":"find-and-replace autolink positions > the splitUrl trail is its own node, with its own exact span","input":"[www.x.y&amp;","syntax":["gfm"]},
+{"name":"find-and-replace autolink positions > offsets are UTF-16 indices at the JS boundary","input":"你好[www.x.y","syntax":["gfm"]},
+{"name":"find-and-replace autolink positions > skip-positions mode builds no map and reports nothing","input":"[www.a.com&amp;b","syntax":["gfm"]}
+]

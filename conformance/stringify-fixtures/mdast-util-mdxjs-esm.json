@@ -1,0 +1,4 @@
+[
+{"name":"mdxjsEsmToMarkdown() > should serialize ESM","tree":{"type":"root","children":[{"type":"mdxjsEsm","value":"import a from \"b\"\nexport var c = \"\""},{"type":"paragraph","children":[{"type":"text","value":"d"}]}]},"options":{},"syntax":["mdx"]},
+{"name":"mdxjsEsmToMarkdown() > should not crash on ESM missing `value`","tree":{"type":"root","children":[{"type":"mdxjsEsm"},{"type":"paragraph","children":[{"type":"text","value":"d"}]}]},"options":{},"syntax":["mdx"]}
+]

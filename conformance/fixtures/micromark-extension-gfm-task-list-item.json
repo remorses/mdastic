@@ -1,0 +1,6 @@
+[
+{"name":"basic.md","input":"* [ ] foo\n* [x] bar\n\n- [x] foo\n  - [ ] bar\n  - [x] baz\n- [ ] bim\n\n+ [ ] Unchecked?\n\n* [x] Checked?\n\n+ [y] What is this even?\n\n- [n]: #\n  [ ] After a definition\n\n+ [ ] In a setext heading\n  =======================\n\n* In the…\n\n  [ ] Second paragraph\n\n- [\t] With a tab\n\n+ [X] With an upper case `x`\n\n+ [\n] In a lazy line\n\n- [  ] With two spaces\n\n+  [x] Two spaces indent\n\n*   [x] Three spaces indent\n\n-    [x] Four spaces indent\n\n+     [x] Five spaces indent\n\n[ ] here?\n\n* > [ ] here?\n\n- [ ]No space?\n\nEmpty?\n\n+ [ ]\n\nSpace after:\n\n+ [ ]␠\n\n* [ ]␠Text.\n\nTab after:\n\n+ [ ]␉\n\n* [ ]␉Text.\n\nEOL after:\n\n+ [ ]\n\n* [ ]\n  Text.\n\n-\n  [ ] after blank?\n\n+ # [ ] ATX Heading\n\n> * [x] In a list in a block quote\n","syntax":["gfm"]},
+{"name":"markdown -> html (micromark) > should skip `tasklistCheck` construct if `disable.null` includes `tasklistCheck`","input":"* [ ] foo","syntax":["gfm"]},
+{"name":"markdown -> html (micromark) > should not support laziness (1)","input":"*\n    [x]","syntax":["gfm"]},
+{"name":"markdown -> html (micromark) > should not support laziness (2)","input":"*\n[x]","syntax":["gfm"]}
+]

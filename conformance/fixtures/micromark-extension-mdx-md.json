@@ -1,0 +1,11 @@
+[
+{"name":"mdxMd > should turn off html (flow)","input":"<a>","syntax":["mdx"]},
+{"name":"mdxMd > should turn off html (text)","input":"a<b>","syntax":["mdx"]},
+{"name":"mdxMd > should turn off autolinks","input":"a <https://example.com>","syntax":["mdx"]},
+{"name":"mdxMd > should turn off indented code (1, basic)","input":"    a","syntax":["mdx"]},
+{"name":"mdxMd > should turn off indented code (2, containers)","input":"    - a\n    - b","syntax":["mdx"]},
+{"name":"mdxMd > should turn off indented code (3, containers)","input":"    - a\n\n    - b","syntax":["mdx"]},
+{"name":"mdxMd > should turn off indented code (4, containers)","input":"    > a\n    > b","syntax":["mdx"]},
+{"name":"mdxMd > should turn off indented code (5, interrupt)","input":"a\n   ---","syntax":["mdx"]},
+{"name":"mdxMd > should turn off indented code (6, interrupt)","input":"a\n    ---","syntax":["mdx"]}
+]

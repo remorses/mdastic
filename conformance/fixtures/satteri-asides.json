@@ -1,0 +1,18 @@
+[
+{"name":"Starlight asides plugin (fresh-node data hints, full integration) > :::note (default title) renders identical HTML","input":":::note\nBody text.\n:::","syntax":["gfm"]},
+{"name":"Starlight asides plugin (fresh-node data hints, full integration) > :::note[Custom Title] renders identical HTML","input":":::note[Heads up!]\nBody text.\n:::","syntax":["gfm"]},
+{"name":"Starlight asides plugin (fresh-node data hints, full integration) > :::tip (default title) renders identical HTML","input":":::tip\nBody text.\n:::","syntax":["gfm"]},
+{"name":"Starlight asides plugin (fresh-node data hints, full integration) > :::tip[Custom Title] renders identical HTML","input":":::tip[Heads up!]\nBody text.\n:::","syntax":["gfm"]},
+{"name":"Starlight asides plugin (fresh-node data hints, full integration) > :::caution (default title) renders identical HTML","input":":::caution\nBody text.\n:::","syntax":["gfm"]},
+{"name":"Starlight asides plugin (fresh-node data hints, full integration) > :::caution[Custom Title] renders identical HTML","input":":::caution[Heads up!]\nBody text.\n:::","syntax":["gfm"]},
+{"name":"Starlight asides plugin (fresh-node data hints, full integration) > :::danger (default title) renders identical HTML","input":":::danger\nBody text.\n:::","syntax":["gfm"]},
+{"name":"Starlight asides plugin (fresh-node data hints, full integration) > :::danger[Custom Title] renders identical HTML","input":":::danger[Heads up!]\nBody text.\n:::","syntax":["gfm"]},
+{"name":"Starlight asides plugin (fresh-node data hints, full integration) > aside body preserves multiple paragraphs and inli...","input":":::tip[Did you know?]\nFirst paragraph with **bold** and *italic*.\n\nSecond paragraph with [a link](https://example.com).\n:::","syntax":["gfm"]},
+{"name":"Starlight asides plugin (fresh-node data hints, full integration) > aside label preserves inline `code`","input":":::note[See `config`]\nDetails.\n:::","syntax":["gfm"]},
+{"name":"Starlight asides plugin (fresh-node data hints, full integration) > aside label parses emphasis and strong","input":":::note[Custom **strong with _emphasis_** Label]\nSome text\n:::","syntax":["gfm"]},
+{"name":"Starlight asides plugin (fresh-node data hints, full integration) > aside label parses a link","input":":::tip[See [the docs](https://example.com)]\nBody.\n:::","syntax":["gfm"]},
+{"name":"Starlight asides plugin (fresh-node data hints, full integration) > aside body ending in an HTML block closes cleanly","input":":::note\nParagraph.\n\n<details>\n<summary>See more</summary>\n\nMore.\n\n</details>\n:::","syntax":["gfm"]},
+{"name":"Starlight asides plugin (fresh-node data hints, full integration) > nested asides","input":"::::note\nNote contents.\n\n:::tip\nNested tip.\n:::\n\n::::","syntax":["gfm"]},
+{"name":"Starlight asides plugin (fresh-node data hints, full integration) > nested asides with custom titles","input":":::::caution[Caution with a custom title]\nNested caution.\n\n::::note\nNested note.\n\n:::tip[Tip with a custom title]\nNested tip.\n:::\n\n::::\n\n:::::","syntax":["gfm"]},
+{"name":"Starlight asides plugin (fresh-node data hints, full integration) > triply nested asides","input":":::::note\nA\n\n::::tip\nB\n\n:::caution\nC\n:::\n\n::::\n\n:::::","syntax":["gfm"]}
+]

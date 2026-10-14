@@ -1,0 +1,6 @@
+[
+{"name":"gfmTaskListItemToMarkdown > should serialize a checked list item","tree":{"type":"listItem","checked":true,"children":[{"type":"paragraph","children":[{"type":"text","value":"a"}]}]},"options":{},"syntax":["gfm"]},
+{"name":"gfmTaskListItemToMarkdown > should serialize an unchecked list item","tree":{"type":"listItem","checked":false,"children":[{"type":"paragraph","children":[{"type":"text","value":"b"}]}]},"options":{},"syntax":["gfm"]},
+{"name":"gfmTaskListItemToMarkdown > should serialize an normal list item","tree":{"type":"listItem","children":[{"type":"paragraph","children":[{"type":"text","value":"c"}]}]},"options":{},"syntax":["gfm"]},
+{"name":"gfmTaskListItemToMarkdown > should ignore `checked` if the head is not a paragraph","tree":{"type":"listItem","checked":true,"children":[{"type":"definition","label":"d","identifier":"d","title":null,"url":"definition"},{"type":"paragraph","children":[{"type":"text","value":"e"}]}]},"options":{},"syntax":["gfm"]}
+]

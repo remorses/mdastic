@@ -1,0 +1,6 @@
+[
+{"name":"misc_default_line_ending.rs:7","input":"> a","syntax":[]},
+{"name":"misc_default_line_ending.rs:13","input":"> a\n","syntax":[]},
+{"name":"misc_default_line_ending.rs:19","input":"> a\r","syntax":[]},
+{"name":"misc_default_line_ending.rs:25","input":"> a\r\n","syntax":[]}
+]

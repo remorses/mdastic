@@ -1,0 +1,14 @@
+[
+{"name":"character_escape.rs:21","input":"\\!\\\"\\#\\$\\%\\&\\'\\(\\)\\*\\+\\,\\-\\.\\/\\:\\;\\<\\=\\>\\?\\@\\[\\\\\\]\\^\\_\\`\\{\\|\\}\\~","syntax":[]},
+{"name":"character_escape.rs:28","input":"\\→\\A\\a\\ \\3\\φ\\«","syntax":[]},
+{"name":"character_escape.rs:34","input":"\\*not emphasized*\n\\<br/> not a tag\n\\[not a link](/foo)\n\\`not code`\n1\\. not a list\n\\* not a list\n\\# not a heading\n\\[foo]: /url \"not a reference\"\n\\&ouml; not a character entity","syntax":[]},
+{"name":"character_escape.rs:41","input":"foo\\\nbar","syntax":[]},
+{"name":"character_escape.rs:47","input":"`` \\[\\` ``","syntax":[]},
+{"name":"character_escape.rs:53","input":"    \\[\\]","syntax":[]},
+{"name":"character_escape.rs:59","input":"<http://example.com?find=\\*>","syntax":[]},
+{"name":"character_escape.rs:65","input":"<a href=\"/bar\\/)\">","syntax":[]},
+{"name":"character_escape.rs:71","input":"[foo](/bar\\* \"ti\\*tle\")","syntax":[]},
+{"name":"character_escape.rs:77","input":"[foo]: /bar\\* \"ti\\*tle\"\n\n[foo]","syntax":[]},
+{"name":"character_escape.rs:83","input":"``` foo\\+bar\nfoo\n```","syntax":[]},
+{"name":"character_escape.rs:107","input":"a \\* b","syntax":[]}
+]

@@ -1,0 +1,4 @@
+[
+{"name":"gfmStrikethroughFromMarkdown() > should support strikethrough","input":"a ~~b~~ c.","syntax":["gfm"]},
+{"name":"gfmStrikethroughFromMarkdown() > should support strikethrough w/ eols","input":"a ~~b\nc~~ d.","syntax":["gfm"]}
+]

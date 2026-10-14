@@ -1,0 +1,9 @@
+[
+{"name":"gfmTaskListItemFromMarkdown > should support task list items","input":"* [x] a","syntax":["gfm"]},
+{"name":"gfmTaskListItemFromMarkdown > should support a task list item after a blank line","input":"*\n  [x] after a blank line","syntax":["gfm"]},
+{"name":"gfmTaskListItemFromMarkdown > should support a task list item follwed by a tab","input":"* [x]\ttab","syntax":["gfm"]},
+{"name":"gfmTaskListItemFromMarkdown > should support a task list item after a definition","input":"* [x]: definition\n  [x] tasklist","syntax":["gfm"]},
+{"name":"gfmTaskListItemFromMarkdown > should not support a task list item when not in a list item","input":"[x] tasklist","syntax":["gfm"]},
+{"name":"gfmTaskListItemFromMarkdown > should support a text construct after the checkbox","input":"* [x] *b*","syntax":["gfm"]},
+{"name":"gfmTaskListItemFromMarkdown > should support further paragraphs after checkboxes","input":"* [x] a\n\n  b","syntax":["gfm"]}
+]

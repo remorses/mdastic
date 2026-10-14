@@ -1,0 +1,4 @@
+[
+{"name":"gfm_tasklist.rs:gfm_tasklist_test_1","input":"- [ ] foo\n- [x] bar\n","syntax":["gfm"]},
+{"name":"gfm_tasklist.rs:gfm_tasklist_test_1","input":"- [x] foo\n  - [ ] bar\n  - [x] baz\n- [ ] bim\n","syntax":["gfm"]}
+]

@@ -1,0 +1,3 @@
+[
+{"name":"mdxjsEsmFromMarkdown() > should support ESM","input":"import a from \"b\"\nexport var c = \"\"\n\nd","syntax":["mdx"]}
+]

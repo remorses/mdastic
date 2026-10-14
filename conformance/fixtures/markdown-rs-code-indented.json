@@ -1,0 +1,22 @@
+[
+{"name":"code_indented.rs:12","input":"    a simple\n      indented code block","syntax":[]},
+{"name":"code_indented.rs:18","input":"  - foo\n\n    bar","syntax":[]},
+{"name":"code_indented.rs:24","input":"1.  foo\n\n    - bar","syntax":[]},
+{"name":"code_indented.rs:30","input":"    <a/>\n    *hi*\n\n    - one","syntax":[]},
+{"name":"code_indented.rs:36","input":"    chunk1\n\n    chunk2\n  \n \n \n    chunk3","syntax":[]},
+{"name":"code_indented.rs:42","input":"    chunk1\n      \n      chunk2","syntax":[]},
+{"name":"code_indented.rs:48","input":"Foo\n    bar","syntax":[]},
+{"name":"code_indented.rs:54","input":"    foo\nbar","syntax":[]},
+{"name":"code_indented.rs:60","input":"# Heading\n    foo\nHeading\n------\n    foo\n----","syntax":[]},
+{"name":"code_indented.rs:66","input":"        foo\n    bar","syntax":[]},
+{"name":"code_indented.rs:72","input":"\n    \n    foo\n    ","syntax":[]},
+{"name":"code_indented.rs:78","input":"    foo  ","syntax":[]},
+{"name":"code_indented.rs:84","input":">     a\nb","syntax":[]},
+{"name":"code_indented.rs:90","input":"> a\n    b","syntax":[]},
+{"name":"code_indented.rs:96","input":"> a\n     b","syntax":[]},
+{"name":"code_indented.rs:102","input":"> a\n      b","syntax":[]},
+{"name":"code_indented.rs:108","input":">     a\n    b","syntax":[]},
+{"name":"code_indented.rs:114","input":">     a\n     b","syntax":[]},
+{"name":"code_indented.rs:120","input":">     a\n      b","syntax":[]},
+{"name":"code_indented.rs:206","input":"\tconsole.log(1)\n    console.log(2)\n","syntax":[]}
+]

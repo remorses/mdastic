@@ -1,0 +1,7 @@
+[
+{"name":"mdxFromMarkdown() > should support esm","input":"import a from \"b\"","syntax":["mdx"]},
+{"name":"mdxFromMarkdown() > should support jsx","input":"<x/>","syntax":["mdx"]},
+{"name":"mdxFromMarkdown() > should support expressions","input":"{1 + 1}","syntax":["mdx"]},
+{"name":"mdxFromMarkdown() > should add proper positions on estree (1)","input":"<Stuff>\n  {{\n    template: /* Comment */ '',\n  }}\n</Stuff>","syntax":["mdx"]},
+{"name":"mdxFromMarkdown() > should add proper positions on estree (2)","input":"export let a = 'a'\n\nexport let b = 'b'","syntax":["mdx"]}
+]

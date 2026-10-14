@@ -1,0 +1,8 @@
+[
+{"name":"syntax extension > baseline (slash)","input":"///","syntax":[]},
+{"name":"syntax extension > baseline (less than)","input":"<<<","syntax":[]},
+{"name":"syntax extension > should precede over previously attached constructs by default","input":"a <i> b, 1 < 3","syntax":[]},
+{"name":"html extension > baseline","input":"// a\n//\rb","syntax":[]},
+{"name":"html extension > should support html extensions for documents","input":"!","syntax":[]},
+{"name":"html extension > should support html extensions for empty documents","input":"","syntax":[]}
+]

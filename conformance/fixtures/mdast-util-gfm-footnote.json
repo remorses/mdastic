@@ -1,0 +1,5 @@
+[
+{"name":"gfmFootnoteFromMarkdown > should support a footnote definition","input":"[^a]: b\nc\n\n    d","syntax":["gfm"]},
+{"name":"gfmFootnoteFromMarkdown > should support a footnote call","input":"Call.[^a]\n[^a]: b","syntax":["gfm"]},
+{"name":"gfmFootnoteFromMarkdown > should support a footnote after an exclamation mark","input":"![^a]\n[^a]: b","syntax":["gfm"]}
+]

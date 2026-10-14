@@ -1,0 +1,6 @@
+[
+{"name":"mdxToMarkdown() > should support esm","tree":{"type":"mdxjsEsm","value":"import a from \"b\""},"options":{},"syntax":["mdx"]},
+{"name":"mdxToMarkdown() > should support jsx","tree":{"type":"mdxJsxFlowElement","name":"x","attributes":[],"children":[]},"options":{},"syntax":["mdx"]},
+{"name":"mdxToMarkdown() > should support expressions","tree":{"type":"mdxFlowExpression","value":"1 + 1"},"options":{},"syntax":["mdx"]},
+{"name":"mdxToMarkdown() > should use link (resource) instead of link (auto)","tree":{"type":"link","url":"tel:123","children":[{"type":"text","value":"tel:123"}]},"options":{},"syntax":["mdx"]}
+]

@@ -1,0 +1,4 @@
+[
+{"name":"markdown -> html (micromark) > should work","input":"<div>\n{asd}\n</div>","syntax":["mdx"]},
+{"name":"markdown -> html (micromark) > should be gnostic","input":"<x {...{\"{\": 1}} />\n{1 + /*}*/ + 2}","syntax":["mdx"]}
+]

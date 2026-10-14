@@ -1,0 +1,4 @@
+[
+{"name":"misc_dangerous_html.rs:16","input":"<x>","syntax":[]},
+{"name":"misc_dangerous_html.rs:22","input":"a<b>","syntax":[]}
+]

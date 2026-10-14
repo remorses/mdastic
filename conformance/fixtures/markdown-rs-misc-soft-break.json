@@ -1,0 +1,4 @@
+[
+{"name":"misc_soft_break.rs:7","input":"foo\nbaz","syntax":[]},
+{"name":"misc_soft_break.rs:13","input":"foo \n baz","syntax":[]}
+]

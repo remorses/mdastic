@@ -1,0 +1,13 @@
+[
+{"name":"gfm_autolink.rs:gfm_autolink_test_1","input":"www.commonmark.org\n","syntax":["gfm"]},
+{"name":"gfm_autolink.rs:gfm_autolink_test_1","input":"Visit www.commonmark.org/help for more information.\n","syntax":["gfm"]},
+{"name":"gfm_autolink.rs:gfm_autolink_test_1","input":"Visit www.commonmark.org.\n\nVisit www.commonmark.org/a.b.\n","syntax":["gfm"]},
+{"name":"gfm_autolink.rs:gfm_autolink_test_1","input":"www.google.com/search?q=Markup+(business)\n\n(www.google.com/search?q=Markup+(business))\n","syntax":["gfm"]},
+{"name":"gfm_autolink.rs:gfm_autolink_test_1","input":"www.google.com/search?q=(business))+ok\n","syntax":["gfm"]},
+{"name":"gfm_autolink.rs:gfm_autolink_test_1","input":"www.google.com/search?q=commonmark&hl=en\n\nwww.google.com/search?q=commonmark&hl;\n","syntax":["gfm"]},
+{"name":"gfm_autolink.rs:gfm_autolink_test_1","input":"www.commonmark.org/he<lp\n","syntax":["gfm"]},
+{"name":"gfm_autolink.rs:gfm_autolink_test_1","input":"http://commonmark.org\n\n(Visit https://encrypted.google.com/search?q=Markup+(business))\n\nAnonymous FTP is available at ftp://foo.bar.baz.\n","syntax":["gfm"]},
+{"name":"gfm_autolink.rs:gfm_autolink_test_1","input":"foo@bar.baz\n","syntax":["gfm"]},
+{"name":"gfm_autolink.rs:gfm_autolink_test_1","input":"hello@mail+xyz.example isn't valid, but hello+xyz@mail.example is.\n","syntax":["gfm"]},
+{"name":"gfm_autolink.rs:gfm_autolink_test_1","input":"a.b-c_d@a.b\n\na.b-c_d@a.b.\n\na.b-c_d@a.b-\n\na.b-c_d@a.b_\n","syntax":["gfm"]}
+]

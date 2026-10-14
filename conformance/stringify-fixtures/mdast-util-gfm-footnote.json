@@ -1,0 +1,17 @@
+[
+{"name":"gfmFootnoteToMarkdown > should serialize a footnote reference w/ identifier","tree":{"type":"footnoteReference","identifier":"a"},"options":{},"syntax":["gfm"]},
+{"name":"gfmFootnoteToMarkdown > should serialize a footnote reference w/ label","tree":{"type":"footnoteReference","label":"X]Y"},"options":{},"syntax":["gfm"]},
+{"name":"gfmFootnoteToMarkdown > should serialize a footnote reference in a paragraph","tree":{"type":"paragraph","children":[{"type":"text","value":"a"},{"type":"footnoteReference","label":"b","identifier":"b"},{"type":"text","value":"c"}]},"options":{},"syntax":["gfm"]},
+{"name":"gfmFootnoteToMarkdown > should serialize a footnote definition w/ identifier","tree":{"type":"footnoteDefinition","identifier":"a"},"options":{},"syntax":["gfm"]},
+{"name":"gfmFootnoteToMarkdown > should serialize a footnote definition w/ label","tree":{"type":"footnoteDefinition","label":"X]Y"},"options":{},"syntax":["gfm"]},
+{"name":"gfmFootnoteToMarkdown > should serialize a footnote definition w/ content","tree":{"type":"footnoteDefinition","label":"a","identifier":"a","children":[{"type":"paragraph","children":[{"type":"text","value":"b\nc"}]},{"type":"paragraph","children":[{"type":"text","value":"d"}]}]},"options":{},"syntax":["gfm"]},
+{"name":"gfmFootnoteToMarkdown > should serialize code in a footnote definition","tree":{"type":"footnoteDefinition","label":"a","identifier":"a","children":[{"type":"code","value":"b"}]},"options":{},"syntax":["gfm"]},
+{"name":"gfmFootnoteToMarkdown > should serialize code as the 2nd child in a footnote definition","tree":{"type":"footnoteDefinition","label":"a","identifier":"a","children":[{"type":"paragraph","children":[{"type":"text","value":"b"}]},{"type":"code","value":"c"}]},"options":{},"syntax":["gfm"]},
+{"name":"gfmFootnoteToMarkdown > should escape what would otherwise be an inline note","tree":{"type":"paragraph","children":[{"type":"text","value":"b^[a]"}]},"options":{},"syntax":["gfm"]},
+{"name":"gfmFootnoteToMarkdown > should escape what would otherwise be an footnote call","tree":{"type":"paragraph","children":[{"type":"text","value":"b[^a]"}]},"options":{},"syntax":["gfm"]},
+{"name":"gfmFootnoteToMarkdown > should escape what would otherwise be an footnote definition","tree":{"type":"paragraph","children":[{"type":"text","value":"[a]: b"}]},"options":{},"syntax":["gfm"]},
+{"name":"gfmFootnoteToMarkdown > should support colons in footnote definitions","tree":{"type":"footnoteDefinition","identifier":"a:b","children":[]},"options":{},"syntax":["gfm"]},
+{"name":"gfmFootnoteToMarkdown > should support lists in footnote definitions","tree":{"type":"footnoteDefinition","identifier":"a","children":[{"type":"list","children":[{"type":"listItem","children":[]}]}]},"options":{},"syntax":["gfm"]},
+{"name":"gfmFootnoteToMarkdown > should support `firstLineBlank`","tree":{"type":"footnoteDefinition","identifier":"a","children":[{"type":"paragraph","children":[{"type":"text","value":"b"}]}]},"options":{},"syntax":["gfm"]},
+{"name":"gfmFootnoteToMarkdown > should support `firstLineBlank` w/o children","tree":{"type":"footnoteDefinition","identifier":"a","children":[]},"options":{},"syntax":["gfm"]}
+]

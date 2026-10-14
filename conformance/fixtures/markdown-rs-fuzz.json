@@ -1,0 +1,20 @@
+[
+{"name":"fuzz.rs:7","input":"[\n~\na\n-\n\n","syntax":[]},
+{"name":"fuzz.rs:15","input":"a@b.c+d@e.f","syntax":["gfm"]},
+{"name":"fuzz.rs:21","input":"    x\n*    ","syntax":[]},
+{"name":"fuzz.rs:27","input":"    a\n*     b","syntax":[]},
+{"name":"fuzz.rs:33","input":"a * ","syntax":[]},
+{"name":"fuzz.rs:39","input":"_  ","syntax":[]},
+{"name":"fuzz.rs:45","input":"a ~ ","syntax":["gfm"]},
+{"name":"fuzz.rs:52","input":"123456789. ok","syntax":[]},
+{"name":"fuzz.rs:59","input":"> ```\n","syntax":[]},
+{"name":"fuzz.rs:65","input":"- ```\n","syntax":[]},
+{"name":"fuzz.rs:71","input":"> x\n``","syntax":["gfm"]},
+{"name":"fuzz.rs:77","input":"a\tb@c.d","syntax":["gfm"]},
+{"name":"fuzz.rs:83","input":"aa\tb@c.d","syntax":["gfm"]},
+{"name":"fuzz.rs:89","input":"aaa\tb@c.d","syntax":["gfm"]},
+{"name":"fuzz.rs:95","input":"aaaa\tb@c.d","syntax":["gfm"]},
+{"name":"fuzz.rs:101","input":"| a |\n| - |\n| www.a|","syntax":["gfm"]},
+{"name":"fuzz.rs:107","input":"[*]() [*]()","syntax":["gfm"]},
+{"name":"fuzz.rs:114","input":"* [ ]\na","syntax":[]}
+]
