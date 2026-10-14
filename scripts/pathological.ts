@@ -3,8 +3,9 @@
 //
 //   fixtures  writes conformance/fixtures/pathological.json at 1/100 of the upstream size, small
 //             enough for the remark oracle (it is quadratic on many of these), compared as trees.
-//   check     runs mdastic only at the full upstream size and at 1/4 of it. Fails on a crash, on
+//   check     runs mdastic only at 1/16, 1/4 and the full upstream size. Fails on a crash, on
 //             more than BUDGET_MS, or on superlinear growth (time exponent vs input length).
+//             Exits 1 when any case fails. Not part of vitest: it is a perf gate, not parity.
 //
 // Usage (from conformance/): pnpm exec tsx ../scripts/pathological.ts fixtures|check [name-filter]
 import { performance } from 'node:perf_hooks'
@@ -13,14 +14,12 @@ import { parse } from '../mdastic/src/index.ts'
 import { toSyntax } from '../conformance/src/harness.ts'
 import { writeFixtures } from './fixtures-lib.ts'
 
-type Case = { name: string; n: number; syntax: SyntaxName[]; input: (n: number) => string }
-
 const range = (n: number) => Array.from({ length: n }, (_, i) => i)
 const gfm: SyntaxName[] = ['gfm']
 const mdx: SyntaxName[] = ['mdx']
 
 // `n` is the upstream size. Generators must stay deterministic.
-const cases: Case[] = [
+const cases: { name: string; n: number; syntax: SyntaxName[]; input: (n: number) => string }[] = [
   // cmark test/pathological_tests.py (cmark-gfm doubles most sizes)
   { name: 'cmark nested strong emph', n: 32500, syntax: [], input: (n) => '*a **a '.repeat(n) + 'b' + ' a** a*'.repeat(n) },
   { name: 'cmark many emph closers with no openers', n: 32500, syntax: [], input: (n) => 'a_ '.repeat(n) },
@@ -109,19 +108,24 @@ if (command === 'fixtures') {
   let failed = 0
   for (const c of selected) {
     for (const syntax of c.syntax.includes('mdx') ? [all] : [c.syntax, all]) {
-      const small = c.input(Math.round(c.n / 4))
-      const large = c.input(c.n)
-      time(small, syntax) // warm up the JIT
-      const t1 = time(small, syntax)
-      const t2 = time(large, syntax)
-      const exponent = Math.log(t2.ms / Math.max(t1.ms, 0.05)) / Math.log(large.length / small.length)
+      // Sizes n/16, n/4, n. Skip n when n/4 is already over budget: quadratic cases take minutes.
+      const inputs = [16, 4, 1].map((d) => c.input(Math.max(1, Math.round(c.n / d))))
+      time(inputs[0], syntax) // warm up the JIT
+      const runs = [time(inputs[0], syntax), time(inputs[1], syntax)]
+      if (runs[1].ms <= BUDGET_MS) runs.push(time(inputs[2], syntax))
+      const [a, b] = runs.slice(-2)
+      const ratio = inputs[runs.length - 1].length / inputs[runs.length - 2].length
+      const exponent = Math.log(b.ms / Math.max(a.ms, 0.05)) / Math.log(ratio)
       const problems: string[] = []
-      if (t1.crash || t2.crash) problems.push(`crash: ${t2.crash ?? t1.crash}`)
-      if (t2.ms > BUDGET_MS) problems.push(`over ${BUDGET_MS} ms`)
-      if (t2.ms > 20 && exponent > MAX_EXPONENT) problems.push(`superlinear, exponent ${exponent.toFixed(2)}`)
+      const crash = runs.find((r) => r.crash)?.crash
+      if (crash) problems.push(`crash: ${crash}`)
+      if (b.ms > BUDGET_MS) problems.push(`over ${BUDGET_MS} ms${runs.length < 3 ? ' at n/4' : ''}`)
+      if (b.ms > 20 && exponent > MAX_EXPONENT) problems.push(`superlinear, exponent ${exponent.toFixed(2)}`)
       if (problems.length) failed++
       const status = problems.length ? 'FAIL' : 'ok  '
-      console.log(`${status} ${c.name} [${syntax.join(',')}] ${large.length} chars ${t2.ms.toFixed(1)} ms ${problems.join(', ')}`)
+      const size = inputs[runs.length - 1].length
+      const note = b.mdxError ? ' (returns MdxParseError)' : ''
+      console.log(`${status} ${c.name} [${syntax.join(',')}] ${size} chars ${b.ms.toFixed(1)} ms${note} ${problems.join(', ')}`)
     }
   }
   console.log(`\npathological check: ${failed} failing`)
@@ -135,9 +139,9 @@ function time(input: string, syntax: SyntaxName[]) {
   const options = { syntax: toSyntax(syntax) }
   const start = performance.now()
   try {
-    parse(input, options)
-    return { ms: performance.now() - start, crash: undefined }
+    const result = parse(input, options)
+    return { ms: performance.now() - start, crash: undefined, mdxError: result instanceof Error }
   } catch (error) {
-    return { ms: performance.now() - start, crash: String(error).split('\n')[0] }
+    return { ms: performance.now() - start, crash: String(error).split('\n')[0], mdxError: false }
   }
 }

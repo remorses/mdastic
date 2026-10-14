@@ -1,6 +1,8 @@
-// Inputs from spec-format test files of other CommonMark implementations: pulldown-cmark specs,
-// cmark / cmark-gfm / commonmark.js regression and extension files, comrak fixtures, md4c tests
-// and markdown-it fixtures. Only inputs are kept; the remark oracle computes expected trees.
+// Inputs from test files of other markdown implementations: pulldown-cmark specs, cmark /
+// cmark-gfm / commonmark.js regression and extension files, comrak fixtures, md4c tests,
+// markdown-it fixtures, flexmark-java specs, goldmark testdata and benchmark sample documents.
+// Only inputs are kept; the remark oracle computes expected trees. Extension syntax that remark
+// lacks (math, wikilinks, attributes) is still useful: remark must parse it as plain text.
 // Inputs already present in other fixture files (same syntax) are skipped.
 // Usage (from conformance/): pnpm exec tsx ../scripts/extract-spec-files.ts
 // Repos must be fetched first: opensrc path pulldown-cmark/pulldown-cmark kivikakk/comrak ...
@@ -52,10 +54,22 @@ function markdownItExamples(file: string, prefix: string): Example[] {
   return out
 }
 
-/** The checked-out branch folder of an opensrc repo (main or master). */
+/** goldmark testdata: number line, `//- - -//`, input, `//- - -//`, html, `//= = =//`. */
+function goldmarkExamples(file: string, prefix: string): Example[] {
+  const out: Example[] = []
+  for (const block of fs.readFileSync(file, 'utf8').split(/^\/\/= = =[= ]*\/\/$/m)) {
+    const parts = block.split(/^\/\/- - -[- ]*\/\/$/m)
+    if (parts.length < 3) continue
+    const title = parts[0].trim().split('\n')[0]
+    out.push({ name: `${prefix} ${title}`, input: parts[1].replace(/^\n/, '') })
+  }
+  return out
+}
+
+/** The checked-out branch folder of an opensrc repo (main, master or v2). */
 function repo(name: string) {
   const base = path.join(opensrc, name)
-  const branch = fs.readdirSync(base).find((d) => d === 'main' || d === 'master')
+  const branch = fs.readdirSync(base).find((d) => d === 'main' || d === 'master' || d === 'v2')
   if (!branch) throw new Error(`fetch ${name} first: opensrc path ${name}`)
   return path.join(base, branch)
 }
@@ -86,10 +100,20 @@ function emit(file: string, groups: { examples: Example[]; syntax: SyntaxName[] 
   writeFixtures(file, fixtures)
 }
 
-const outputs = ['pulldown-cmark-specs.json', 'cmark-tests.json', 'comrak-fixtures.json', 'md4c-tests.json', 'markdown-it-fixtures.json']
+const outputs = [
+  'pulldown-cmark-specs.json',
+  'cmark-tests.json',
+  'comrak-fixtures.json',
+  'md4c-tests.json',
+  'markdown-it-fixtures.json',
+  'flexmark-specs.json',
+  'goldmark-tests.json',
+  'benchmark-samples.json',
+]
 loadExisting(new Set(outputs))
 const gfm: SyntaxName[] = ['gfm']
 const plain: SyntaxName[] = []
+const frontmatterGfm: SyntaxName[] = ['frontmatter', 'gfm']
 const txt = (dir: string) => walk(dir, (p) => p.endsWith('.txt'))
 
 console.log('pulldown-cmark specs')
@@ -97,7 +121,7 @@ const pulldown = repo('pulldown-cmark/pulldown-cmark')
 emit('pulldown-cmark-specs.json', [
   ...txt(path.join(pulldown, 'pulldown-cmark/specs')).map((f) => ({
     examples: specExamples(f, `pulldown ${path.basename(f, '.txt')}`),
-    syntax: (f.includes('metadata_blocks') ? ['frontmatter', 'gfm'] : gfm) as SyntaxName[],
+    syntax: f.includes('metadata_blocks') ? frontmatterGfm : gfm,
   })),
   ...txt(path.join(pulldown, 'pulldown-cmark/third_party')).map((f) => ({
     examples: specExamples(f, `pulldown ${path.relative(path.join(pulldown, 'pulldown-cmark/third_party'), f)}`),
@@ -142,3 +166,29 @@ emit('markdown-it-fixtures.json', txt(markdownIt).map((f) => ({
   examples: markdownItExamples(f, `markdown-it ${path.relative(markdownIt, f)}`),
   syntax: markdownItGfm.has(path.basename(f)) ? gfm : plain,
 })))
+
+// Specs of flexmark-java modules. Converter specs (html2md, docx, pdf) take HTML or emit other formats.
+console.log('flexmark-java specs')
+const flexmark = repo('vsch/flexmark-java')
+const flexmarkSpecs = walk(flexmark, (p) => p.endsWith('.md') && p.includes('src/test/resources') && !/html2md|docx|pdf/.test(p))
+emit('flexmark-specs.json', flexmarkSpecs.map((f) => ({
+  examples: specExamples(f, `flexmark ${path.relative(flexmark, f).split('/')[0]} ${path.basename(f, '.md')}`),
+  syntax: gfm,
+})))
+
+console.log('goldmark testdata')
+const goldmark = repo('yuin/goldmark')
+emit('goldmark-tests.json', [
+  ...txt(path.join(goldmark, 'testdata')).map((f) => ({ examples: goldmarkExamples(f, `goldmark ${path.basename(f)}`), syntax: plain })),
+  ...txt(path.join(goldmark, 'extension/testdata')).map((f) => ({ examples: goldmarkExamples(f, `goldmark extension ${path.basename(f)}`), syntax: gfm })),
+])
+
+// Whole documents that parser benchmarks use: one construct repeated, nested or mixed.
+console.log('benchmark samples')
+const samples = (dir: string, prefix: string) =>
+  walk(dir, (p) => /\.(md|txt)$/.test(p)).map((f) => ({ name: `${prefix} ${path.basename(f)}`, input: fs.readFileSync(f, 'utf8') }))
+const benchSamples = [
+  ...samples(path.join(repo('markdown-it/markdown-it'), 'benchmark/samples'), 'markdown-it'),
+  ...samples(path.join(pulldown, 'bench/third_party'), 'pulldown-cmark'),
+]
+emit('benchmark-samples.json', [{ examples: benchSamples, syntax: plain }, { examples: benchSamples, syntax: gfm }])

@@ -3,8 +3,9 @@
 Exact remark-compatible mdast parsing and serialization, in plain TypeScript, much faster.
 
 ```ts
-const tree = parse(source, { syntax: [mdx(), frontmatter(), gfm()] }) // Root | MdxParseError
-const markdown = stringify(tree, { syntax })                           // same string as remark
+const syntax = [mdx(), frontmatter(), gfm()]
+const tree = parse(source, { syntax })        // Root | MdxParseError, never throws
+const markdown = stringify(tree, { syntax })  // same string as remark
 ```
 
 **remark output is the spec.** Every tree (positions, `data.estree`, MDX errors) and every
@@ -160,7 +161,7 @@ gfm, then headingId. Upgrading the oracle means rerunning everything; difference
 
 ```text
 fixture { name, input, syntax } ──┬──► oracle (remark) ──► JSON ──┐
-                                  │                              ├──► deep equal, first diff path
+                                  │                              ├──► deep equal, first diff
                                   └──► mdastic ─────────► JSON ──┘
                                        positions, estree, error fields
 ```
@@ -180,6 +181,9 @@ markdown inputs is useful, even suites that only assert HTML.
 | micromark, mdast-util-*, remark-*, mdx-js test files, run with capture stubs | `scripts/extract-js-tests.ts` + `scripts/capture/` |
 | markdown-rs, mdxjs-rs, Sätteri pulldown-cmark Rust tests (string literals) | `scripts/extract-rust.ts` |
 | READMEs, Mintlify `llms-full.txt`, Holocron and mdx-js docs | `scripts/extract-realworld.ts` |
+| spec-format files of pulldown-cmark, cmark(-gfm), commonmark.js, md4c, comrak, markdown-it, flexmark, goldmark; bench sample docs | `scripts/extract-spec-files.ts` |
+| source MDX of docs sites (mintlify/docs) | `scripts/extract-docs-repos.ts` |
+| cmark-style pathological inputs at 1/100 size | `scripts/pathological.ts fixtures` |
 | hand-written bugs and edge cases | `conformance/fixtures/regressions.json`, `smoke.json` |
 
 `conformance/stringify-fixtures/` holds 838 hand-built trees with options, captured from the
@@ -204,13 +208,25 @@ pnpm exec tsx src/report.ts parse              # per-file pass counts + first fa
 pnpm exec tsx src/report.ts stringify          # oracle tree ──► both serializers
 pnpm exec tsx src/report.ts stringify-trees    # hand-built trees with options
 pnpm exec tsx src/report.ts parse markdown-rs --fail 20   # filter files, show 20 failures
-pnpm exec vitest run                           # full differential suite, ~20.5k tests
+pnpm exec vitest run                           # full differential suite
 pnpm run typecheck
 pnpm exec tsx ../scripts/check-core.ts         # non-MDX parse only, first diff per fixture
 ```
 
 **`report.ts` never fails the exit code.** It prints `parse: passed/total`. Read the numbers:
-the requirement is **passed == total** in every mode. Only vitest fails CI-style.
+the requirement is **passed == total** in every mode. Only vitest fails CI-style. The open
+failures from the newest suites, with minimal repros, are listed in `docs/test-suites.md`;
+compare against that list before assuming your change broke something.
+
+### Pathological inputs
+
+remark is quadratic on many cmark pathological inputs, so only small sizes are tree-compared.
+Linear time and no stack overflow at upstream sizes is checked on mdastic alone:
+
+```bash
+# exits 1 on a crash, more than 1 s, or superlinear growth
+pnpm exec tsx ../scripts/pathological.ts check [name-filter]
+```
 
 ### Known oracle problems
 
@@ -231,7 +247,7 @@ pnpm --dir mdastic build
 NODE_ENV=production pnpm --dir conformance exec tsx src/bench.ts   # main benchmark
 pnpm exec tsx scripts/bench-parse.ts       # 167 KB README corpus vs remark and Sätteri
 pnpm exec tsx scripts/bench-mdx.ts         # 530 Holocron MDX docs
-pnpm exec tsx scripts/bench-stringify.ts   # 180 KB; PROFILE_STRINGIFY=1, STRESS_STRINGIFY=1 modes
+pnpm exec tsx scripts/bench-stringify.ts   # 180 KB; PROFILE_STRINGIFY=1, STRESS_STRINGIFY=1
 ```
 
 `src/bench.ts` parses each real document separately (342 markdown docs, 2.6 MB; 523 MDX docs that
@@ -256,8 +272,10 @@ acorn was not dominant, so a hand-written JS brace scanner was never built.
 
 ## Known limits and open work
 
-- **Deep nesting overflows the stack.** Containers and links recurse. See `docs/test-suites.md`
-  for the pathological inputs that crash or scale worse than remark.
+- **Deep nesting overflows the stack.** Containers, links, emphasis and MDX JSX recurse.
+  `'> '.repeat(25000)` and `'<a>'.repeat(20000)` crash; remark handles both.
+- **Some inputs are quadratic where remark is linear**: many link definitions, `[a` floods,
+  nested brackets, `![[]()`. See `docs/test-suites.md` for the full table.
 - **Allocation is not minimal.** Line and container views are objects, regex searches allocate
   match arrays, some strings decode before materialization, acorn allocates tokens.
 - **Stringify is 5.4x, not the 6x target.**
