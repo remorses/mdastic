@@ -5,15 +5,41 @@ description: Parser phases, exact remark compatibility, benchmark results, and a
 
 # Core parser
 
-**9,854 / 9,854 fixtures pass**, including **2,043 MDX fixtures** and all **7,811 non-MDX
-fixtures**. Comparison includes every node field, positions, ESTree and error metadata.
+**The original cohort passes 9,858 / 9,858 fixtures**, including **2,047 MDX fixtures** and all
+**7,811 non-MDX fixtures**. Comparison includes every node field, positions, ESTree and error metadata.
 The original 7,733 non-MDX trees also match with positions removed.
 All **3,926 additional MDX option checks** pass with positions or ESTree attachment disabled.
 
 CommonMark: **652/652**. GFM specification: **671/671**. README corpus: **160/160**.
 No runtime dependencies were added. Only the `mdastic/mdx` entry imports Acorn and acorn-jsx.
 
+**MDX link regressions:** four cases in `regressions.json` cover expression brackets inside
+resource links, nested expressions, image alt and reference links. Expression brackets do not
+cancel an outer Markdown link. A manual 100,000-failure run also confirms delimiter buffers
+retain no extra capacity after repeated malformed `*<` inputs.
+
+**Concurrent corpus expansion:** the latest full report is 11,238 / 11,259 parse cases,
+11,259 / 11,259 stringify cases and 838 / 838 tree-to-markdown cases. The 21 parser mismatches
+are in newly added cmark, comrak, markdown-it, md4c and pulldown fixtures, outside the original cohort.
+
 ## Benchmark
+
+**Readability cleanup:** median of three standalone production benchmark runs before and after.
+Scanners retain their branch structure; only whole-block and ESM phases were extracted.
+
+| Corpus | Before | After |
+| --- | ---: | ---: |
+| Markdown + GFM | 25.13 ms | 25.26 ms |
+| Markdown, positions disabled | 24.18 ms | 24.41 ms |
+| MDX, ESTree enabled | 17.09 ms | 17.55 ms |
+| MDX, ESTree disabled | 17.33 ms | 16.64 ms |
+| Markdown stringify | 43.87 ms | 44.28 ms |
+| MDX stringify | 17.86 ms | 17.53 ms |
+
+Compiled `tsc` output also shows no slowdown against the committed implementation in an
+interleaved comparison. Source loaders do not inline imported const enums the same way as `tsc`;
+mixed-source interleaved measurements were slower, while the standalone source benchmark above
+remained within run-to-run noise. Do not treat source-loader and compiled timings as interchangeable.
 
 **Heading ID and remark adapter change:** production benchmark before and after, same machine.
 Ordinary parser paths remain within measurement noise; the benchmark does not enable heading IDs.

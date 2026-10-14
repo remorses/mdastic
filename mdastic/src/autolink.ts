@@ -1,17 +1,31 @@
 // Remark has tokenizer autolinks with positions, then positionless fallback replacements.
-import { alpha, digit, isPunctuation, isWhitespace } from './scan.ts'
+// Tokenizer and fallback rules differ intentionally; do not merge their recognizers.
+import { alpha, Char, digit, isPunctuation, isWhitespace } from './scan.ts'
 import { Kind, node, tree } from './tree.ts'
 
 export interface LiteralLink {
   end: number
   prefix: string
 }
+const ASCII_CASE_BIT = 0x20
+const HTTP_PREFIX_LENGTH = 7
+const HTTPS_PREFIX_LENGTH = 8
+const WWW_PREFIX_LENGTH = 4
+const WWW_MARKER_LENGTH = 3
+
 function atext(c: number): boolean {
-  return alpha(c) || digit(c) || c === 43 || c === 45 || c === 46 || c === 95
+  return (
+    alpha(c) ||
+    digit(c) ||
+    c === Char.Plus ||
+    c === Char.Hyphen ||
+    c === Char.Dot ||
+    c === Char.Underscore
+  )
 }
 function word(source: string, at: number, value: string): boolean {
   for (let i = 0; i < value.length; i++)
-    if ((source.charCodeAt(at + i) | 32) !== value.charCodeAt(i)) return false
+    if ((source.charCodeAt(at + i) | ASCII_CASE_BIT) !== value.charCodeAt(i)) return false
   return true
 }
 
@@ -52,6 +66,7 @@ function trail(source: string, at: number, end: number): boolean {
 }
 
 function domain(source: string, start: number, end: number): number {
+  // GFM forbids underscores in the final two domain labels.
   let underscore = false
   let previousUnderscore = false
   let seen = false
@@ -74,6 +89,7 @@ function domain(source: string, start: number, end: number): number {
 }
 
 function path(source: string, start: number, end: number): number {
+  // Keep trailing closing parentheses only while they balance URL-internal opens.
   let opens = 0
   let closes = 0
   let i = start
@@ -120,7 +136,11 @@ export function rawLiteralLink(
     }
   }
   if ((c === 72 || c === 104) && !alpha(previous)) {
-    const prefix = word(source, start, 'http://') ? 7 : word(source, start, 'https://') ? 8 : 0
+    const prefix = word(source, start, 'http://')
+      ? HTTP_PREFIX_LENGTH
+      : word(source, start, 'https://')
+        ? HTTPS_PREFIX_LENGTH
+        : 0
     if (prefix) {
       const first = source.charCodeAt(start + prefix)
       if (start + prefix < end && first > 32 && !isPunctuation(first) && !isWhitespace(first)) {
@@ -132,7 +152,7 @@ export function rawLiteralLink(
   if (
     (c === 87 || c === 119) &&
     word(source, start, 'www.') &&
-    start + 4 < end &&
+    start + WWW_PREFIX_LENGTH < end &&
     (previous === -1 ||
       previous === 40 ||
       previous === 42 ||
@@ -191,14 +211,15 @@ function splitEnd(source: string, start: number, end: number): number {
 }
 
 function fallbackUrl(source: string, start: number): LiteralLink | undefined {
+  // This pass sees decoded text, unlike the source tokenizer above.
   const previous = start ? source.charCodeAt(start - 1) : -1
   if (start && !isWhitespace(previous) && !isPunctuation(previous)) return
   const protocol = word(source, start, 'http://')
-    ? 7
+    ? HTTP_PREFIX_LENGTH
     : word(source, start, 'https://')
-      ? 8
+      ? HTTPS_PREFIX_LENGTH
       : word(source, start, 'www.')
-        ? 3
+        ? WWW_MARKER_LENGTH // The fallback domain scan intentionally starts on the dot.
         : 0
   if (!protocol) return
   let i = start + protocol
@@ -212,7 +233,8 @@ function fallbackUrl(source: string, start: number): LiteralLink | undefined {
       source.charCodeAt(i) === 46)
   )
     i++
-  if (i === begin || !correctDomain(source, protocol === 3 ? start : begin, i)) return
+  if (i === begin || !correctDomain(source, protocol === WWW_MARKER_LENGTH ? start : begin, i))
+    return
   while (
     i < source.length &&
     source.charCodeAt(i) !== 32 &&
@@ -222,8 +244,8 @@ function fallbackUrl(source: string, start: number): LiteralLink | undefined {
   )
     i++
   const stop = splitEnd(source, start + protocol, i)
-  if (stop > start + protocol || (protocol === 3 && stop === start + protocol))
-    return { end: stop, prefix: protocol === 3 ? 'http://' : '' }
+  if (stop > start + protocol || (protocol === WWW_MARKER_LENGTH && stop === start + protocol))
+    return { end: stop, prefix: protocol === WWW_MARKER_LENGTH ? 'http://' : '' }
 }
 
 function fallbackEmail(source: string, start: number): LiteralLink | undefined {
@@ -268,6 +290,7 @@ function emailStart(source: string, from: number): number {
 }
 
 function replaceText(parent: number, n: number, email: boolean): void {
+  // Replacing any part drops positions for the whole original text segment, as remark does.
   const value = tree.value[n] ?? ''
   if (value.indexOf(email ? '@' : '.') < 0) return
   let segment = 0
@@ -330,14 +353,15 @@ function replaceText(parent: number, n: number, email: boolean): void {
 }
 
 export function transformLiteralLinks(parent: number): void {
-  for (let n = tree.child[parent]; n;) {
+  // URL replacements precede emails; existing links must never be transformed again.
+  for (let n = tree.child[parent]; n; ) {
     const next = tree.next[n]
     if (tree.kind[n] === Kind.Text) replaceText(parent, n, false)
     else if (tree.kind[n] !== Kind.Link && tree.kind[n] !== Kind.LinkReference && tree.child[n])
       transformLiteralLinks(n)
     n = next
   }
-  for (let n = tree.child[parent]; n;) {
+  for (let n = tree.child[parent]; n; ) {
     const next = tree.next[n]
     if (tree.kind[n] === Kind.Text) replaceText(parent, n, true)
     n = next

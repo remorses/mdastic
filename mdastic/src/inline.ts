@@ -1,6 +1,11 @@
+// Recognize inline tokens, then resolve attention runs in the shared node arena.
+// Views map container-stripped text back to original source offsets.
 import type { Config } from './syntax.ts'
 import {
   alpha,
+  ASCII_SIZE,
+  AsciiFlag,
+  Char,
   ascii,
   decode,
   digit,
@@ -8,6 +13,7 @@ import {
   isWhitespace,
   normalizeIdentifier,
   space,
+  TAB_SIZE,
 } from './scan.ts'
 import { append, Kind, node, tree } from './tree.ts'
 import { rawLiteralLink } from './autolink.ts'
@@ -31,9 +37,11 @@ export interface InlineContext {
   inlineMarkers?: boolean
 }
 export interface View {
+  // Contiguous views use base + index; stripped views map each virtual UTF-16 unit.
   source: string
   base: number
   map?: Int32Array
+  // map includes an EOF slot; partial-tab spaces point back to their consumed tab.
   table?: boolean
   lazy?: Set<number>
   boundary?: number
@@ -42,25 +50,62 @@ export function offset(view: View, i: number): number {
   return view.map ? view.map[i] : view.base + i
 }
 
-const inlineStops = new Uint8Array(128)
-for (const c of [10, 13, 33, 42, 60, 91, 92, 93, 95, 96, 123, 126]) inlineStops[c] = 1
+// Email candidates use the ASCII table; other views jump with native regex search.
+const inlineStops = new Uint8Array(ASCII_SIZE)
+for (const c of [
+  Char.LineFeed,
+  Char.CarriageReturn,
+  Char.Exclamation,
+  Char.Asterisk,
+  Char.LessThan,
+  Char.LeftBracket,
+  Char.Backslash,
+  Char.RightBracket,
+  Char.Underscore,
+  Char.Backtick,
+  Char.LeftBrace,
+  Char.Tilde,
+])
+  inlineStops[c] = 1
 const linkStops = inlineStops.slice()
-for (const c of [72, 104, 87, 119]) linkStops[c] = 1
+for (const c of [Char.UpperH, Char.LowerH, Char.UpperW, Char.LowerW]) linkStops[c] = 1
 const emailStops = linkStops.slice()
-for (let c = 0; c < 128; c++) {
-  if (ascii[c] & 12 || c === 43 || c === 45 || c === 46) emailStops[c] = 1
+for (let c = 0; c < ASCII_SIZE; c++) {
+  if (
+    ascii[c] & AsciiFlag.Alphanumeric ||
+    c === Char.Plus ||
+    c === Char.Hyphen ||
+    c === Char.Dot
+  )
+    emailStops[c] = 1
 }
 const markdownMarkers = /[\n\r!*<[\]\\_`{~]/g
 const gfmMarkers = /[\n\r!*<[\]\\_`{~]|https?:\/\/|www\./gi
 
+const enum DelimiterFlag {
+  CanOpen = 1,
+  CanClose = 2,
+}
+const INITIAL_DELIMITER_CAPACITY = 1024
+const MAX_DESTINATION_PAREN_DEPTH = 32
+const MIN_AUTOLINK_SCHEME_LENGTH = 2
+const MAX_AUTOLINK_SCHEME_LENGTH = 32
+const MAX_EMAIL_LABEL_LENGTH = 63
+const MAX_CONTINUATION_INDENT = 3
+
+// Recursive spans reserve [begin, end); successful scopes restore their starting count.
 let delimiterCount = 0
-let delimiterCapacity = 1024
+let delimiterCapacity = INITIAL_DELIMITER_CAPACITY
 let delimiterNode = new Int32Array(delimiterCapacity)
 let delimiterParent = new Int32Array(delimiterCapacity)
 let delimiterStart = new Int32Array(delimiterCapacity)
 let delimiterLength = new Int32Array(delimiterCapacity)
 let delimiterChar = new Uint8Array(delimiterCapacity)
 let delimiterFlags = new Uint8Array(delimiterCapacity)
+
+export function resetInline(): void {
+  delimiterCount = 0
+}
 
 function delimiter(
   n: number,
@@ -130,8 +175,8 @@ function resolveFamily(
   for (let close = begin; close < end; close++) {
     if (
       delimiterParent[close] !== parent ||
-      (delimiterChar[close] === 126) !== tilde ||
-      !(delimiterFlags[close] & 2)
+      (delimiterChar[close] === Char.Tilde) !== tilde ||
+      !(delimiterFlags[close] & DelimiterFlag.CanClose)
     )
       continue
     while (delimiterLength[close]) {
@@ -140,16 +185,18 @@ function resolveFamily(
         if (
           delimiterParent[open] !== parent ||
           !delimiterLength[open] ||
-          !(delimiterFlags[open] & 1) ||
+          !(delimiterFlags[open] & DelimiterFlag.CanOpen) ||
           delimiterChar[open] !== delimiterChar[close]
         )
           continue
         const a = delimiterLength[open]
         const b = delimiterLength[close]
-        if (delimiterChar[open] === 126) {
+        // Tildes need equal runs; emphasis follows CommonMark's rule of three.
+        if (delimiterChar[open] === Char.Tilde) {
           if (a !== b) continue
         } else if (
-          (delimiterFlags[open] & 2 || delimiterFlags[close] & 1) &&
+          (delimiterFlags[open] & DelimiterFlag.CanClose ||
+            delimiterFlags[close] & DelimiterFlag.CanOpen) &&
           (a + b) % 3 === 0 &&
           (a % 3 !== 0 || b % 3 !== 0)
         )
@@ -158,7 +205,7 @@ function resolveFamily(
       }
       if (open < begin) break
       const use =
-        delimiterChar[open] === 126
+        delimiterChar[open] === Char.Tilde
           ? delimiterLength[open]
           : delimiterLength[open] >= 2 && delimiterLength[close] >= 2
             ? 2
@@ -168,10 +215,15 @@ function resolveFamily(
       const leftEnd = delimiterStart[open] + delimiterLength[open]
       const rightStart = delimiterStart[close]
       const wrapper = node(
-        delimiterChar[open] === 126 ? Kind.Delete : use === 2 ? Kind.Strong : Kind.Emphasis,
+        delimiterChar[open] === Char.Tilde
+          ? Kind.Delete
+          : use === 2
+            ? Kind.Strong
+            : Kind.Emphasis,
         offset(view, leftEnd - use),
         offset(view, rightStart + use),
       )
+      // Wrap the sibling range, consume its markers, then transfer nested run ownership.
       tree.child[wrapper] = tree.next[left]
       tree.last[wrapper] = tree.prev[right]
       tree.prev[tree.child[wrapper]] = 0
@@ -206,28 +258,28 @@ export function destination(
 ): { end: number; value: string } | undefined {
   // mdast stores decoded destinations; URI encoding belongs to HTML serialization.
   let i = start
-  if (source.charCodeAt(i) === 60) {
+  if (source.charCodeAt(i) === Char.LessThan) {
     i++
     const begin = i
     for (; i < end; i++) {
       const c = source.charCodeAt(i)
-      if (c === 62) return { end: i + 1, value: decode(source.slice(begin, i)) }
-      if (c === 60 || c === 10 || c === 13) return
-      if (c === 92 && isPunctuation(source.charCodeAt(i + 1))) i++
+      if (c === Char.GreaterThan) return { end: i + 1, value: decode(source.slice(begin, i)) }
+      if (c === Char.LessThan || c === Char.LineFeed || c === Char.CarriageReturn) return
+      if (c === Char.Backslash && isPunctuation(source.charCodeAt(i + 1))) i++
     }
     return
   }
   let depth = 0
   for (; i < end; i++) {
     const c = source.charCodeAt(i)
-    if ((c !== 0 && c <= 32) || c === 127) break
-    if (c === 92 && isPunctuation(source.charCodeAt(i + 1))) {
+    if ((c !== 0 && c <= Char.Space) || c === Char.Delete) break
+    if (c === Char.Backslash && isPunctuation(source.charCodeAt(i + 1))) {
       i++
       continue
     }
-    if (c === 40) {
-      if (++depth > 32) return
-    } else if (c === 41) {
+    if (c === Char.LeftParen) {
+      if (++depth > MAX_DESTINATION_PAREN_DEPTH) return
+    } else if (c === Char.RightParen) {
       if (!depth) break
       depth--
     }
@@ -242,8 +294,8 @@ export function title(
   end: number,
 ): { end: number; value: string } | undefined {
   const open = source.charCodeAt(start)
-  if (open !== 34 && open !== 39 && open !== 40) return
-  const close = open === 40 ? 41 : open
+  if (open !== Char.DoubleQuote && open !== Char.SingleQuote && open !== Char.LeftParen) return
+  const close = open === Char.LeftParen ? Char.RightParen : open
   for (let i = start + 1; i < end; i++) {
     const c = source.charCodeAt(i)
     if (c === close)
@@ -280,7 +332,7 @@ function trimContinuation(value: string, limit = Infinity): string {
     let end = i + 1
     let indent = 0
     while (space(value.charCodeAt(end)) && indent < limit) {
-      indent += value.charCodeAt(end) === 9 ? 4 - (indent % 4) : 1
+      indent += value.charCodeAt(end) === Char.Tab ? TAB_SIZE - (indent % TAB_SIZE) : 1
       end++
     }
     if (end > i + 1) {
@@ -321,7 +373,8 @@ function bracketEnd(
   let depth = 0
   for (let i = start; i < end; i++) {
     const c = source.charCodeAt(i)
-    if (c === 123 && view && context?.inline) {
+    // JavaScript brackets inside expressions do not participate in Markdown labels.
+    if (c === Char.LeftBrace && view && context?.inline) {
       const match = context.inline(view, i, end, context)
       if (match) {
         i = match.end - 1
@@ -358,7 +411,7 @@ function bracketEnd(
 }
 
 function codeEnd(source: string, start: number, end: number, length: number): number {
-  for (let i = start; i < end;) {
+  for (let i = start; i < end; ) {
     if (source.charCodeAt(i) !== 96) {
       i++
       continue
@@ -372,6 +425,7 @@ function codeEnd(source: string, start: number, end: number, length: number): nu
 }
 
 function codeValue(source: string, start: number, end: number): string {
+  // CommonMark trims one edge space only when the code span is not entirely spaces.
   let allSpaces = true
   for (let i = start; i < end; i++) {
     const c = source.charCodeAt(i)
@@ -416,8 +470,10 @@ function attributeValueEnd(source: string, at: number, end: number, loose: boole
 export function htmlEnd(source: string, start: number, end: number, loose = false): number {
   let i = start + 1
   if (source.startsWith('<!--', start)) {
+    // Micromark accepts the short comment endings <!--> and <!--->.
     if (source.charCodeAt(start + 4) === 62) return start + 5
-    if (source.charCodeAt(start + 4) === 45 && source.charCodeAt(start + 5) === 62) return start + 6
+    if (source.charCodeAt(start + 4) === 45 && source.charCodeAt(start + 5) === 62)
+      return start + 6
     const stop = source.indexOf('-->', start + 4)
     return stop < 0 || stop + 3 > end ? -1 : stop + 3
   }
@@ -489,8 +545,8 @@ function autolink(
   while (colon < i && source.charCodeAt(colon) !== 58) colon++
   if (
     colon < i &&
-    colon - start >= 3 &&
-    colon - start <= 33 &&
+    colon - start >= MIN_AUTOLINK_SCHEME_LENGTH + 1 &&
+    colon - start <= MAX_AUTOLINK_SCHEME_LENGTH + 1 &&
     alpha(source.charCodeAt(start + 1))
   ) {
     let valid = true
@@ -525,7 +581,8 @@ function validEmail(value: string): boolean {
   for (let i = at + 1; i <= value.length; i++) {
     const c = value.charCodeAt(i)
     if (i === value.length || c === 46) {
-      if (!label || label > 63 || value.charCodeAt(i - 1) === 45) return false
+      if (!label || label > MAX_EMAIL_LABEL_LENGTH || value.charCodeAt(i - 1) === Char.Hyphen)
+        return false
       label = 0
     } else {
       if ((!alpha(c) && !digit(c) && c !== 45) || (!label && c === 45)) return false
@@ -535,7 +592,13 @@ function validEmail(value: string): boolean {
   return true
 }
 
-function plainText(view: View, start: number, end: number, parent: number, value?: string): number {
+function plainText(
+  view: View,
+  start: number,
+  end: number,
+  parent: number,
+  value?: string,
+): number {
   const last = view.source.charCodeAt(end - 1)
   const n = node(
     Kind.Text,
@@ -549,7 +612,7 @@ function plainText(view: View, start: number, end: number, parent: number, value
 
 function mergeText(parent: number): void {
   let last = 0
-  for (let n = tree.child[parent]; n;) {
+  for (let n = tree.child[parent]; n; ) {
     const next = tree.next[n]
     if (tree.kind[n] === Kind.Text && last && tree.kind[last] === Kind.Text) {
       tree.value[last] = (tree.value[last] ?? '') + (tree.value[n] ?? '')
@@ -579,6 +642,7 @@ export function parseInline(
   inLink = false,
   trim = true,
 ): void {
+  // ── Reserve this inline scope and select its candidate scanner ──
   const source = view.source
   const delimiterBegin = delimiterCount
   let textStart = start
@@ -590,6 +654,7 @@ export function parseInline(
   let i = start
   let unbalanced = 0
   while (i < end) {
+    // ── Jump to a candidate; unrestricted custom hooks see every character ──
     if (scanText) {
       if (email) {
         while (i < end && !stops[source.charCodeAt(i)]) i++
@@ -601,6 +666,7 @@ export function parseInline(
       if (i === end) break
     }
     const c = source.charCodeAt(i)
+    // ── Syntax hooks take priority over built-in Markdown tokens ──
     if (context.inline) {
       const match = context.inline(view, i, end, context)
       if (match) {
@@ -610,25 +676,32 @@ export function parseInline(
         continue
       }
     }
+    // ── GFM tokenizer autolinks keep source positions ──
     const previous = i > start ? source.charCodeAt(i - 1) : -1
     const literalStart =
-      (!(ascii[previous] & 12) &&
-        previous !== 43 &&
-        previous !== 45 &&
-        previous !== 46 &&
-        previous !== 95 &&
-        previous !== 47) ||
-      ((c === 72 || c === 104 || c === 87 || c === 119) && !(ascii[previous] & 8))
+      (!(ascii[previous] & AsciiFlag.Alphanumeric) &&
+        previous !== Char.Plus &&
+        previous !== Char.Hyphen &&
+        previous !== Char.Dot &&
+        previous !== Char.Underscore &&
+        previous !== Char.Slash) ||
+      ((c === Char.UpperH || c === Char.LowerH || c === Char.UpperW || c === Char.LowerW) &&
+        !(ascii[previous] & AsciiFlag.Letter))
     if (
       context.config.gfm &&
       !inLink &&
-      !unbalanced &&
+      !unbalanced && // Unmatched label brackets suppress tokenizer autolinks.
       literalStart &&
-      ((email && (ascii[c] & 12 || c === 43 || c === 45 || c === 46 || c === 95)) ||
-        c === 72 ||
-        c === 104 ||
-        c === 87 ||
-        c === 119)
+      ((email &&
+        (ascii[c] & AsciiFlag.Alphanumeric ||
+          c === Char.Plus ||
+          c === Char.Hyphen ||
+          c === Char.Dot ||
+          c === Char.Underscore)) ||
+        c === Char.UpperH ||
+        c === Char.LowerH ||
+        c === Char.UpperW ||
+        c === Char.LowerW)
     ) {
       const link = rawLiteralLink(source, i, end, previous, email)
       if (link) {
@@ -641,9 +714,10 @@ export function parseInline(
         continue
       }
     }
-    if (c === 92) {
+    // ── Escapes and line endings, including two-space hard breaks ──
+    if (c === Char.Backslash) {
       const next = source.charCodeAt(i + 1)
-      if (next < 128 && isPunctuation(next)) {
+      if (next < ASCII_SIZE && isPunctuation(next)) {
         i += 2
         continue
       }
@@ -682,7 +756,8 @@ export function parseInline(
       }
       continue
     }
-    if (c === 96) {
+    // ── Code spans consume only a closing run of the same length ──
+    if (c === Char.Backtick) {
       let run = i + 1
       while (source.charCodeAt(run) === 96) run++
       const close = codeEnd(source, run, end, run - i)
@@ -698,37 +773,56 @@ export function parseInline(
       i = run
       continue
     }
-    if (c === 42 || c === 95 || (c === 126 && context.config.gfm)) {
+    // ── Record attention runs; resolve their sibling ranges after tokenization ──
+    if (
+      c === Char.Asterisk ||
+      c === Char.Underscore ||
+      (c === Char.Tilde && context.config.gfm)
+    ) {
       let stop = i + 1
       while (source.charCodeAt(stop) === c) stop++
       const length = stop - i
-      if (c === 126 && (length > 2 || (length === 1 && !context.config.gfm?.singleTilde))) {
+      if (
+        c === Char.Tilde &&
+        (length > 2 || (length === 1 && !context.config.gfm?.singleTilde))
+      ) {
         i = stop
         continue
       }
       if (textStart < i) plainText(view, textStart, i, parent)
       const n = plainText(view, i, stop, parent)
       // Micromark classifies UTF-16 units, not decoded surrogate pairs.
-      const before = i > start ? source.charCodeAt(i - 1) : 32
-      const after = stop < end ? source.charCodeAt(stop) : 32
+      const before = i > start ? source.charCodeAt(i - 1) : Char.Space
+      const after = stop < end ? source.charCodeAt(stop) : Char.Space
       const beforeSpace = isWhitespace(before)
       const afterSpace = isWhitespace(after)
       const beforePunct = isPunctuation(before)
       const afterPunct = isPunctuation(after)
       const left =
         (!afterSpace && (!afterPunct || beforeSpace || beforePunct)) ||
-        (c !== 126 && context.config.gfm !== undefined && after === 126)
+        (c !== Char.Tilde && context.config.gfm !== undefined && after === Char.Tilde)
       const right =
         (!beforeSpace && (!beforePunct || afterSpace || afterPunct)) ||
-        (c !== 126 && context.config.gfm !== undefined && before === 126)
-      const canOpen = c === 95 ? left && (!right || beforePunct) : left
-      const canClose = c === 95 ? right && (!left || afterPunct) : right
-      delimiter(n, parent, i, length, c, (canOpen ? 1 : 0) | (canClose ? 2 : 0))
+        (c !== Char.Tilde && context.config.gfm !== undefined && before === Char.Tilde)
+      const canOpen = c === Char.Underscore ? left && (!right || beforePunct) : left
+      const canClose = c === Char.Underscore ? right && (!left || afterPunct) : right
+      delimiter(
+        n,
+        parent,
+        i,
+        length,
+        c,
+        (canOpen ? DelimiterFlag.CanOpen : 0) | (canClose ? DelimiterFlag.CanClose : 0),
+      )
       i = textStart = stop
       continue
     }
-    if (c === 91 || (c === 33 && source.charCodeAt(i + 1) === 91)) {
-      const image = c === 33
+    // ── Resolve bracket constructs now that all definitions are known ──
+    if (
+      c === Char.LeftBracket ||
+      (c === Char.Exclamation && source.charCodeAt(i + 1) === Char.LeftBracket)
+    ) {
+      const image = c === Char.Exclamation
       const labelStart = i + (image ? 2 : 1)
       const close = bracketEnd(source, labelStart, end, view, context)
       if (close >= 0) {
@@ -778,6 +872,7 @@ export function parseInline(
             }
           }
         }
+        // Reject actual nested links, not brackets belonging to embedded syntax.
         if (data && !image && !footnote && containsLink(view, labelStart, close, context))
           data = undefined
         if (data) {
@@ -795,6 +890,7 @@ export function parseInline(
           tree.extra[n] = data
           if (!footnote) {
             parseInline(view, labelStart, close, n, context, !image, false)
+            // MDX image alt waits for deferred JSX nesting before flattening.
             if (image && !context.config.mdx) {
               tree.value[n] = flatten(n)
               tree.child[n] = tree.last[n] = 0
@@ -807,22 +903,29 @@ export function parseInline(
       if (!image) unbalanced++
     }
     if (c === 93 && unbalanced) unbalanced--
-    if (c === 60 && !context.config.mdx) {
+    // ── Ordinary HTML and angle autolinks are disabled in MDX ──
+    if (c === Char.LessThan && !context.config.mdx) {
       const auto = autolink(source, i, end)
       const stop = auto?.end ?? htmlEnd(source, i, end)
       if (stop > i) {
         if (textStart < i) plainText(view, textStart, i, parent)
-        const n = node(auto ? Kind.Link : Kind.Html, offset(view, i), offset(view, stop), parent)
+        const n = node(
+          auto ? Kind.Link : Kind.Html,
+          offset(view, i),
+          offset(view, stop),
+          parent,
+        )
         if (auto) {
           tree.extra[n] = { url: auto.url, title: null }
           plainText(view, i + 1, stop - 1, n, auto.value)
-        } else tree.value[n] = trimContinuation(source.slice(i, stop), 3)
+        } else tree.value[n] = trimContinuation(source.slice(i, stop), MAX_CONTINUATION_INDENT)
         i = textStart = stop
         continue
       }
     }
     i++
   }
+  // ── Flush text, resolve attention, and release the recursive delimiter scope ──
   while (trim && end > textStart && space(source.charCodeAt(end - 1))) end--
   if (textStart < end) plainText(view, textStart, end, parent)
   resolveDelimiters(
@@ -830,7 +933,7 @@ export function parseInline(
     parent,
     delimiterBegin,
     delimiterCount,
-    !trim || delimiterChar[delimiterBegin] === 126,
+    !trim || delimiterChar[delimiterBegin] === Char.Tilde,
   )
   delimiterCount = delimiterBegin
   mergeText(parent)
@@ -860,7 +963,8 @@ function containsLink(view: View, start: number, end: number, context: InlineCon
   const source = view.source
   for (let i = start; i < end; i++) {
     const c = source.charCodeAt(i)
-    if (c === 123 && context.config.headingId && context.inline) {
+    // Like bracketEnd, ignore reference-looking brackets inside embedded expressions.
+    if (c === Char.LeftBrace && context.inline) {
       const match = context.inline(view, i, end, context)
       if (match) {
         i = match.end - 1
@@ -888,7 +992,7 @@ function containsLink(view: View, start: number, end: number, context: InlineCon
       }
     }
     if (c === 33 && source.charCodeAt(i + 1) === 91) {
-      const close = bracketEnd(source, i + 2, end)
+      const close = bracketEnd(source, i + 2, end, view, context)
       if (close >= 0) {
         let stop = close + 1
         if (source.charCodeAt(stop) === 40) stop = resource(source, stop, end)?.end ?? stop
@@ -901,7 +1005,7 @@ function containsLink(view: View, start: number, end: number, context: InlineCon
       }
     }
     if (c !== 91) continue
-    const close = bracketEnd(source, i + 1, end)
+    const close = bracketEnd(source, i + 1, end, view, context)
     if (close < 0) continue
     const stop = close + 1
     if (source.charCodeAt(stop) === 40 && resource(source, stop, end)) return true

@@ -1,3 +1,5 @@
+// Reusable structure-of-arrays arena; IDs link siblings without mdast allocations.
+// Materialize ordinary mdast objects only after all parser passes finish.
 import { position } from './scan.ts'
 import type { Root, RootContent } from './types.ts'
 
@@ -52,11 +54,31 @@ for (const kind of [
   Kind.FootnoteDefinition,
 ])
   parents[kind] = 1
+export const enum TaskState {
+  None = 0,
+  Unchecked = 1,
+  Checked = 2,
+}
+
+// Index 0 is a defensive depth-1 fallback; parser-produced headings use indices 1..6.
 const headingDepths = [1, 1, 2, 3, 4, 5, 6] as const
 const values: (string | undefined)[] = []
 const extras: any[] = []
 
-let capacity = 2048
+const INITIAL_NODE_CAPACITY = 2048
+let capacity = INITIAL_NODE_CAPACITY
+// Node 0 is the null sentinel; the first allocated node is the root.
+// child/last bound a sibling chain; next/prev link siblings, not parents.
+// Payload contract (unused slots are zero):
+// Kind                  a                       b                  extra
+// Heading               depth                   unused             unused
+// Paragraph             task cleanup pending    unused             position override
+// List                  ordered flag            start number       spread boolean
+// ListItem              spread flag             TaskState          unused
+// MDX flow JSX          opening-tag end         closing-tag start  MDX fields
+// Other MDX             unused                  unused             MDX fields
+// Links / definitions   unused                  unused             named metadata
+// Table                 unused                  unused             alignment array
 export const tree = {
   count: 0,
   kind: new Uint8Array(capacity),
@@ -74,6 +96,7 @@ export const tree = {
 }
 
 export function resetTree(): void {
+  // Clear logical contents, retaining typed-array capacity for the next document.
   tree.count = 0
   tree.value.length = 0
   tree.extra.length = 0
@@ -106,6 +129,7 @@ export function node(kind: Kind, start: number, end: number, parent = 0): number
 }
 
 export function append(parent: number, n: number): void {
+  // Callers must detach n first; append does not repair its previous sibling chain.
   tree.prev[n] = tree.last[parent]
   if (tree.last[parent]) tree.next[tree.last[parent]] = n
   else tree.child[parent] = n
@@ -113,6 +137,7 @@ export function append(parent: number, n: number): void {
 }
 
 export function materialize(n: number): RootContent {
+  // MDX metadata marks parent nodes; task cleanup may override the paragraph start.
   const children: any[] =
     parents[tree.kind[n]] || (tree.kind[n] === Kind.Mdx && tree.extra[n]?.children)
       ? []
@@ -124,6 +149,7 @@ export function materialize(n: number): RootContent {
     ? undefined
     : position(tree.start[n], tree.end[n], e?.positionStart)
   switch (tree.kind[n]) {
+    // Omit absent positions entirely, rather than emitting position: undefined.
     case Kind.Mdx: {
       const result = { ...e }
       if (children) result.children = children
@@ -139,7 +165,9 @@ export function materialize(n: number): RootContent {
     case Kind.ThematicBreak:
       return p ? { type: 'thematicBreak', position: p } : { type: 'thematicBreak' }
     case Kind.Blockquote:
-      return p ? { type: 'blockquote', children, position: p } : { type: 'blockquote', children }
+      return p
+        ? { type: 'blockquote', children, position: p }
+        : { type: 'blockquote', children }
     case Kind.List:
       return p
         ? {
@@ -162,14 +190,14 @@ export function materialize(n: number): RootContent {
         ? {
             type: 'listItem',
             spread: !!tree.a[n],
-            checked: tree.b[n] ? tree.b[n] === 2 : null,
+            checked: tree.b[n] ? tree.b[n] === TaskState.Checked : null,
             children,
             position: p,
           }
         : {
             type: 'listItem',
             spread: !!tree.a[n],
-            checked: tree.b[n] ? tree.b[n] === 2 : null,
+            checked: tree.b[n] ? tree.b[n] === TaskState.Checked : null,
             children,
           }
     case Kind.Html:

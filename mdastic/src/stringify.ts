@@ -1,4 +1,5 @@
 // CommonMark serializer ported from mdast-util-to-markdown 2.1.2 (MIT, Titus Wormer).
+// Core handlers coordinate construct scopes and sibling context for exact escaping.
 /*
 Copyright (c) Titus Wormer <tituswormer@gmail.com>
 
@@ -32,13 +33,18 @@ import {
 } from './stringify-safe.ts'
 import { entities as characterEntities } from './entities.ts'
 import type { Config } from './syntax.ts'
+import { Char, TAB_SIZE } from './scan.ts'
+
+const MIN_FENCE_LENGTH = 3
+const MAX_HEADING_DEPTH = 6
+const MIN_THEMATIC_MARKERS = 3
+const enum CharacterKind {
+  Whitespace = 1,
+  Punctuation = 2,
+}
 import type { Nodes } from './types.ts'
 import type * as M from './types.ts'
-import {
-  gfmToMarkdown,
-  mdxToMarkdown,
-  frontmatterToMarkdown,
-} from './stringify-extensions.ts'
+import { gfmToMarkdown, mdxToMarkdown, frontmatterToMarkdown } from './stringify-extensions.ts'
 export interface StringifyOptions {
   bullet?: '*' | '+' | '-' | null
   bulletOther?: '*' | '+' | '-' | null
@@ -84,18 +90,10 @@ type Tracker = {
 }
 // Extension handlers can add their own node shapes.
 // Handler arguments intentionally match mdast-util-to-markdown's extension API.
-export type Handler = ((
-  node: any,
-  parent: any,
-  state: State,
-  info: Info,
-) => string) & { peek?: Handler }
-export type Join = (
-  left: any,
-  right: any,
-  parent: any,
-  state: State,
-) => number | boolean | void
+export type Handler = ((node: any, parent: any, state: State, info: Info) => string) & {
+  peek?: Handler
+}
+export type Join = (left: any, right: any, parent: any, state: State) => number | boolean | void
 export interface State {
   associationId(node: { identifier?: string; label?: string | null }): string
   containerPhrasing(parent: any, info: Info): string
@@ -149,10 +147,7 @@ function blockquote(node: M.Blockquote, _: any, state: State, info: Info) {
   const tracker = state.createTracker(info)
   tracker.move('> ')
   tracker.shift(2)
-  const value = state.indentLines(
-    state.containerFlow(node, tracker.current()),
-    quoteLine,
-  )
+  const value = state.indentLines(state.containerFlow(node, tracker.current()), quoteLine)
   exit()
   return value
 }
@@ -174,7 +169,11 @@ function hardBreak(_: any, _1: any, state: State, info: Info) {
 function longestStreak(value: string, marker: string): number {
   let longest = 0
   const code = marker.charCodeAt(0)
-  for (let index = value.indexOf(marker); index !== -1; index = value.indexOf(marker, index + 1)) {
+  for (
+    let index = value.indexOf(marker);
+    index !== -1;
+    index = value.indexOf(marker, index + 1)
+  ) {
     const start = index
     while (value.charCodeAt(index + 1) === code) index++
     const streak = index - start + 1
@@ -207,13 +206,13 @@ function code(node: M.Code, _: any, state: State, info: Info) {
   const raw = node.value || ''
   const suffix = marker === '`' ? 'GraveAccent' : 'Tilde'
   if (formatCodeAsIndented(node, state)) {
-    const exit2 = state.enter('codeIndented')
-    const value2 = state.indentLines(raw, indentCodeLine)
-    exit2()
-    return value2
+    const exitIndented = state.enter('codeIndented')
+    const indentedCode = state.indentLines(raw, indentCodeLine)
+    exitIndented()
+    return indentedCode
   }
   const tracker = state.createTracker(info)
-  const sequence = marker.repeat(Math.max(longestStreak(raw, marker) + 1, 3))
+  const sequence = marker.repeat(Math.max(longestStreak(raw, marker) + 1, MIN_FENCE_LENGTH))
   const exit = state.enter('codeFenced')
   let value = tracker.move(sequence)
   if (node.lang) {
@@ -254,9 +253,7 @@ function checkQuote(state: State) {
   const marker = state.options.quote || '"'
   if (marker !== '"' && marker !== "'") {
     throw new Error(
-      'Cannot serialize title with `' +
-        marker +
-        '` for `options.quote`, expected `"`, or `\'`',
+      'Cannot serialize title with `' + marker + '` for `options.quote`, expected `"`, or `\'`',
     )
   }
   return marker
@@ -279,9 +276,7 @@ function definition(node: M.Definition, _: any, state: State, info: Info) {
   if (!node.url || /[\0- \u007F]/.test(node.url)) {
     subexit = state.enter('destinationLiteral')
     value += tracker.move('<')
-    value += tracker.move(
-      state.safe(node.url, { before: value, after: '>' }),
-    )
+    value += tracker.move(state.safe(node.url, { before: value, after: '>' }))
     value += tracker.move('>')
   } else {
     subexit = state.enter('destinationRaw')
@@ -319,34 +314,30 @@ function checkEmphasis(state: State) {
   }
   return marker
 }
-function encodeCharacterReference(code2: number) {
-  return '&#x' + code2.toString(16).toUpperCase() + ';'
+function encodeCharacterReference(code: number) {
+  return '&#x' + code.toString(16).toUpperCase() + ';'
 }
-function markdownLineEndingOrSpace(code2: number) {
-  return code2 < 0 || code2 === 32
+function markdownLineEndingOrSpace(code: number) {
+  return code < 0 || code === Char.Space
 }
 const unicodePunctuation = regexCheck(/\p{P}|\p{S}/u)
 const unicodeWhitespace = regexCheck(/\s/)
 function regexCheck(regex: RegExp) {
   return check
-  function check(code2: number) {
-    return (
-      code2 > -1 && regex.test(String.fromCharCode(code2))
-    )
+  function check(code: number) {
+    return code > -1 && regex.test(String.fromCharCode(code))
   }
 }
-function classifyCharacter(code2: number) {
-  if (
-    markdownLineEndingOrSpace(code2) ||
-    unicodeWhitespace(code2)
-  ) {
-    return 1
+function classifyCharacter(code: number) {
+  if (markdownLineEndingOrSpace(code) || unicodeWhitespace(code)) {
+    return CharacterKind.Whitespace
   }
-  if (unicodePunctuation(code2)) {
-    return 2
+  if (unicodePunctuation(code)) {
+    return CharacterKind.Punctuation
   }
 }
 function encodeInfo(outside: number, inside: number, marker: string) {
+  // Encode boundary letters/whitespace only as needed for attention flanking.
   const outsideKind = classifyCharacter(outside)
   const insideKind = classifyCharacter(inside)
   if (outsideKind === void 0) {
@@ -354,20 +345,20 @@ function encodeInfo(outside: number, inside: number, marker: string) {
       ? marker === '_'
         ? { inside: true, outside: true }
         : { inside: false, outside: false }
-      : insideKind === 1
+      : insideKind === CharacterKind.Whitespace
         ? { inside: true, outside: true }
         : { inside: false, outside: true }
   }
-  if (outsideKind === 1) {
+  if (outsideKind === CharacterKind.Whitespace) {
     return insideKind === void 0
       ? { inside: false, outside: false }
-      : insideKind === 1
+      : insideKind === CharacterKind.Whitespace
         ? { inside: true, outside: true }
         : { inside: false, outside: false }
   }
   return insideKind === void 0
     ? { inside: false, outside: false }
-    : insideKind === 1
+    : insideKind === CharacterKind.Whitespace
       ? { inside: true, outside: false }
       : { inside: false, outside: false }
 }
@@ -377,26 +368,22 @@ function emphasis(node: M.Emphasis, _: any, state: State, info: Info) {
   const exit = state.enter('emphasis')
   const tracker = state.createTracker(info)
   const before = tracker.move(marker)
-  let between2 = tracker.move(
+  let content = tracker.move(
     state.containerPhrasing(node, {
       after: marker,
       before,
       ...tracker.current(),
     }),
   )
-  const betweenHead = between2.charCodeAt(0)
-  const open = encodeInfo(
-    info.before.charCodeAt(info.before.length - 1),
-    betweenHead,
-    marker,
-  )
+  const betweenHead = content.charCodeAt(0)
+  const open = encodeInfo(info.before.charCodeAt(info.before.length - 1), betweenHead, marker)
   if (open.inside) {
-    between2 = encodeCharacterReference(betweenHead) + between2.slice(1)
+    content = encodeCharacterReference(betweenHead) + content.slice(1)
   }
-  const betweenTail = between2.charCodeAt(between2.length - 1)
+  const betweenTail = content.charCodeAt(content.length - 1)
   const close = encodeInfo(info.after.charCodeAt(0), betweenTail, marker)
   if (close.inside) {
-    between2 = between2.slice(0, -1) + encodeCharacterReference(betweenTail)
+    content = content.slice(0, -1) + encodeCharacterReference(betweenTail)
   }
   const after = tracker.move(marker)
   exit()
@@ -404,7 +391,7 @@ function emphasis(node: M.Emphasis, _: any, state: State, info: Info) {
     after: close.outside,
     before: open.outside,
   }
-  return before + between2 + after
+  return before + content + after
 }
 function emphasisPeek(_: any, _1: any, state: State) {
   return state.options.emphasis || '*'
@@ -436,24 +423,24 @@ function formatHeadingAsSetext(node: M.Heading, state: State) {
   )
 }
 function heading(node: M.Heading, _: any, state: State, info: Info) {
-  const rank = Math.max(Math.min(6, node.depth || 1), 1)
+  const rank = Math.max(Math.min(MAX_HEADING_DEPTH, node.depth || 1), 1)
   const tracker = state.createTracker(info)
   if (formatHeadingAsSetext(node, state)) {
-    const exit2 = state.enter('headingSetext')
-    const subexit2 = state.enter('phrasing')
-    const value2 = state.containerPhrasing(node, {
+    const exitSetext = state.enter('headingSetext')
+    const exitPhrasing = state.enter('phrasing')
+    const headingText = state.containerPhrasing(node, {
       ...tracker.current(),
       before: '\n',
       after: '\n',
     })
-    subexit2()
-    exit2()
+    exitPhrasing()
+    exitSetext()
     return (
-      value2 +
+      headingText +
       '\n' +
       (rank === 1 ? '=' : '-').repeat(
-        value2.length -
-          (Math.max(value2.lastIndexOf('\r'), value2.lastIndexOf('\n')) + 1),
+        headingText.length -
+          (Math.max(headingText.lastIndexOf('\r'), headingText.lastIndexOf('\n')) + 1),
       )
     )
   }
@@ -492,17 +479,13 @@ function image(node: M.Image, _: any, state: State, info: Info) {
   let subexit = state.enter('label')
   const tracker = state.createTracker(info)
   let value = tracker.move('![')
-  value += tracker.move(
-    state.safe(node.alt, { before: value, after: ']' }),
-  )
+  value += tracker.move(state.safe(node.alt, { before: value, after: ']' }))
   value += tracker.move('](')
   subexit()
   if ((!node.url && node.title) || /[\0- \u007F]/.test(node.url)) {
     subexit = state.enter('destinationLiteral')
     value += tracker.move('<')
-    value += tracker.move(
-      state.safe(node.url, { before: value, after: '>' }),
-    )
+    value += tracker.move(state.safe(node.url, { before: value, after: '>' }))
     value += tracker.move('>')
   } else {
     subexit = state.enter('destinationRaw')
@@ -534,12 +517,7 @@ function imagePeek() {
   return '!'
 }
 imageReference.peek = imageReferencePeek
-function imageReference(
-  node: M.ImageReference,
-  _: any,
-  state: State,
-  info: Info,
-) {
+function imageReference(node: M.ImageReference, _: any, state: State, info: Info) {
   const type = node.referenceType
   const exit = state.enter('imageReference')
   let subexit = state.enter('label')
@@ -551,6 +529,7 @@ function imageReference(
   })
   value += tracker.move(alt + '][')
   subexit()
+  // Reference labels escape independently of their enclosing phrasing scope.
   const stack = state.stack
   state.stack = []
   subexit = state.enter('reference')
@@ -579,7 +558,7 @@ export function inlineCode(node: M.InlineCode, _: any, state: State) {
   const streaks = new Set<number>()
   for (let index = value.indexOf('`'); index !== -1; index = value.indexOf('`', index + 1)) {
     const start = index
-    while (value.charCodeAt(index + 1) === 96) index++
+    while (value.charCodeAt(index + 1) === Char.Backtick) index++
     streaks.add(index - start + 1)
   }
   let width = 1
@@ -597,10 +576,7 @@ export function inlineCode(node: M.InlineCode, _: any, state: State) {
     let match: RegExpExecArray | null
     while ((match = expression.exec(value))) {
       let position = match.index
-      if (
-        value.charCodeAt(position) === 10 &&
-        value.charCodeAt(position - 1) === 13
-      ) {
+      if (value.charCodeAt(position) === 10 && value.charCodeAt(position - 1) === 13) {
         position--
       }
       value = value.slice(0, position) + ' ' + value.slice(match.index + 1)
@@ -633,21 +609,22 @@ function link(node: M.Link, _: any, state: State, info: Info) {
   let exit: () => void
   let subexit: () => void
   if (formatLinkAsAutolink(node, state)) {
+    // Autolinks reset scope so enclosing constructs do not escape the URL text.
     const stack = state.stack
     state.stack = []
     exit = state.enter('autolink')
-    let value2 = tracker.move('<')
-    value2 += tracker.move(
+    let autolinkValue = tracker.move('<')
+    autolinkValue += tracker.move(
       state.containerPhrasing(node, {
-        before: value2,
+        before: autolinkValue,
         after: '>',
         ...tracker.current(),
       }),
     )
-    value2 += tracker.move('>')
+    autolinkValue += tracker.move('>')
     exit()
     state.stack = stack
-    return value2
+    return autolinkValue
   }
   exit = state.enter('link')
   subexit = state.enter('label')
@@ -664,9 +641,7 @@ function link(node: M.Link, _: any, state: State, info: Info) {
   if ((!node.url && node.title) || /[\0- \u007F]/.test(node.url)) {
     subexit = state.enter('destinationLiteral')
     value += tracker.move('<')
-    value += tracker.move(
-      state.safe(node.url, { before: value, after: '>' }),
-    )
+    value += tracker.move(state.safe(node.url, { before: value, after: '>' }))
     value += tracker.move('>')
   } else {
     subexit = state.enter('destinationRaw')
@@ -698,23 +673,18 @@ function linkPeek(node: M.Link, _: any, state: State) {
   return formatLinkAsAutolink(node, state) ? '<' : '['
 }
 linkReference.peek = linkReferencePeek
-function linkReference(
-  node: M.LinkReference,
-  _: any,
-  state: State,
-  info: Info,
-) {
+function linkReference(node: M.LinkReference, _: any, state: State, info: Info) {
   const type = node.referenceType
   const exit = state.enter('linkReference')
   let subexit = state.enter('label')
   const tracker = state.createTracker(info)
   let value = tracker.move('[')
-  const text2 = state.containerPhrasing(node, {
+  const labelText = state.containerPhrasing(node, {
     before: value,
     after: ']',
     ...tracker.current(),
   })
-  value += tracker.move(text2 + '][')
+  value += tracker.move(labelText + '][')
   subexit()
   const stack = state.stack
   state.stack = []
@@ -727,7 +697,7 @@ function linkReference(
   subexit()
   state.stack = stack
   exit()
-  if (type === 'full' || !text2 || text2 !== reference) {
+  if (type === 'full' || !labelText || labelText !== reference) {
     value += tracker.move(reference + ']')
   } else if (type === 'shortcut') {
     value = value.slice(0, -1)
@@ -800,14 +770,11 @@ function listBlock(node: M.List, parent: any, state: State, info: Info) {
   const exit = state.enter('list')
   const bulletCurrent = state.bulletCurrent
   let bullet = node.ordered ? checkBulletOrdered(state) : checkBullet(state)
-  const bulletOther = node.ordered
-    ? bullet === '.'
-      ? ')'
-      : '.'
-    : checkBulletOther(state)
+  const bulletOther = node.ordered ? (bullet === '.' ? ')' : '.') : checkBulletOther(state)
   let useDifferentMarker =
     parent && state.bulletLastUsed ? bullet === state.bulletLastUsed : false
   if (!node.ordered) {
+    // Different bullets keep empty nested lists from becoming thematic breaks.
     const firstListItem = node.children ? node.children[0] : void 0
     if (
       (bullet === '*' || bullet === '-') &&
@@ -823,6 +790,7 @@ function listBlock(node: M.List, parent: any, state: State, info: Info) {
     ) {
       useDifferentMarker = true
     }
+    // A thematic-break child can also force a different list marker.
     if (checkRule(state) === bullet && firstListItem) {
       let index = -1
       while (++index < node.children.length) {
@@ -861,22 +829,13 @@ function checkListItemIndent(state: State) {
   }
   return style
 }
-export function listItem(
-  node: M.ListItem,
-  parent: any,
-  state: State,
-  info: Info,
-) {
+export function listItem(node: M.ListItem, parent: any, state: State, info: Info) {
   const listItemIndent = checkListItemIndent(state)
   let bullet = state.bulletCurrent || checkBullet(state)
   if (parent && parent.type === 'list' && parent.ordered) {
     bullet =
-      (typeof parent.start === 'number' && parent.start > -1
-        ? parent.start
-        : 1) +
-      (state.options.incrementListMarker === false
-        ? 0
-        : parent.children.indexOf(node)) +
+      (typeof parent.start === 'number' && parent.start > -1 ? parent.start : 1) +
+      (state.options.incrementListMarker === false ? 0 : parent.children.indexOf(node)) +
       bullet
   }
   let size = bullet.length + 1
@@ -885,19 +844,16 @@ export function listItem(
     (listItemIndent === 'mixed' &&
       ((parent && parent.type === 'list' && parent.spread) || node.spread))
   ) {
-    size = Math.ceil(size / 4) * 4
+    size = Math.ceil(size / TAB_SIZE) * TAB_SIZE
   }
   const tracker = state.createTracker(info)
   tracker.move(bullet + ' '.repeat(size - bullet.length))
   tracker.shift(size)
   const exit = state.enter('listItem')
-  const value = state.indentLines(
-    state.containerFlow(node, tracker.current()),
-    map4,
-  )
+  const value = state.indentLines(state.containerFlow(node, tracker.current()), indentItemLine)
   exit()
   return value
-  function map4(line: string, index: number, blank: boolean) {
+  function indentItemLine(line: string, index: number, blank: boolean) {
     if (index) {
       return (blank ? '' : ' '.repeat(size)) + line
     }
@@ -950,26 +906,22 @@ function strong(node: M.Strong, _: any, state: State, info: Info) {
   const exit = state.enter('strong')
   const tracker = state.createTracker(info)
   const before = tracker.move(marker + marker)
-  let between2 = tracker.move(
+  let content = tracker.move(
     state.containerPhrasing(node, {
       after: marker,
       before,
       ...tracker.current(),
     }),
   )
-  const betweenHead = between2.charCodeAt(0)
-  const open = encodeInfo(
-    info.before.charCodeAt(info.before.length - 1),
-    betweenHead,
-    marker,
-  )
+  const betweenHead = content.charCodeAt(0)
+  const open = encodeInfo(info.before.charCodeAt(info.before.length - 1), betweenHead, marker)
   if (open.inside) {
-    between2 = encodeCharacterReference(betweenHead) + between2.slice(1)
+    content = encodeCharacterReference(betweenHead) + content.slice(1)
   }
-  const betweenTail = between2.charCodeAt(between2.length - 1)
+  const betweenTail = content.charCodeAt(content.length - 1)
   const close = encodeInfo(info.after.charCodeAt(0), betweenTail, marker)
   if (close.inside) {
-    between2 = between2.slice(0, -1) + encodeCharacterReference(betweenTail)
+    content = content.slice(0, -1) + encodeCharacterReference(betweenTail)
   }
   const after = tracker.move(marker + marker)
   exit()
@@ -977,7 +929,7 @@ function strong(node: M.Strong, _: any, state: State, info: Info) {
     after: close.outside,
     before: open.outside,
   }
-  return before + between2 + after
+  return before + content + after
 }
 function strongPeek(_: any, _1: any, state: State) {
   return state.options.strong || '*'
@@ -1000,8 +952,8 @@ function text(node: M.Text, _: any, state: State, info: Info) {
   return state.safe(node.value, info)
 }
 function checkRuleRepetition(state: State) {
-  const repetition = state.options.ruleRepetition || 3
-  if (repetition < 3) {
+  const repetition = state.options.ruleRepetition || MIN_THEMATIC_MARKERS
+  if (repetition < MIN_THEMATIC_MARKERS) {
     throw new Error(
       'Cannot serialize rules with repetition `' +
         repetition +
@@ -1011,9 +963,9 @@ function checkRuleRepetition(state: State) {
   return repetition
 }
 function thematicBreak(_: any, _1: any, state: State) {
-  const value = (
-    checkRule(state) + (state.options.ruleSpaces ? ' ' : '')
-  ).repeat(checkRuleRepetition(state))
+  const value = (checkRule(state) + (state.options.ruleSpaces ? ' ' : '')).repeat(
+    checkRuleRepetition(state),
+  )
   return state.options.ruleSpaces ? value.slice(0, -1) : value
 }
 const handle: Record<string, Handler> = {
@@ -1043,8 +995,7 @@ function joinDefaults(left: any, right: any, parent: any, state: State) {
   if (
     right.type === 'code' &&
     formatCodeAsIndented(right, state) &&
-    (left.type === 'list' ||
-      (left.type === right.type && formatCodeAsIndented(left, state)))
+    (left.type === 'list' || (left.type === right.type && formatCodeAsIndented(left, state)))
   ) {
     return false
   }
@@ -1171,6 +1122,7 @@ const unsafe: Unsafe[] = [
   { atBreak: true, character: '~' },
 ]
 function decodeString(value: string): string {
+  // Same CommonMark invalid-code-point rules as scan.ts; this path also handles labels.
   return value.replace(
     /\\([!-/:-@[-`{-~])|&(#(?:\d{1,7}|x[\da-f]{1,6})|[\da-z]{1,31});/gi,
     (whole, escape: string, reference: string) => {
@@ -1204,6 +1156,7 @@ function association(node: { label?: string | null; identifier?: string }) {
   return decodeString(node.identifier)
 }
 function containerPhrasing(parent: any, state: State, info: Info) {
+  // ── Peek neighbors, serialize each child, then repair attention boundaries ──
   const indexStack = state.indexStack
   const children = parent.children || []
   const results: string[] = []
@@ -1223,21 +1176,18 @@ function containerPhrasing(parent: any, state: State, info: Info) {
       const current = tracker.current()
       after = nextHandler
         ? nextHandler(children[index + 1], parent, state, {
-            before: '', after: '', now: current.now, lineShift: current.lineShift,
+            before: '',
+            after: '',
+            now: current.now,
+            lineShift: current.lineShift,
           }).charAt(0)
         : ''
     } else {
       after = info.after
     }
-    if (
-      results.length > 0 &&
-      (before === '\r' || before === '\n') &&
-      child.type === 'html'
-    ) {
-      results[results.length - 1] = results[results.length - 1].replace(
-        /(\r?\n|\r)$/,
-        ' ',
-      )
+    // A newline before inline HTML would reparse as flow HTML; replace it with a space.
+    if (results.length > 0 && (before === '\r' || before === '\n') && child.type === 'html') {
+      results[results.length - 1] = results[results.length - 1].replace(/(\r?\n|\r)$/, ' ')
       before = ' '
       tracker = state.createTracker(info)
       tracker.move(results.join(''))
@@ -1247,13 +1197,19 @@ function containerPhrasing(parent: any, state: State, info: Info) {
     childInfo.lineShift = current.lineShift
     childInfo.before = before
     childInfo.after = after
-    let value = child.type === 'text' && !state.customHandlers
-      ? safe(state, child.value, childInfo)
-      : state.handle(child, parent, state, state.customHandlers ? { ...childInfo } : childInfo)
+    let value =
+      child.type === 'text' && !state.customHandlers
+        ? safe(state, child.value, childInfo)
+        : state.handle(
+            child,
+            parent,
+            state,
+            state.customHandlers ? { ...childInfo } : childInfo,
+          )
     if (encodeAfter && encodeAfter === value.slice(0, 1)) {
-      value =
-        encodeCharacterReference(encodeAfter.charCodeAt(0)) + value.slice(1)
+      value = encodeCharacterReference(encodeAfter.charCodeAt(0)) + value.slice(1)
     }
+    // Attention handlers may request encoding on the preceding or following sibling.
     const encodingInfo = state.attentionEncodeSurroundingInfo
     state.attentionEncodeSurroundingInfo = void 0
     encodeAfter = void 0
@@ -1281,7 +1237,12 @@ function containerFlow(parent: any, state: State, info: Info) {
   const children = parent.children || []
   const tracker = state.createTracker(info)
   const results: string[] = []
-  const childInfo: Info = { before: '\n', after: '\n', now: info.now, lineShift: info.lineShift }
+  const childInfo: Info = {
+    before: '\n',
+    after: '\n',
+    now: info.now,
+    lineShift: info.lineShift,
+  }
   let index = -1
   indexStack.push(-1)
   while (++index < children.length) {
@@ -1299,15 +1260,14 @@ function containerFlow(parent: any, state: State, info: Info) {
       state.bulletLastUsed = void 0
     }
     if (index < children.length - 1) {
-      results.push(
-        tracker.move(between(child, children[index + 1], parent, state)),
-      )
+      results.push(tracker.move(between(child, children[index + 1], parent, state)))
     }
   }
   indexStack.pop()
   return results.join('')
 }
 function between(left: any, right: any, parent: any, state: State) {
+  // Join numbers count extra newlines; false requires an HTML-comment separator.
   let index = state.join.length
   while (index--) {
     const result = state.join[index](left, right, parent, state)
@@ -1325,7 +1285,7 @@ function between(left: any, right: any, parent: any, state: State) {
 }
 function indentLines(
   value: string,
-  map4: (line: string, index: number, blank: boolean) => string,
+  mapLine: (line: string, index: number, blank: boolean) => string,
 ): string {
   let result = ''
   let start = 0
@@ -1335,9 +1295,8 @@ function indentLines(
   while (lf !== -1 || cr !== -1) {
     const index = lf === -1 ? cr : cr === -1 ? lf : Math.min(lf, cr)
     const segment = value.slice(start, index)
-    result += map4(segment, line, !segment)
-    const end =
-      index === cr && lf === cr + 1 ? index + 2 : index + 1
+    result += mapLine(segment, line, !segment)
+    const end = index === cr && lf === cr + 1 ? index + 2 : index + 1
     result += value.slice(index, end)
     start = end
     if (lf !== -1 && lf < end) lf = value.indexOf('\n', end)
@@ -1345,7 +1304,7 @@ function indentLines(
     line++
   }
   const segment = value.slice(start)
-  return result + map4(segment, line, !segment)
+  return result + mapLine(segment, line, !segment)
 }
 function track(config: Partial<TrackerInfo> = {}): Tracker {
   const options = config || {}
@@ -1386,9 +1345,11 @@ const untracked: Tracker = {
   move: (value) => value || '',
 }
 function needsTracking(options: StringifyOptions): boolean {
-  return Boolean(options.handlers && Object.keys(options.handlers).length) ||
+  return (
+    Boolean(options.handlers && Object.keys(options.handlers).length) ||
     Boolean(options.join?.length) ||
     Boolean(options.extensions?.some(needsTracking))
+  )
 }
 function stringifyTree(
   tree: Nodes,
@@ -1417,10 +1378,9 @@ function stringifyTree(
     createTracker: tracking ? track : () => untracked,
     compilePattern,
     enter,
-    handle: Object.assign(
-      (node, parent, state, info) => dispatch(node, parent, state, info),
-      { handlers: setup.handlers },
-    ),
+    handle: Object.assign((node, parent, state, info) => dispatch(node, parent, state, info), {
+      handlers: setup.handlers,
+    }),
     indentLines,
     indexStack: [],
     safe: safeBound,
@@ -1462,6 +1422,7 @@ function dispatch(node: any, parent: any, state: State, info: Info): string {
   if (handler !== handle[node.type]) {
     return handler ? handler(node, parent, state, info) : unknown(node)
   }
+  // Direct built-in calls avoid megamorphic dispatch while retaining user overrides.
   switch (node.type) {
     case 'blockquote':
       return blockquote(node, parent, state, info)
@@ -1521,18 +1482,10 @@ function containerPhrasingBound(this: State, parent: any, info: Info) {
 function containerFlowBound(this: State, parent: any, info: Info) {
   return containerFlow(parent, this, info)
 }
-function safeBound(
-  this: State,
-  value: string | null | undefined,
-  config: SafeConfig,
-) {
+function safeBound(this: State, value: string | null | undefined, config: SafeConfig) {
   return safe(this, value, config)
 }
-export function toMarkdown(
-  tree: Nodes,
-  config: Config,
-  options: StringifyOptions = {},
-) {
+export function toMarkdown(tree: Nodes, config: Config, options: StringifyOptions = {}) {
   const extensions: StringifyOptions[] = []
   if (config.mdx) extensions.push(mdxToMarkdown(options))
   if (config.frontmatter)
@@ -1543,25 +1496,29 @@ export function toMarkdown(
       ]),
     )
   if (config.gfm) extensions.push(gfmToMarkdown(options))
-  if (config.headingId) extensions.push({
-    handlers: {
-      idString(node) {
-        return '{#' + node.value.replace(/[&{}\\\r\n\t|]/g, (c: string) => '&#' + c.charCodeAt(0) + ';') + '}'
+  if (config.headingId)
+    extensions.push({
+      handlers: {
+        idString(node) {
+          return (
+            '{#' +
+            node.value.replace(/[&{}\\\r\n\t|]/g, (c: string) => '&#' + c.charCodeAt(0) + ';') +
+            '}'
+          )
+        },
       },
-    },
-  })
+    })
   extensions.push(...(options.extensions || []))
+  const customHandlers = needsTracking(options)
   return stringifyTree(
     tree,
     { ...options, extensions },
     config,
     hasCustomUnsafe(options),
-    needsTracking(options) || Boolean(config.mdx && Number.isFinite(options.printWidth)),
-    needsTracking(options),
+    customHandlers || Boolean(config.mdx && Number.isFinite(options.printWidth)),
+    customHandlers,
   )
 }
 function hasCustomUnsafe(options: StringifyOptions): boolean {
-  return Boolean(
-    options.unsafe?.length || options.extensions?.some(hasCustomUnsafe),
-  )
+  return Boolean(options.unsafe?.length || options.extensions?.some(hasCustomUnsafe))
 }

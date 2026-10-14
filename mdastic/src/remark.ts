@@ -1,3 +1,5 @@
+// Run tree-only remark transformers with a small processor/file adapter.
+// This is not a unified pipeline and does not support parser extensions.
 import type { Root } from './types.ts'
 
 export interface RemarkFile {

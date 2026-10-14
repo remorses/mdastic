@@ -1,6 +1,17 @@
-// GFM and MDX serializer ports (MIT, Titus Wormer and contributors; license in stringify.ts).
+// GFM, MDX and frontmatter serializer ports (MIT; license in stringify.ts).
+// Handler factories capture formatting options once, outside the token loops.
 import type * as M from './types.ts'
 import type { Unsafe } from './stringify-safe.ts'
+import { Char } from './scan.ts'
+
+const enum TableAlignment {
+  None = 0,
+  Center = 99,
+  Left = 108,
+  Right = 114,
+}
+const FOOTNOTE_INDENT = 4
+const JSX_INDENT = 2
 import {
   inlineCode,
   listItem,
@@ -56,19 +67,12 @@ footnoteReference.peek = footnoteReferencePeek
 function footnoteReferencePeek() {
   return '['
 }
-function footnoteReference(
-  node: M.FootnoteReference,
-  _: any,
-  state: State,
-  info: Info,
-) {
+function footnoteReference(node: M.FootnoteReference, _: any, state: State, info: Info) {
   const tracker = state.createTracker(info)
   let value = tracker.move('[^')
   const exit = state.enter('footnoteReference')
   const subexit = state.enter('reference')
-  value += tracker.move(
-    state.safe(state.associationId(node), { after: ']', before: value }),
-  )
+  value += tracker.move(state.safe(state.associationId(node), { after: ']', before: value }))
   subexit()
   exit()
   value += tracker.move(']')
@@ -81,27 +85,18 @@ function gfmFootnoteToMarkdown(options: StringifyOptions) {
   }
   return {
     handlers: { footnoteDefinition, footnoteReference },
-    unsafe: [
-      { character: '[', inConstruct: ['label', 'phrasing', 'reference'] },
-    ],
+    unsafe: [{ character: '[', inConstruct: ['label', 'phrasing', 'reference'] }],
   }
-  function footnoteDefinition(
-    node: M.FootnoteDefinition,
-    _: any,
-    state: State,
-    info: Info,
-  ) {
+  function footnoteDefinition(node: M.FootnoteDefinition, _: any, state: State, info: Info) {
     const tracker = state.createTracker(info)
     let value = tracker.move('[^')
     const exit = state.enter('footnoteDefinition')
     const subexit = state.enter('label')
-    value += tracker.move(
-      state.safe(state.associationId(node), { before: value, after: ']' }),
-    )
+    value += tracker.move(state.safe(state.associationId(node), { before: value, after: ']' }))
     subexit()
     value += tracker.move(']:')
     if (node.children && node.children.length > 0) {
-      tracker.shift(4)
+      tracker.shift(FOOTNOTE_INDENT)
       value += tracker.move(
         (firstLineBlank ? '\n' : ' ') +
           state.indentLines(
@@ -128,7 +123,6 @@ const constructsWithoutStrikethrough = [
   'titleQuote',
   'titleApostrophe',
 ]
-handleDelete.attention = attentionDelete
 handleDelete.peek = peekDelete
 function gfmStrikethroughToMarkdown() {
   return {
@@ -144,6 +138,7 @@ function gfmStrikethroughToMarkdown() {
 }
 function handleDelete(node: M.Delete, _: any, state: State, info: Info) {
   const tracker = state.createTracker(info)
+  // Nested strikethrough switches marker length to preserve the outer run.
   const sequence = state.stack.includes('strikethrough') ? '~' : '~~'
   const exit = state.enter('strikethrough')
   let value = tracker.move(sequence)
@@ -155,9 +150,6 @@ function handleDelete(node: M.Delete, _: any, state: State, info: Info) {
   value += tracker.move(sequence)
   exit()
   return value
-}
-function attentionDelete() {
-  return { construct: 'strikethrough', markers: ['~'], sizes: [2, 1] }
 }
 function peekDelete() {
   return '~'
@@ -174,6 +166,7 @@ interface TableOptions {
   delimiterEnd?: boolean
 }
 function markdownTable(table: string[][], options: TableOptions) {
+  // ── Measure serialized cells once, collecting maximum width per column ──
   const settings = options || {}
   const align = (settings.align || []).concat()
   const stringLength = settings.stringLength || defaultStringLength
@@ -184,62 +177,60 @@ function markdownTable(table: string[][], options: TableOptions) {
   let mostCellsPerRow = 0
   let rowIndex = -1
   while (++rowIndex < table.length) {
-    const row2: string[] = []
-    const sizes2: number[] = []
-    let columnIndex2 = -1
+    const cells: string[] = []
+    const cellWidths: number[] = []
+    let cellIndex = -1
     if (table[rowIndex].length > mostCellsPerRow) {
       mostCellsPerRow = table[rowIndex].length
     }
-    while (++columnIndex2 < table[rowIndex].length) {
-      const cell = serialize(table[rowIndex][columnIndex2])
+    while (++cellIndex < table[rowIndex].length) {
+      const cell = serialize(table[rowIndex][cellIndex])
       if (settings.alignDelimiters !== false) {
         const size = stringLength(cell)
-        sizes2[columnIndex2] = size
+        cellWidths[cellIndex] = size
         if (
-          longestCellByColumn[columnIndex2] === void 0 ||
-          size > longestCellByColumn[columnIndex2]
+          longestCellByColumn[cellIndex] === void 0 ||
+          size > longestCellByColumn[cellIndex]
         ) {
-          longestCellByColumn[columnIndex2] = size
+          longestCellByColumn[cellIndex] = size
         }
       }
-      row2.push(cell)
+      cells.push(cell)
     }
-    cellMatrix[rowIndex] = row2
-    sizeMatrix[rowIndex] = sizes2
+    cellMatrix[rowIndex] = cells
+    sizeMatrix[rowIndex] = cellWidths
   }
+  // ── Normalize per-column alignment, then construct the delimiter row ──
   let columnIndex = -1
   if (Array.isArray(align)) {
     while (++columnIndex < mostCellsPerRow) {
       alignments[columnIndex] = toAlignment(align[columnIndex])
     }
   } else {
-    const code2 = toAlignment(align)
+    const alignment = toAlignment(align)
     while (++columnIndex < mostCellsPerRow) {
-      alignments[columnIndex] = code2
+      alignments[columnIndex] = alignment
     }
   }
   columnIndex = -1
   const row: string[] = []
   const sizes: number[] = []
   while (++columnIndex < mostCellsPerRow) {
-    const code2 = alignments[columnIndex]
+    const alignment = alignments[columnIndex]
     let before = ''
     let after = ''
-    if (code2 === 99) {
+    if (alignment === TableAlignment.Center) {
       before = ':'
       after = ':'
-    } else if (code2 === 108) {
+    } else if (alignment === TableAlignment.Left) {
       before = ':'
-    } else if (code2 === 114) {
+    } else if (alignment === TableAlignment.Right) {
       after = ':'
     }
     let size =
       settings.alignDelimiters === false
         ? 1
-        : Math.max(
-            1,
-            longestCellByColumn[columnIndex] - before.length - after.length,
-          )
+        : Math.max(1, longestCellByColumn[columnIndex] - before.length - after.length)
     const cell = before + '-'.repeat(size) + after
     if (settings.alignDelimiters !== false) {
       size = before.length + size + after.length
@@ -252,24 +243,24 @@ function markdownTable(table: string[][], options: TableOptions) {
   }
   cellMatrix.splice(1, 0, row)
   sizeMatrix.splice(1, 0, sizes)
+  // ── Pad each cell to its column width and emit the requested pipe layout ──
   rowIndex = -1
   const lines: string[] = []
   while (++rowIndex < cellMatrix.length) {
-    const row2 = cellMatrix[rowIndex]
-    const sizes2 = sizeMatrix[rowIndex]
+    const cells = cellMatrix[rowIndex]
+    const cellWidths = sizeMatrix[rowIndex]
     columnIndex = -1
     const line: string[] = []
     while (++columnIndex < mostCellsPerRow) {
-      const cell = row2[columnIndex] || ''
+      const cell = cells[columnIndex] || ''
       let before = ''
       let after = ''
       if (settings.alignDelimiters !== false) {
-        const size =
-          longestCellByColumn[columnIndex] - (sizes2[columnIndex] || 0)
-        const code2 = alignments[columnIndex]
-        if (code2 === 114) {
+        const size = longestCellByColumn[columnIndex] - (cellWidths[columnIndex] || 0)
+        const alignment = alignments[columnIndex]
+        if (alignment === TableAlignment.Right) {
           before = ' '.repeat(size)
-        } else if (code2 === 99) {
+        } else if (alignment === TableAlignment.Center) {
           if (size % 2) {
             before = ' '.repeat(size / 2 + 0.5)
             after = ' '.repeat(size / 2 - 0.5)
@@ -301,17 +292,12 @@ function markdownTable(table: string[][], options: TableOptions) {
       if (settings.padding !== false) {
         line.push(' ')
       }
-      if (
-        settings.delimiterEnd !== false ||
-        columnIndex !== mostCellsPerRow - 1
-      ) {
+      if (settings.delimiterEnd !== false || columnIndex !== mostCellsPerRow - 1) {
         line.push('|')
       }
     }
     lines.push(
-      settings.delimiterEnd === false
-        ? line.join('').replace(/ +$/, '')
-        : line.join(''),
+      settings.delimiterEnd === false ? line.join('').replace(/ +$/, '') : line.join(''),
     )
   }
   return lines.join('\n')
@@ -320,14 +306,14 @@ function serialize(value: string | null | undefined) {
   return value === null || value === void 0 ? '' : String(value)
 }
 function toAlignment(value: string | null | undefined) {
-  const code2 = typeof value === 'string' ? value.codePointAt(0) : 0
-  return code2 === 67 || code2 === 99
-    ? 99
-    : code2 === 76 || code2 === 108
-      ? 108
-      : code2 === 82 || code2 === 114
-        ? 114
-        : 0
+  const code = typeof value === 'string' ? value.codePointAt(0) : 0
+  return code === Char.UpperC || code === Char.LowerC
+    ? TableAlignment.Center
+    : code === Char.UpperL || code === Char.LowerL
+      ? TableAlignment.Left
+      : code === Char.UpperR || code === Char.LowerR
+        ? TableAlignment.Right
+        : TableAlignment.None
 }
 function gfmTableToMarkdown(options: StringifyOptions) {
   const settings = options || {}
@@ -359,12 +345,7 @@ function gfmTableToMarkdown(options: StringifyOptions) {
     const value = serializeData([row], undefined)
     return value.slice(0, value.indexOf('\n'))
   }
-  function handleTableCell(
-    node: M.TableCell,
-    _: any,
-    state: State,
-    info: Info,
-  ) {
+  function handleTableCell(node: M.TableCell, _: any, state: State, info: Info) {
     const exit = state.enter('tableCell')
     const subexit = state.enter('phrasing')
     const value = state.containerPhrasing(node, {
@@ -420,15 +401,9 @@ function gfmTaskListItemToMarkdown() {
     handlers: { listItem: listItemWithTaskListItem },
   }
 }
-function listItemWithTaskListItem(
-  node: M.ListItem,
-  parent: any,
-  state: State,
-  info: Info,
-) {
+function listItemWithTaskListItem(node: M.ListItem, parent: any, state: State, info: Info) {
   const head = node.children[0]
-  const checkable =
-    typeof node.checked === 'boolean' && head && head.type === 'paragraph'
+  const checkable = typeof node.checked === 'boolean' && head && head.type === 'paragraph'
   const checkbox = '[' + (node.checked ? 'x' : ' ') + '] '
   const tracker = state.createTracker(info)
   if (checkable) {
@@ -439,6 +414,7 @@ function listItemWithTaskListItem(
     ...tracker.current(),
   })
   if (checkable) {
+    // Inject after the serialized marker, using the same matching rule as upstream.
     value = value.replace(/^(?:[*+-]|\d+\.)([\r\n]| {1,3})/, check)
   }
   return value
@@ -482,9 +458,7 @@ function handleMdxExpression(
 }
 function stringifyEntitiesLight(value: string, options: { subset: string[] }) {
   const quote = options.subset[0]
-  return value
-    .split(quote)
-    .join('&#x' + quote.charCodeAt(0).toString(16).toUpperCase() + ';')
+  return value.split(quote).join('&#x' + quote.charCodeAt(0).toString(16).toUpperCase() + ';')
 }
 const indent = '  '
 function mdxJsxToMarkdown(options: StringifyOptions) {
@@ -520,10 +494,9 @@ function mdxJsxToMarkdown(options: StringifyOptions) {
     state: State,
     info: Info,
   ) {
+    // ── Determine element shape and the enclosing JSX depth ──
     const flow = node.type === 'mdxJsxFlowElement'
-    const selfClosing = node.name
-      ? !node.children || node.children.length === 0
-      : false
+    const selfClosing = node.name ? !node.children || node.children.length === 0 : false
     const depth = inferDepth(state)
     const currentIndent = createIndent(depth)
     const trackerOneLine = state.createTracker(info)
@@ -533,6 +506,7 @@ function mdxJsxToMarkdown(options: StringifyOptions) {
     const exit = state.enter(node.type)
     trackerOneLine.move(prefix)
     trackerMultiLine.move(prefix)
+    // ── Serialize attributes before deciding single-line versus multiline layout ──
     if (node.attributes && node.attributes.length > 0) {
       if (!node.name) {
         throw new Error('Cannot serialize fragment w/ attributes')
@@ -547,20 +521,20 @@ function mdxJsxToMarkdown(options: StringifyOptions) {
           if (!attribute.name) {
             throw new Error('Cannot serialize attribute w/o name')
           }
-          const value2 = attribute.value
+          const attributeValue = attribute.value
           const left = attribute.name
           let right = ''
-          if (value2 === null || value2 === void 0) {
-          } else if (typeof value2 === 'object') {
-            right = '{' + (value2.value || '') + '}'
+          if (attributeValue === null || attributeValue === void 0) {
+          } else if (typeof attributeValue === 'object') {
+            right = '{' + (attributeValue.value || '') + '}'
           } else {
             const appliedQuote =
-              quoteSmart && ccount(value2, quote) > ccount(value2, alternative)
+              quoteSmart && ccount(attributeValue, quote) > ccount(attributeValue, alternative)
                 ? alternative
                 : quote
             right =
               appliedQuote +
-              stringifyEntitiesLight(value2, { subset: [appliedQuote] }) +
+              stringifyEntitiesLight(attributeValue, { subset: [appliedQuote] }) +
               appliedQuote
           }
           result = left + (right ? '=' : '') + right
@@ -568,6 +542,7 @@ function mdxJsxToMarkdown(options: StringifyOptions) {
         serializedAttributes.push(result)
       }
     }
+    // Multiline attributes depend on flow context and print width, not inline depth.
     let attributesOnTheirOwnLine = false
     const attributesOnOneLine = serializedAttributes.join(' ')
     if (
@@ -580,27 +555,24 @@ function mdxJsxToMarkdown(options: StringifyOptions) {
     ) {
       attributesOnTheirOwnLine = true
     }
+    // ── Emit the opening tag using the chosen attribute layout ──
     let tracker = trackerOneLine
     let value = prefix
     if (attributesOnTheirOwnLine) {
       tracker = trackerMultiLine
       let index = -1
       while (++index < serializedAttributes.length) {
-        serializedAttributes[index] =
-          currentIndent + indent + serializedAttributes[index]
+        serializedAttributes[index] = currentIndent + indent + serializedAttributes[index]
       }
-      value += tracker.move(
-        '\n' + serializedAttributes.join('\n') + '\n' + currentIndent,
-      )
+      value += tracker.move('\n' + serializedAttributes.join('\n') + '\n' + currentIndent)
     } else if (attributesOnOneLine) {
       value += tracker.move(' ' + attributesOnOneLine)
     }
     if (selfClosing) {
-      value += tracker.move(
-        (tightSelfClosing || attributesOnTheirOwnLine ? '' : ' ') + '/',
-      )
+      value += tracker.move((tightSelfClosing || attributesOnTheirOwnLine ? '' : ' ') + '/')
     }
     value += tracker.move('>')
+    // ── Inline children use phrasing; flow children use fixed JSX separation ──
     if (node.children && node.children.length > 0) {
       if (node.type === 'mdxJsxTextElement') {
         value += tracker.move(
@@ -611,22 +583,21 @@ function mdxJsxToMarkdown(options: StringifyOptions) {
           }),
         )
       } else {
-        tracker.shift(2)
+        tracker.shift(JSX_INDENT)
         value += tracker.move('\n')
-        value += tracker.move(containerFlow2(node, state, tracker.current()))
+        value += tracker.move(containerJsxFlow(node, state, tracker.current()))
         value += tracker.move('\n')
       }
     }
     if (!selfClosing) {
-      value += tracker.move(
-        (flow ? currentIndent : '') + '</' + (node.name || '') + '>',
-      )
+      value += tracker.move((flow ? currentIndent : '') + '</' + (node.name || '') + '>')
     }
     exit()
     return value
   }
 }
-function containerFlow2(parent: any, state: State, info: TrackerInfo) {
+function containerJsxFlow(parent: any, state: State, info: TrackerInfo) {
+  // JSX flow has fixed blank separation and depth indentation, unlike Markdown joins.
   const indexStack = state.indexStack
   const children = parent.children
   const tracker = state.createTracker(info)
@@ -661,6 +632,7 @@ function inferDepth(state: State) {
   let index = state.stack.length
   while (--index > -1) {
     const name = state.stack[index]
+    // Markdown containers reset JSX indentation depth.
     if (name === 'blockquote' || name === 'listItem') break
     if (name === 'mdxJsxFlowElement') depth++
   }
@@ -680,11 +652,7 @@ function handleMdxjsEsm(node: M.MdxjsEsm) {
 }
 export function mdxToMarkdown(options: StringifyOptions) {
   return {
-    extensions: [
-      mdxExpressionToMarkdown(),
-      mdxJsxToMarkdown(options),
-      mdxjsEsmToMarkdown(),
-    ],
+    extensions: [mdxExpressionToMarkdown(), mdxJsxToMarkdown(options), mdxjsEsmToMarkdown()],
   }
 }
 export function frontmatterToMarkdown(types: string[]) {
@@ -693,10 +661,7 @@ export function frontmatterToMarkdown(types: string[]) {
   for (const type of types) {
     const marker = type === 'yaml' ? '-' : '+'
     handlers[type] = (node: any) =>
-      marker.repeat(3) +
-      (node.value ? '\n' + node.value : '') +
-      '\n' +
-      marker.repeat(3)
+      marker.repeat(3) + (node.value ? '\n' + node.value : '') + '\n' + marker.repeat(3)
     unsafe.push({ atBreak: true, character: marker, after: '\\' + marker })
   }
   return { handlers, unsafe }

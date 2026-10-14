@@ -1,16 +1,25 @@
+// Predict expression boundaries with Acorn, validate JavaScript, and remap ESTree.
+// Failed predictions retain micromark-compatible closing-brace retries and errors.
 import type { MdxSyntax } from './syntax.ts'
 import { MdxParseError } from './syntax.ts'
-import { isWhitespace, point, space } from './scan.ts'
+import { Char, isWhitespace, point, space, TAB_SIZE } from './scan.ts'
 import { offset, type View } from './inline.ts'
 
+const ACORN_LANGUAGE_VERSION = 2024
+const EXPRESSION_KEY_STRIDE = 4
+const SPREAD_KEY_BIT = 2
+const ALLOW_EMPTY_KEY_BIT = 1
+const MDX_CONTINUATION_INDENT = 2
+
 const options = {
-  ecmaVersion: 2024 as const,
+  ecmaVersion: ACORN_LANGUAGE_VERSION,
   sourceType: 'module' as const,
   locations: true,
   preserveParens: true,
-}
+} as const
 
 function empty(value: string): boolean {
+  // Comment-only expressions are empty, except an unclosed EOF line comment.
   let start = 0
   let stripped = ''
   for (;;) {
@@ -22,7 +31,7 @@ function empty(value: string): boolean {
     start = close + 2
   }
   if (start) value = stripped + value.slice(start)
-  for (let i = 0; i < value.length;) {
+  for (let i = 0; i < value.length; ) {
     const c = value.charCodeAt(i)
     if (isWhitespace(c)) {
       i++
@@ -48,6 +57,7 @@ export function mdxError(
 }
 
 function remap(value: any, map: (i: number) => number): void {
+  // Acorn columns are zero-based; point() returns one-based mdast source columns.
   if (!value || typeof value !== 'object') return
   if (typeof value.type === 'string' && typeof value.start === 'number') {
     const start = point(map(value.start))
@@ -66,6 +76,7 @@ function remap(value: any, map: (i: number) => number): void {
     if (Array.isArray(child)) {
       for (let i = 0; i < child.length; i++) {
         remap(child[i], map)
+        // Validation preserves parens, but remark's attached ESTree omits the wrappers.
         if (child[i]?.type === 'ParenthesizedExpression') child[i] = child[i].expression
       }
     } else if (child && typeof child === 'object') {
@@ -83,6 +94,7 @@ export function acornProgram(
   spread = false,
   allowEmpty = true,
 ): { program?: any; error?: any; swallow?: boolean } {
+  // ── Wrap spreads as object expressions for Acorn validation ──
   const comments: any[] = []
   const prefix = spread ? '({' : ''
   const suffix = spread ? '})' : ''
@@ -92,6 +104,7 @@ export function acornProgram(
     mdxError('Unexpected empty expression', map(0), 'unexpected-empty-expression')
   const mapped = (i: number) => map(Math.max(0, Math.min(value.length, i - prefix.length)))
   let program: any
+  // ── Parse once, preserving incomplete-input status for ESM continuation ──
   try {
     program =
       expression && !isEmpty
@@ -106,6 +119,7 @@ export function acornProgram(
     }
   }
   if (expression && !isEmpty) {
+    // parseExpressionAt does not validate any trailing content on its own.
     if (!empty(source.slice(program.end, source.length - suffix.length)))
       return { error: { at: mapped(program.end) } }
     if (!syntax.estree && !spread) return { program }
@@ -126,6 +140,7 @@ export function acornProgram(
     }
   }
   program.comments = comments
+  // ── Remap offsets and validate the one-spread-only MDX attribute contract ──
   if (syntax.estree || spread || !expression) remap(program, mapped)
   if (spread) {
     const head = program.body[0]
@@ -187,15 +202,20 @@ export function expression(
   spread = false,
   allowEmpty = true,
 ): Expression {
-  const key = start * 4 + (spread ? 2 : 0) + (allowEmpty ? 1 : 0)
+  // Two option bits follow the start offset; the WeakMap releases document views.
+  const key =
+    start * EXPRESSION_KEY_STRIDE +
+    (spread ? SPREAD_KEY_BIT : 0) +
+    (allowEmpty ? ALLOW_EMPTY_KEY_BIT : 0)
   const cached = expressions.get(view)?.get(key)
   if (cached && cached.end <= end) return cached
   const source = view.source
   const predicted = candidate(source.slice(0, end), start + 1, syntax)
   let lastCrash: any
   const first = predicted >= 0 ? predicted : start + 1
+  // Prediction is only an optimization; retry later braces to preserve upstream errors.
   for (let close = first; close < end; close++) {
-    if (source.charCodeAt(close) !== 125) continue
+    if (source.charCodeAt(close) !== Char.RightBrace) continue
     const content = collect(view, start + 1, close, true)
     const parsed = content.virtual ? collect(view, start + 1, close, true, false) : content
     const result = acornProgram(parsed.value, syntax, parsed.map, true, spread, allowEmpty)
@@ -250,8 +270,12 @@ export function collect(
     ending = offset(view, i) + 1
     if (strip && (c === 10 || (c === 13 && view.source.charCodeAt(i + 1) !== 10))) {
       let size = 0
-      while (i + 1 < end && space(view.source.charCodeAt(i + 1)) && size < 2) {
-        const tab = view.source.charCodeAt(i + 1) === 9
+      while (
+        i + 1 < end &&
+        space(view.source.charCodeAt(i + 1)) &&
+        size < MDX_CONTINUATION_INDENT
+      ) {
+        const tab = view.source.charCodeAt(i + 1) === Char.Tab
         let width = 1
         if (tab) {
           let lineStart = i + 1
@@ -261,17 +285,18 @@ export function collect(
             view.source.charCodeAt(lineStart - 1) !== 13
           )
             lineStart--
-          width = 4 - ((i + 1 - lineStart) % 4)
+          width = TAB_SIZE - ((i + 1 - lineStart) % TAB_SIZE)
         }
         size += width
         i++
-        if (size > 2) {
+        if (size > MDX_CONTINUATION_INDENT) {
           virtual = true
           ending = offset(view, i) + 1
           // mdast retains virtual spaces; Acorn collection drops leading virtual spaces.
           if (keepVirtual) {
-            value += ' '.repeat(size - 2)
-            for (let k = 2; k < size; k++) indices.push(offset(view, i) + 1)
+            value += ' '.repeat(size - MDX_CONTINUATION_INDENT)
+            for (let k = MDX_CONTINUATION_INDENT; k < size; k++)
+              indices.push(offset(view, i) + 1)
           }
         }
       }

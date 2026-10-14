@@ -1,6 +1,8 @@
+// MDX hooks scan JSX, attributes and ESM, then resolve deferred JSX nesting.
+// Inline tags remain tokens until Markdown links and attention have resolved.
 import type { MdxSyntax } from './syntax.ts'
 import { MdxParseError } from './syntax.ts'
-import { alpha, digit, entity, isWhitespace, point, position, space } from './scan.ts'
+import { alpha, Char, digit, entity, isWhitespace, point, position, space } from './scan.ts'
 import { append, Kind, node, tree } from './tree.ts'
 import { offset, type View } from './inline.ts'
 import type { BlockContext, Line } from './block.ts'
@@ -17,12 +19,15 @@ interface Tag {
   selfClosing: boolean
 }
 const nameStart = (c: number) =>
-  alpha(c) || c === 36 || c === 95 || (c > 127 && /\p{ID_Start}/u.test(String.fromCharCode(c)))
+  alpha(c) ||
+  c === Char.Dollar ||
+  c === Char.Underscore ||
+  (c > Char.Delete && /\p{ID_Start}/u.test(String.fromCharCode(c)))
 const nameContinue = (c: number) =>
   nameStart(c) ||
   digit(c) ||
-  c === 45 ||
-  (c > 127 && /\p{ID_Continue}/u.test(String.fromCharCode(c)))
+  c === Char.Hyphen ||
+  (c > Char.Delete && /\p{ID_Continue}/u.test(String.fromCharCode(c)))
 const beforeName = 'a character that can start a name, such as a letter, `$`, or `_`'
 const beforeAttribute =
   'a character that can start an attribute name, such as a letter, `$`, or `_`; whitespace before attributes; or the end of the tag'
@@ -34,11 +39,12 @@ const afterAttribute =
   'a character that can start an attribute name, such as a letter, `$`, or `_`; `=` to initialize a value; or the end of the tag'
 
 function tag(view: View, start: number, end: number, syntax: MdxSyntax): Tag | undefined {
+  // ── Cursor helpers retain the exact upstream diagnostic wording ──
   const source = view.source
   if (
     space(source.charCodeAt(start + 1)) ||
-    source.charCodeAt(start + 1) === 10 ||
-    source.charCodeAt(start + 1) === 13
+    source.charCodeAt(start + 1) === Char.LineFeed ||
+    source.charCodeAt(start + 1) === Char.CarriageReturn
   )
     return
   let i = start + 1
@@ -68,12 +74,16 @@ function tag(view: View, start: number, end: number, syntax: MdxSyntax): Tag | u
       )
     const c = source.charCodeAt(i)
     const eof = i >= end
-    const char = c === 96 ? '` ` `' : source[i]
+    const char = c === Char.Backtick ? '` ` `' : source[i]
     const reason =
       'Unexpected ' +
       (eof
         ? 'end of file'
-        : 'character `' + char + '` (U+' + c.toString(16).toUpperCase().padStart(4, '0') + ')') +
+        : 'character `' +
+          char +
+          '` (U+' +
+          c.toString(16).toUpperCase().padStart(4, '0') +
+          ')') +
       ' ' +
       at +
       ', expected ' +
@@ -85,8 +95,9 @@ function tag(view: View, start: number, end: number, syntax: MdxSyntax): Tag | u
       'micromark-extension-mdx-jsx',
     )
   }
+  // ── Opening/closing prefix, then qualified element name ──
   skip()
-  const close = source.charCodeAt(i) === 47
+  const close = source.charCodeAt(i) === Char.Slash
   if (close) {
     i++
     skip()
@@ -98,65 +109,79 @@ function tag(view: View, start: number, end: number, syntax: MdxSyntax): Tag | u
     return source.slice(begin, i)
   }
   let name: string | null = null
-  if (source.charCodeAt(i) !== 62) {
+  if (source.charCodeAt(i) !== Char.GreaterThan) {
     const c = source.charCodeAt(i)
     name = readName(
       'name',
       beforeName +
-        (c === 33
+        (c === Char.Exclamation
           ? ' (note: to create a comment in MDX, use `{/* text */}`)'
-          : close && (c === 42 || c === 47)
+          : close && (c === Char.Asterisk || c === Char.Slash)
             ? ' (note: JS comments in JSX tags are not supported in MDX)'
             : ''),
     )
+    // Member names allow dots; namespace local names cannot continue with dots or colons.
     let mode = 'name'
     for (;;) {
       const c = source.charCodeAt(i)
       if (
         !isWhitespace(c) &&
-        ((c === 46 && mode === 'local name') ||
-          (c === 58 && mode !== 'name') ||
-          (c !== 46 && c !== 58 && c !== 47 && c !== 62 && c !== 123))
+        ((c === Char.Dot && mode === 'local name') ||
+          (c === Char.Colon && mode !== 'name') ||
+          (c !== Char.Dot &&
+            c !== Char.Colon &&
+            c !== Char.Slash &&
+            c !== Char.GreaterThan &&
+            c !== Char.LeftBrace))
       )
         crash(
           'in ' + mode,
           inName +
-            (c === 64 && mode !== 'local name'
+            (c === Char.At && mode !== 'local name'
               ? ' (note: to create a link in MDX, use `[text](url)`)'
               : ''),
         )
       skip()
       const separator = source.charCodeAt(i)
-      if ((separator === 46 && mode !== 'local name') || (separator === 58 && mode === 'name')) {
+      if (
+        (separator === Char.Dot && mode !== 'local name') ||
+        (separator === Char.Colon && mode === 'name')
+      ) {
         i++
         skip()
-        mode = separator === 46 ? 'member name' : 'local name'
+        mode = separator === Char.Dot ? 'member name' : 'local name'
         name +=
-          (separator === 46 ? '.' : ':') +
+          (separator === Char.Dot ? '.' : ':') +
           readName(
             mode,
-            separator === 46
+            separator === Char.Dot
               ? beforeAttribute
               : beforeName +
-                  (source.charCodeAt(i) === 43 ||
-                  (source.charCodeAt(i) > 46 && source.charCodeAt(i) < 58)
+                  (source.charCodeAt(i) === Char.Plus ||
+                  (source.charCodeAt(i) > Char.Dot && source.charCodeAt(i) < Char.Colon)
                     ? ' (note: to create a link in MDX, use `[text](url)`)'
                     : ''),
           )
         continue
       }
-      if (separator !== 47 && separator !== 62 && separator !== 123 && !nameStart(separator))
+      if (
+        separator !== Char.Slash &&
+        separator !== Char.GreaterThan &&
+        separator !== Char.LeftBrace &&
+        !nameStart(separator)
+      )
         crash('after ' + mode, beforeAttribute)
       break
     }
   }
+  // ── Attributes and the optional self-closing suffix ──
   const attributes: Tag['attributes'] = []
   let selfClosing = false
-  while (i < end && source.charCodeAt(i) !== 62) {
+  while (i < end && source.charCodeAt(i) !== Char.GreaterThan) {
     skip()
     const c = source.charCodeAt(i)
-    if (c === 62) break
-    if (c === 47) {
+    if (c === Char.GreaterThan) break
+    if (c === Char.Slash) {
       if (close)
         mdxError(
           'Unexpected self-closing slash `/` in closing tag, expected the end of the tag',
@@ -167,11 +192,11 @@ function tag(view: View, start: number, end: number, syntax: MdxSyntax): Tag | u
       selfClosing = true
       i++
       skip()
-      if (source.charCodeAt(i) !== 62)
+      if (source.charCodeAt(i) !== Char.GreaterThan)
         crash(
           'after self-closing slash',
           '`>` to end the tag' +
-            (source.charCodeAt(i) === 42 || source.charCodeAt(i) === 47
+            (source.charCodeAt(i) === Char.Asterisk || source.charCodeAt(i) === Char.Slash
               ? ' (note: JS comments in JSX tags are not supported in MDX)'
               : ''),
         )
@@ -185,7 +210,7 @@ function tag(view: View, start: number, end: number, syntax: MdxSyntax): Tag | u
         'unexpected-attribute',
         'mdast-util-mdx-jsx',
       )
-    if (c === 123) {
+    if (c === Char.LeftBrace) {
       const result = expression(view, i, end, syntax, true, false)
       i = result.end
       const attribute: MdxJsxExpressionAttribute = {
@@ -203,38 +228,45 @@ function tag(view: View, start: number, end: number, syntax: MdxSyntax): Tag | u
     const after = source.charCodeAt(i)
     if (
       !isWhitespace(after) &&
-      after !== 47 &&
-      after !== 58 &&
-      after !== 61 &&
-      after !== 62 &&
-      after !== 123
+      after !== Char.Slash &&
+      after !== Char.Colon &&
+      after !== Char.Equals &&
+      after !== Char.GreaterThan &&
+      after !== Char.LeftBrace
     )
       crash('in attribute name', inAttribute)
     let attributeEnd = i
     skip()
-    if (source.charCodeAt(i) === 58) {
+    if (source.charCodeAt(i) === Char.Colon) {
       local = true
       i++
       skip()
       attributeName += ':' + readName('local attribute name', afterAttribute)
       attributeEnd = i
       const c = source.charCodeAt(i)
-      if (!isWhitespace(c) && c !== 47 && c !== 61 && c !== 62 && c !== 123)
+      if (
+        !isWhitespace(c) &&
+        c !== Char.Slash &&
+        c !== Char.Equals &&
+        c !== Char.GreaterThan &&
+        c !== Char.LeftBrace
+      )
         crash('in local attribute name', inAttribute)
       skip()
     }
     let value: MdxJsxAttribute['value'] = null
-    if (source.charCodeAt(i) === 61) {
+    if (source.charCodeAt(i) === Char.Equals) {
       i++
       skip()
       const quote = source.charCodeAt(i)
-      if (quote === 34 || quote === 39) {
+      if (quote === Char.DoubleQuote || quote === Char.SingleQuote) {
         i++
         value = ''
+        // Quoted JSX values decode entities and remove continuation indentation.
         while (i < end && source.charCodeAt(i) !== quote) {
           checkLazy()
           const c = source.charCodeAt(i)
-          if (c === 38) {
+          if (c === Char.Ampersand) {
             const ref = entity(source, i, end)
             if (ref) {
               value += ref.value
@@ -243,7 +275,10 @@ function tag(view: View, start: number, end: number, syntax: MdxSyntax): Tag | u
             }
           }
           value += source[i++]
-          if (c === 10 || (c === 13 && source.charCodeAt(i) !== 10))
+          if (
+            c === Char.LineFeed ||
+            (c === Char.CarriageReturn && source.charCodeAt(i) !== Char.LineFeed)
+          )
             while (space(source.charCodeAt(i))) i++
         }
         if (i >= end)
@@ -253,7 +288,7 @@ function tag(view: View, start: number, end: number, syntax: MdxSyntax): Tag | u
           )
         i++
         attributeEnd = i
-      } else if (quote === 123) {
+      } else if (quote === Char.LeftBrace) {
         const result = expression(view, i, end, syntax, false, false)
         value = { type: 'mdxJsxAttributeValueExpression', value: result.value }
         if (result.data) value.data = result.data
@@ -262,14 +297,14 @@ function tag(view: View, start: number, end: number, syntax: MdxSyntax): Tag | u
         crash(
           'before attribute value',
           'a character that can start an attribute value, such as `"`, `\'`, or `{`' +
-            (quote === 60
+            (quote === Char.LessThan
               ? ' (note: to use an element or fragment as a prop value in MDX, use `{<element />}`)'
               : ''),
         )
     } else if (
-      source.charCodeAt(i) !== 47 &&
-      source.charCodeAt(i) !== 62 &&
-      source.charCodeAt(i) !== 123 &&
+      source.charCodeAt(i) !== Char.Slash &&
+      source.charCodeAt(i) !== Char.GreaterThan &&
+      source.charCodeAt(i) !== Char.LeftBrace &&
       !nameStart(source.charCodeAt(i))
     )
       crash(local ? 'after local attribute name' : 'after attribute name', afterAttribute)
@@ -279,6 +314,7 @@ function tag(view: View, start: number, end: number, syntax: MdxSyntax): Tag | u
     attributes.push(attribute)
     skip()
   }
+  // ── Require a complete closing angle before committing the tag ──
   if (i >= end)
     crash(
       name === null ? 'before name' : 'before attribute name',
@@ -296,13 +332,24 @@ function location(start: number, end?: number): string {
   return p.line + ':' + p.column + (q ? '-' + q.line + ':' + q.column : '')
 }
 
+function imageAlt(parent: number): string {
+  let value = ''
+  for (let c = tree.child[parent]; c; c = tree.next[c])
+    value +=
+      tree.value[c] ??
+      (tree.extra[c]?.type === 'mdxTextExpression' ? tree.extra[c].value : imageAlt(c))
+  return value
+}
+
 export function mdxHooks(source: string, syntax: MdxSyntax) {
+  // Per-document stacks/imports and cached container views never escape this closure.
   const rawView: View = { source, base: 0 }
   const stacks = new Map<number, { tag: Tag; node: number }[]>()
   const imports: string[] = []
   const views = new WeakMap<Line[], { view: View; starts: Int32Array }>()
   const current = (parent: number) => stacks.get(parent)?.at(-1)?.node ?? parent
   function flowView(input: Line[], boundary?: Line): { view: View; starts: Int32Array } {
+    // Cache the remaining container once, rather than rebuilding it for each flow tag.
     const cached = views.get(input)
     if (cached) return cached
     const starts = new Int32Array(input.length)
@@ -320,7 +367,11 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
       view =
         input[0].start === 0 && input.at(-1)!.next === source.length
           ? rawView
-          : { source: source.slice(input[0].start, input.at(-1)!.next), base: input[0].start, lazy }
+          : {
+              source: source.slice(input[0].start, input.at(-1)!.next),
+              base: input[0].start,
+              lazy,
+            }
     else {
       const map = new Int32Array(length + 1)
       const chunks: string[] = []
@@ -364,15 +415,16 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
     start: number,
     end: number,
   ): { end: number; node: number } | undefined {
+    // Tags are temporary tokens; finish() checks nesting after Markdown resolves spans.
     const c = view.source.charCodeAt(start)
-    if (c === 123) {
+    if (c === Char.LeftBrace) {
       const result = expression(view, start, end, syntax)
       const n = node(Kind.Mdx, offset(view, start), offset(view, result.end))
       tree.extra[n] = { type: 'mdxTextExpression', value: result.value }
       if (result.data) tree.extra[n].data = result.data
       return { end: result.end, node: n }
     }
-    if (c !== 60) return
+    if (c !== Char.LessThan) return
     const opening = tag(view, start, end, syntax)
     if (!opening) return
     const n = node(Kind.Mdx, offset(view, start), offset(view, opening.end))
@@ -384,6 +436,59 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
       tag: { ...opening, start: offset(view, opening.start), end: offset(view, opening.end) },
     }
     return { end: opening.end, node: n }
+  }
+  function parseEsmFlow(input: Line[], at: number, begin: number, parent: number): number {
+    let j = at
+    // Incomplete ESM retries another blank-delimited chunk, not every source line.
+    for (;;) {
+      while (j + 1 < input.length && source.slice(input[j + 1].start, input[j + 1].end).trim())
+        j++
+      const end = input[j].end
+      const value = source.slice(begin, end)
+      // Prior imports satisfy Acorn scope validation; remove this declaration afterward.
+      const prefix = imports.length ? 'var ' + imports.join(',') + '\n' : ''
+      const result = acornProgram(
+        prefix + value,
+        syntax,
+        (i) => begin + Math.max(0, i - prefix.length),
+      )
+      if (!result.program) {
+        if (j + 1 < input.length && result.swallow) {
+          j++
+          continue
+        }
+        mdxError(
+          'Could not parse import/exports with acorn',
+          result.error.at,
+          'acorn',
+          'micromark-extension-mdxjs-esm',
+        )
+      }
+      const program = result.program
+      if (prefix) program.body.shift()
+      for (const statement of program.body) {
+        if (
+          ![
+            'ExportAllDeclaration',
+            'ExportDefaultDeclaration',
+            'ExportNamedDeclaration',
+            'ImportDeclaration',
+          ].includes(statement.type)
+        )
+          mdxError(
+            'Unexpected `' + statement.type + '` in code: only import/exports are supported',
+            statement.start,
+            'non-esm',
+            'micromark-extension-mdxjs-esm',
+          )
+        if (statement.type === 'ImportDeclaration')
+          for (const specifier of statement.specifiers) imports.push(specifier.local.name)
+      }
+      const n = node(Kind.Mdx, begin, end, current(parent))
+      tree.extra[n] = { type: 'mdxjsEsm', value }
+      if (syntax.estree) tree.extra[n].data = { estree: program }
+      return j - at + 1
+    }
   }
   function flow(
     context: BlockContext,
@@ -399,86 +504,59 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
       begin === line.start &&
       point(begin).column === 1 &&
       (source.startsWith('import ', begin) || source.startsWith('export ', begin))
-    ) {
-      let j = at
-      for (;;) {
-        while (j + 1 < input.length && source.slice(input[j + 1].start, input[j + 1].end).trim())
-          j++
-        const end = input[j].end
-        const value = source.slice(begin, end)
-        const prefix = imports.length ? 'var ' + imports.join(',') + '\n' : ''
-        const result = acornProgram(
-          prefix + value,
-          syntax,
-          (i) => begin + Math.max(0, i - prefix.length),
-        )
-        if (!result.program) {
-          if (j + 1 < input.length && result.swallow) {
-            j++
-            continue
-          }
-          mdxError(
-            'Could not parse import/exports with acorn',
-            result.error.at,
-            'acorn',
-            'micromark-extension-mdxjs-esm',
-          )
-        }
-        const program = result.program
-        if (prefix) program.body.shift()
-        for (const statement of program.body) {
-          if (
-            ![
-              'ExportAllDeclaration',
-              'ExportDefaultDeclaration',
-              'ExportNamedDeclaration',
-              'ImportDeclaration',
-            ].includes(statement.type)
-          )
-            mdxError(
-              'Unexpected `' + statement.type + '` in code: only import/exports are supported',
-              statement.start,
-              'non-esm',
-              'micromark-extension-mdxjs-esm',
-            )
-          if (statement.type === 'ImportDeclaration')
-            for (const specifier of statement.specifiers) imports.push(specifier.local.name)
-        }
-        const n = node(Kind.Mdx, begin, end, current(parent))
-        tree.extra[n] = { type: 'mdxjsEsm', value }
-        if (syntax.estree) tree.extra[n].data = { estree: program }
-        return j - at + 1
-      }
-    }
-    if (source.charCodeAt(begin) !== 60 && source.charCodeAt(begin) !== 123) return 0
+    )
+      return parseEsmFlow(input, at, begin, parent)
+    if (
+      source.charCodeAt(begin) !== Char.LessThan &&
+      source.charCodeAt(begin) !== Char.LeftBrace
+    )
+      return 0
+    // ── Probe a line containing only qualifying tags/expressions ──
     const mapped = flowView(input, boundary)
     const view = mapped.view
     const text = view.source
     const found: (
       | Tag
-      | { type: 'expression'; start: number; end: number; result: ReturnType<typeof expression> }
+      | {
+          type: 'expression'
+          start: number
+          end: number
+          result: ReturnType<typeof expression>
+        }
     )[] = []
     let i = mapped.starts[at] + begin - line.start
     for (;;) {
       const c = text.charCodeAt(i)
-      if (c === 60) {
+      if (c === Char.LessThan) {
         const t = tag(view, i, text.length, syntax)
         if (!t) return 0
         found.push(t)
         i = t.end
-      } else if (c === 123) {
+      } else if (c === Char.LeftBrace) {
         const result = expression(view, i, text.length, syntax)
         found.push({ type: 'expression', start: i, end: result.end, result })
         i = result.end
       } else return 0
       while (space(text.charCodeAt(i))) i++
-      if (i >= text.length || text.charCodeAt(i) === 10 || text.charCodeAt(i) === 13) break
-      if (text.charCodeAt(i) === 123 && found.at(-1)!.type === 'expression') return 0
-      if (text.charCodeAt(i) !== 60 && text.charCodeAt(i) !== 123) return 0
+      if (
+        i >= text.length ||
+        text.charCodeAt(i) === Char.LineFeed ||
+        text.charCodeAt(i) === Char.CarriageReturn
+      )
+        break
+      if (text.charCodeAt(i) === Char.LeftBrace && found.at(-1)!.type === 'expression') return 0
+      if (text.charCodeAt(i) !== Char.LessThan && text.charCodeAt(i) !== Char.LeftBrace)
+        return 0
     }
+    // ── Apply the committed tokens to this Markdown container's JSX stack ──
     for (const item of found) {
       if (item.type === 'expression') {
-        const n = node(Kind.Mdx, offset(view, item.start), offset(view, item.end), current(parent))
+        const n = node(
+          Kind.Mdx,
+          offset(view, item.start),
+          offset(view, item.end),
+          current(parent),
+        )
         tree.extra[n] = { type: 'mdxFlowExpression', value: item.result.value }
         if (item.result.data) tree.extra[n].data = item.result.data
         continue
@@ -488,6 +566,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
       if (item.close) {
         const open = stack.at(-1)
         if (!open) {
+          // Defer unmatched closes so finish() can report the enclosing boundary.
           const n = node(
             Kind.Mdx,
             offset(view, item.start),
@@ -508,7 +587,12 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
         tree.b[open.node] = offset(view, item.start)
         stack.pop()
       } else {
-        const n = node(Kind.Mdx, offset(view, item.start), offset(view, item.end), current(parent))
+        const n = node(
+          Kind.Mdx,
+          offset(view, item.start),
+          offset(view, item.end),
+          current(parent),
+        )
         tree.a[n] = offset(view, item.end)
         tree.extra[n] = {
           type: 'mdxJsxFlowElement',
@@ -523,6 +607,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
           })
       }
     }
+    // ── Translate the virtual ending back into consumed block lines ──
     const ending = offset(view, i)
     let j = at
     while (j < input.length && input[j].end < ending) j++
@@ -535,38 +620,45 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
     interrupt(line: Line) {
       let i = line.start
       while (space(source.charCodeAt(i))) i++
-      if (source.charCodeAt(i) !== 60 && source.charCodeAt(i) !== 123) return false
+      if (source.charCodeAt(i) !== Char.LessThan && source.charCodeAt(i) !== Char.LeftBrace)
+        return false
       // Only complete tag/expression-only lines interrupt a paragraph.
       try {
         const view = rawView
         let previousExpression = false
         for (;;) {
           const c = source.charCodeAt(i)
-          if (c === 123 && previousExpression) return false
+          if (c === Char.LeftBrace && previousExpression) return false
           const end =
-            c === 60
+            c === Char.LessThan
               ? tag(view, i, source.length, syntax)?.end
-              : c === 123
+              : c === Char.LeftBrace
                 ? expression(view, i, source.length, syntax).end
                 : undefined
           if (end === undefined) return false
-          previousExpression = c === 123
+          previousExpression = c === Char.LeftBrace
           i = end
           while (space(source.charCodeAt(i))) i++
-          if (i >= source.length || source.charCodeAt(i) === 10 || source.charCodeAt(i) === 13)
+          if (
+            i >= source.length ||
+            source.charCodeAt(i) === Char.LineFeed ||
+            source.charCodeAt(i) === Char.CarriageReturn
+          )
             return true
         }
       } catch {
+        // Commit the flow attempt so its real MDX error is reported, not swallowed.
         return true
       }
     },
     continuationEnd(line: Line) {
       let i = line.start
       while (space(source.charCodeAt(i))) i++
-      if (source.charCodeAt(i) !== 60 && source.charCodeAt(i) !== 123) return line.end
+      if (source.charCodeAt(i) !== Char.LessThan && source.charCodeAt(i) !== Char.LeftBrace)
+        return line.end
       const view = rawView
       try {
-        return source.charCodeAt(i) === 60
+        return source.charCodeAt(i) === Char.LessThan
           ? (tag(view, i, source.length, syntax)?.end ?? line.end)
           : expression(view, i, source.length, syntax).end
       } catch {
@@ -589,11 +681,13 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
         [Kind.Image]: 'image',
         [Kind.ImageReference]: 'imageReference',
       }
-      function resolve(parent: number, active?: Tag): void {
+      function resolveInlineJsx(parent: number, active?: Tag): void {
         const pending: { tag: Tag; node: number }[] = []
         const children: number[] = []
+        // Snapshot before destructive sibling rewiring; the old chain cannot be traversed later.
         for (let n = tree.child[parent]; n; n = tree.next[n]) children.push(n)
         tree.child[parent] = tree.last[parent] = 0
+        // ── Match deferred tags and rebuild sibling chains under their JSX parents ──
         for (const n of children) {
           tree.next[n] = tree.prev[n] = 0
           const e = tree.extra[n]
@@ -604,6 +698,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
               const open = pending.at(-1)
               if (!open) {
                 if (active) {
+                  // Active JSX cannot close across a Markdown container boundary.
                   const type = types[tree.kind[parent]] ?? 'paragraph'
                   mdxError(
                     'Expected the closing tag `' +
@@ -645,22 +740,16 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
                     selfClosing: false,
                   }
                 : undefined
-            if (tree.child[n]) resolve(n, flowTag ?? enclosing)
+            if (tree.child[n]) resolveInlineJsx(n, flowTag ?? enclosing)
             if (tree.kind[n] === Kind.Image || tree.kind[n] === Kind.ImageReference) {
-              function alt(parent: number): string {
-                let value = ''
-                for (let c = tree.child[parent]; c; c = tree.next[c])
-                  value +=
-                    tree.value[c] ??
-                    (tree.extra[c]?.type === 'mdxTextExpression' ? tree.extra[c].value : alt(c))
-                return value
-              }
-              tree.value[n] = alt(n)
+              // Image alt can only be finalized after expressions and JSX have nested.
+              tree.value[n] = imageAlt(n)
               tree.child[n] = tree.last[n] = 0
             }
             append(pending.at(-1)?.node ?? parent, n)
           }
         }
+        // ── Reject unfinished inline and flow stacks at their owning boundary ──
         const open = pending.at(-1)
         if (open)
           mdxError(
@@ -683,6 +772,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
             '` (' +
             location(flowOpen.tag.start, flowOpen.tag.end) +
             ')'
+          // Upstream root-level unfinished-flow diagnostics deliberately have no place.
           if (tree.kind[parent] === Kind.Root)
             throw new MdxParseError({
               reason,
@@ -700,7 +790,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
           )
         }
       }
-      resolve(1)
+      resolveInlineJsx(1)
     },
   }
 }
