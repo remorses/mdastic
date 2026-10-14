@@ -34,7 +34,7 @@ remote-bundler           remark + remark-gfm in a client chat component; drops m
 
 holocron serializes MDX and safe-mdx parses the string again, so **stringify must be exact too**.
 safe-mdx evaluates `data.estree`, so estree must have acorn's exact shape.
-The original plan is `../holocron/docs/mdastic-plan.md` (untracked file in the holocron repo).
+The original plan is `docs/mdastic-plan.md`.
 
 ## Scope and non-goals
 
