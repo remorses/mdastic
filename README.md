@@ -43,8 +43,8 @@ const markdown = stringify(tree, { syntax }) // same string as remark-stringify
 npm install mdastic
 ```
 
-> [!NOTE]
-> mdastic is new. The API can still change before 1.0.
+> [!WARNING]
+> mdastic is **experimental and unstable**. It is on version 0.x, and any release can break the API. Pin the exact version.
 
 ## Benchmarks
 
