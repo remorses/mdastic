@@ -30,9 +30,10 @@ export enum Kind {
   Yaml,
   Toml,
   Mdx,
+  IdString,
 }
 
-const parents = new Uint8Array(28)
+const parents = new Uint8Array(29)
 for (const kind of [
   Kind.Root,
   Kind.Paragraph,
@@ -196,6 +197,8 @@ export function materialize(n: number): RootContent {
           }
     case Kind.Text:
       return p ? { type: 'text', value, position: p } : { type: 'text', value }
+    case Kind.IdString:
+      return p ? { type: 'idString', value, position: p } : { type: 'idString', value }
     case Kind.Emphasis:
       return p ? { type: 'emphasis', children, position: p } : { type: 'emphasis', children }
     case Kind.Strong:

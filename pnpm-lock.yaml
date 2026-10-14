@@ -33,6 +33,9 @@ importers:
       markdown-it:
         specifier: ^14.1.0
         version: 14.3.2
+      mdast-heading-id:
+        specifier: 2.0.0
+        version: 2.0.0
       mdast-util-from-markdown:
         specifier: 2.0.3
         version: 2.0.3
@@ -57,6 +60,9 @@ importers:
       micromark-extension-mdxjs:
         specifier: 3.0.0
         version: 3.0.0
+      micromark-heading-id:
+        specifier: 2.0.0
+        version: 2.0.0
       remark:
         specifier: 15.0.1
         version: 15.0.1
@@ -69,6 +75,9 @@ importers:
       remark-mdx:
         specifier: 3.1.1
         version: 3.1.1
+      remark-squeeze-paragraphs:
+        specifier: 6.0.0
+        version: 6.0.0
       remark-stringify:
         specifier: 11.0.0
         version: 11.0.0
@@ -731,6 +740,12 @@ packages:
   markdown-table@3.0.4:
     resolution: {integrity: sha512-wiYz4+JrLyb/DqW2hkFJxP7Vd7JuTDm77fvbM8VfEQdmSMqcImWeeRbHwZjBjIFki/VaMK2BhFi7oUUZeM5bqw==}
 
+  mdast-heading-id@2.0.0:
+    resolution: {integrity: sha512-JVh0xKqsI3INPzJEqqCiuq3BGde5x6AlBTQAetLQQr9qTiDjX4dCvFhIiGmyPt1rftiHELQPI5obGphIOTXeWQ==}
+
+  mdast-squeeze-paragraphs@6.0.0:
+    resolution: {integrity: sha512-6NDbJPTg0M0Ye+TlYwX1KJ1LFbp515P2immRJyJQhc9Na9cetHzSoHNYIQcXpANEAP1sm9yd/CTZU2uHqR5A+w==}
+
   mdast-util-find-and-replace@3.0.3:
     resolution: {integrity: sha512-xPgpDNl0/OXHsI7TlaIs22lWnH3KlpvZdXG1ET/m/YT2Hhdkx8lJV4kLphE6l9simyM4KPDFBwas08BgEob6Jw==}
 
@@ -842,6 +857,9 @@ packages:
   micromark-factory-whitespace@2.0.1:
     resolution: {integrity: sha512-Ob0nuZ3PKt/n0hORHyvoD9uZhr+Za8sFoP+OnMcnWK5lngSzALgQYKMr9RJVOWLqQYuyn6ulqGWSXdwf6F80lQ==}
 
+  micromark-heading-id@2.0.0:
+    resolution: {integrity: sha512-TdR5WCmwuCroK8QrfX0/4w9bjj3ayN0GzatxGV/lWQKmM75kNKVZEmdvKZS4MOskARxWXu1WHdIJjMSVMBegow==}
+
   micromark-util-character@2.1.1:
     resolution: {integrity: sha512-wv8tdUTJ3thSFFFJKtpYKOYiGP2+v96Hvk4Tu8KpCAsTMs6yi+nVmGh1syvSCsaxz45J6Jbw+9DD6g97+NV67Q==}
 
@@ -952,6 +970,9 @@ packages:
 
   remark-parse@11.0.0:
     resolution: {integrity: sha512-FCxlKLNGknS5ba/1lmpYijMUzX2esxW5xQqjWxw2eHFfS2MSdaHVINFmhjo+qN1WhZhNimq0dZATN9pH0IDrpA==}
+
+  remark-squeeze-paragraphs@6.0.0:
+    resolution: {integrity: sha512-qOk1am0QjTGoCPsFuORIZteajsFzLV2m8ijOn3zX9Y0P0IE0lMgjzyP0BxICWnvNz3j+9B+LUNnLHquNu+IrBw==}
 
   remark-stringify@11.0.0:
     resolution: {integrity: sha512-1OSmLd3awB/t8qdoEOMazZkNsfVTeY4fTsgzcQFdXNq8ToTN4ZGwrMnlda4K6smTFKD+GRV6O48i6Z4iKgPPpw==}
@@ -1611,6 +1632,13 @@ snapshots:
 
   markdown-table@3.0.4: {}
 
+  mdast-heading-id@2.0.0: {}
+
+  mdast-squeeze-paragraphs@6.0.0:
+    dependencies:
+      '@types/mdast': 4.0.4
+      unist-util-visit: 5.1.0
+
   mdast-util-find-and-replace@3.0.3:
     dependencies:
       '@types/mdast': 4.0.4
@@ -1955,6 +1983,10 @@ snapshots:
       micromark-util-symbol: 2.0.1
       micromark-util-types: 2.0.3
 
+  micromark-heading-id@2.0.0:
+    dependencies:
+      micromark-util-symbol: 2.0.1
+
   micromark-util-character@2.1.1:
     dependencies:
       micromark-util-symbol: 2.0.1
@@ -2130,6 +2162,11 @@ snapshots:
       unified: 11.0.5
     transitivePeerDependencies:
       - supports-color
+
+  remark-squeeze-paragraphs@6.0.0:
+    dependencies:
+      '@types/mdast': 4.0.4
+      mdast-squeeze-paragraphs: 6.0.0
 
   remark-stringify@11.0.0:
     dependencies:

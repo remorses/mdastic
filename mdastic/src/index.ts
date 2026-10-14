@@ -5,7 +5,7 @@ import { MdxParseError, resolveConfig, type Syntax } from './syntax.ts'
 import type { NodeOf, NodeType, Nodes, Parents, Root } from './types.ts'
 
 export type * from './types.ts'
-export type { Syntax, GfmSyntax, MdxSyntax, FrontmatterSyntax } from './syntax.ts'
+export type { Syntax, GfmSyntax, MdxSyntax, FrontmatterSyntax, HeadingIdSyntax } from './syntax.ts'
 export type { StringifyOptions } from './stringify.ts'
 export { MdxParseError } from './syntax.ts'
 

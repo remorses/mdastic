@@ -6,6 +6,7 @@ import { parse, stringify, type Syntax } from 'mdastic/src'
 import { gfm } from 'mdastic/src/gfm'
 import { mdx } from 'mdastic/src/mdx'
 import { frontmatter } from 'mdastic/src/frontmatter'
+import { headingId } from 'mdastic/src/heading-id'
 import {
   normalize,
   oracleParse,
@@ -66,6 +67,7 @@ export function toSyntax(names: SyntaxName[]): Syntax[] {
     if (names.includes('mdx')) syntax.push(mdx())
     if (names.includes('frontmatter')) syntax.push(frontmatter())
     if (names.includes('gfm')) syntax.push(gfm())
+    if (names.includes('headingId')) syntax.push(headingId())
     syntaxCache.set(key, syntax)
   }
   return syntax

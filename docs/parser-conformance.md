@@ -5,15 +5,25 @@ description: Parser phases, exact remark compatibility, benchmark results, and a
 
 # Core parser
 
-**9,696 / 9,696 fixtures pass**, including **1,963 MDX fixtures** and all **7,733 non-MDX
+**9,854 / 9,854 fixtures pass**, including **2,043 MDX fixtures** and all **7,811 non-MDX
 fixtures**. Comparison includes every node field, positions, ESTree and error metadata.
-The same 7,733 non-MDX trees also match with positions removed.
+The original 7,733 non-MDX trees also match with positions removed.
 All **3,926 additional MDX option checks** pass with positions or ESTree attachment disabled.
 
 CommonMark: **652/652**. GFM specification: **671/671**. README corpus: **160/160**.
 No runtime dependencies were added. Only the `mdastic/mdx` entry imports Acorn and acorn-jsx.
 
 ## Benchmark
+
+**Heading ID and remark adapter change:** production benchmark before and after, same machine.
+Ordinary parser paths remain within measurement noise; the benchmark does not enable heading IDs.
+
+| Corpus | Before | After |
+| --- | ---: | ---: |
+| Markdown + GFM | 24.83 ms | 25.01 ms |
+| Markdown, positions disabled | 23.76 ms | 23.60 ms |
+| MDX, ESTree enabled | 16.63 ms | 16.92 ms |
+| MDX, ESTree disabled | 16.38 ms | 16.65 ms |
 
 **Real-document benchmark:** each document is parsed separately, Node 24.21.0, arm64.
 The before column is the supplied baseline. Both requested speed targets are met.
@@ -85,6 +95,21 @@ definitions are known. GFM tokenizer links retain positions; fallback transform 
 positions, exactly as remark does.
 
 ## Limits and extension points
+
+**Heading IDs:** `heading-id.json` adds 158 cases from Eyas/md-heading-id and edge cases.
+The oracle pins micromark-heading-id and mdast-heading-id at 2.0.0, after MDX, frontmatter and GFM.
+All 992 real-world fixtures are also compared with heading IDs enabled in a separate test.
+Inline `{#id}` wins over MDX text expressions; standalone flow expressions and JSX flow probes
+still reach Acorn first. Positions cover only the ID content. Stringify writes IDs, while the
+upstream serializer throws because it has no handler.
+
+**Upstream limitation:** `{#}` makes the pinned oracle loop on its empty `chunkString` token.
+It cannot be included in an in-process differential run. mdastic's empty ID behavior is tested
+separately and is not included in the 9,854 conformance count. MDX flow `{#}` still returns the
+same Acorn error. Upstream tests were read from Eyas/md-heading-id on 2026-10-14.
+
+**Remark transforms:** real remark-squeeze-paragraphs trees match remark's transform output.
+The adapter also checks async/callback completion, file messages and syntax-plugin rejection.
 
 `parseDocument(source, config, hooks?)` supports flow and inline syntax hooks. Flow hooks
 append arena nodes and return consumed line count. Inline hooks return an unattached arena

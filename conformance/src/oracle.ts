@@ -8,8 +8,10 @@ import { mdxFromMarkdown, mdxToMarkdown } from 'mdast-util-mdx'
 import { frontmatter } from 'micromark-extension-frontmatter'
 import { frontmatterFromMarkdown, frontmatterToMarkdown } from 'mdast-util-frontmatter'
 import type { Root } from 'mdast'
+import { micromarkHeadingId } from 'micromark-heading-id'
+import { mdastHeadingId } from 'mdast-heading-id'
 
-export type SyntaxName = 'gfm' | 'mdx' | 'frontmatter'
+export type SyntaxName = 'gfm' | 'mdx' | 'frontmatter' | 'headingId'
 
 export type Fixture = {
   name: string
@@ -53,6 +55,10 @@ function extensions(syntax: SyntaxName[]) {
     micromark.push(gfm())
     from.push(gfmFromMarkdown())
     to.push(gfmToMarkdown())
+  }
+  if (syntax.includes('headingId')) {
+    micromark.push(micromarkHeadingId())
+    from.push(mdastHeadingId())
   }
   return { micromark, from, to }
 }

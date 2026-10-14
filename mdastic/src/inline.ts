@@ -860,6 +860,13 @@ function containsLink(view: View, start: number, end: number, context: InlineCon
   const source = view.source
   for (let i = start; i < end; i++) {
     const c = source.charCodeAt(i)
+    if (c === 123 && context.config.headingId && context.inline) {
+      const match = context.inline(view, i, end, context)
+      if (match) {
+        i = match.end - 1
+        continue
+      }
+    }
     if (c === 92) {
       i++
       continue

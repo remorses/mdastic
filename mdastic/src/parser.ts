@@ -6,6 +6,7 @@ import { lines, parseBlocks, resetBlocks, runInlineTasks, type BlockContext } fr
 import { Kind, materializeRoot, node, resetTree } from './tree.ts'
 import { transformLiteralLinks } from './autolink.ts'
 import { mdxHooks } from './mdx-parser.ts'
+import { headingIdInline } from './heading-id.ts'
 
 export interface ParserHooks {
   flow?: BlockContext['flow']
@@ -21,6 +22,9 @@ export function parseDocument(source: string, config: Config, hooks?: ParserHook
   resetBlocks()
   const root = node(Kind.Root, 0, source.length)
   const mdx = config.mdx ? mdxHooks(source, config.mdx) : undefined
+  const inline: BlockContext['inline'] = config.headingId
+    ? (view, start, end) => headingIdInline(view, start, end) ?? mdx?.inline(view, start, end)
+    : mdx?.inline
   const context: BlockContext = {
     source,
     config,
@@ -28,9 +32,9 @@ export function parseDocument(source: string, config: Config, hooks?: ParserHook
     footnotes: new Set(),
     ...mdx,
     flow: hooks?.flow ?? mdx?.flow,
-    inline: hooks?.inline ?? mdx?.inline,
+    inline: hooks?.inline ?? inline,
   }
-  context.inlineMarkers = !!mdx && !hooks?.inline
+  context.inlineMarkers = !!inline && !hooks?.inline
   parseBlocks(context, lines(source), root, true)
   runInlineTasks(context)
   mdx?.finish()

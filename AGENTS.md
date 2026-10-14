@@ -25,6 +25,11 @@ scan.ts ──► ASCII/Unicode classification, entities, UTF-16 line positions
 
 ## Extension boundary
 
+`heading-id.ts` supplies the inline `{#id}` construct. Its value-only positions match
+mdast-heading-id. It runs before MDX text hooks; MDX flow hooks keep their original priority.
+`remark.ts` attaches tree-only remark plugins to a minimal data processor, outside parsing.
+It rejects syntax extensions; it does not depend on unified or vfile.
+
 `parseDocument(source, config, hooks?)` accepts flow and inline hooks for additional syntax.
 Flow hooks append arena nodes and return consumed line count. Inline hooks return an unattached
 arena node and the next virtual offset. Map virtual offsets through `offset(view, index)`.

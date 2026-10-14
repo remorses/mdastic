@@ -13,6 +13,7 @@
   "devDependencies": {
     "@types/mdast": "^4.0.4",
     "markdown-it": "^14.1.0",
+    "mdast-heading-id": "2.0.0",
     "mdast-util-from-markdown": "2.0.3",
     "mdast-util-frontmatter": "2.0.1",
     "mdast-util-gfm": "3.1.0",
@@ -21,10 +22,12 @@
     "micromark-extension-frontmatter": "2.0.0",
     "micromark-extension-gfm": "3.0.0",
     "micromark-extension-mdxjs": "3.0.0",
+    "micromark-heading-id": "2.0.0",
     "remark": "15.0.1",
     "remark-frontmatter": "5.0.0",
     "remark-gfm": "4.0.1",
     "remark-mdx": "3.1.1",
+    "remark-squeeze-paragraphs": "6.0.0",
     "remark-stringify": "11.0.0",
     "satteri": "0.10.5",
     "unified": "11.0.5"

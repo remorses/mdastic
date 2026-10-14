@@ -1543,6 +1543,13 @@ export function toMarkdown(
       ]),
     )
   if (config.gfm) extensions.push(gfmToMarkdown(options))
+  if (config.headingId) extensions.push({
+    handlers: {
+      idString(node) {
+        return '{#' + node.value.replace(/[&{}\\\r\n\t|]/g, (c: string) => '&#' + c.charCodeAt(0) + ';') + '}'
+      },
+    },
+  })
   extensions.push(...(options.extensions || []))
   return stringifyTree(
     tree,

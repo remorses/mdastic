@@ -41,6 +41,14 @@
       "types": "./dist/frontmatter.d.ts",
       "default": "./dist/frontmatter.js"
     },
+    "./heading-id": {
+      "types": "./dist/heading-id.d.ts",
+      "default": "./dist/heading-id.js"
+    },
+    "./remark": {
+      "types": "./dist/remark.d.ts",
+      "default": "./dist/remark.js"
+    },
     "./src": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"

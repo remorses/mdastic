@@ -1,0 +1,1267 @@
+[
+  {
+    "name": "heading-id 0",
+    "input": "\n# regular heading\n# with id {#id-1}\n# with another {#anotherid}\nText.\n    ",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 0",
+    "input": "\n# regular heading\n# with id {#id-1}\n# with another {#anotherid}\nText.\n    ",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 0",
+    "input": "\n# regular heading\n# with id {#id-1}\n# with another {#anotherid}\nText.\n    ",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 0",
+    "input": "\n# regular heading\n# with id {#id-1}\n# with another {#anotherid}\nText.\n    ",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 1",
+    "input": "# escaped \\{#not-id}\nFoo.\n      ",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 1",
+    "input": "# escaped \\{#not-id}\nFoo.\n      ",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 1",
+    "input": "# escaped \\{#not-id}\nFoo.\n      ",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 1",
+    "input": "# escaped \\{#not-id}\nFoo.\n      ",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 2",
+    "input": "\n# regular heading\n# with id {not-id}\n# with another {alsonotid}\nText.\n      ",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 2",
+    "input": "\n# regular heading\n# with id {not-id}\n# with another {alsonotid}\nText.\n      ",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 2",
+    "input": "\n# regular heading\n# with id {not-id}\n# with another {alsonotid}\nText.\n      ",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 2",
+    "input": "\n# regular heading\n# with id {not-id}\n# with another {alsonotid}\nText.\n      ",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 3",
+    "input": "\n# with id {#no\n      ",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 3",
+    "input": "\n# with id {#no\n      ",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 3",
+    "input": "\n# with id {#no\n      ",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 3",
+    "input": "\n# with id {#no\n      ",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 4",
+    "input": "# simple id {#my-id-is-this-one}",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 4",
+    "input": "# simple id {#my-id-is-this-one}",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 4",
+    "input": "# simple id {#my-id-is-this-one}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 4",
+    "input": "# simple id {#my-id-is-this-one}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 5",
+    "input": "# Title {#id}",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 5",
+    "input": "# Title {#id}",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 5",
+    "input": "# Title {#id}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 5",
+    "input": "# Title {#id}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 6",
+    "input": "Title {#id}\n===",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 6",
+    "input": "Title {#id}\n===",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 6",
+    "input": "Title {#id}\n===",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 6",
+    "input": "Title {#id}\n===",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 7",
+    "input": "before {#id} after",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 7",
+    "input": "before {#id} after",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 7",
+    "input": "before {#id} after",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 7",
+    "input": "before {#id} after",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 10",
+    "input": "{#id}",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 10",
+    "input": "{#id}",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 10",
+    "input": "{#id}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 10",
+    "input": "{#id}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 11",
+    "input": "x {#id} {expr}",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 11",
+    "input": "x {#id} {expr}",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 11",
+    "input": "x {#id} {expr}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 11",
+    "input": "x {#id} {expr}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 12",
+    "input": "# x {#a\\b}",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 12",
+    "input": "# x {#a\\b}",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 12",
+    "input": "# x {#a\\b}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 12",
+    "input": "# x {#a\\b}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 13",
+    "input": "x {#a\\}b}",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 13",
+    "input": "x {#a\\}b}",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 13",
+    "input": "x {#a\\}b}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 13",
+    "input": "x {#a\\}b}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 14",
+    "input": "x {#a&amp;&#123;&#125;&#92;}",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 14",
+    "input": "x {#a&amp;&#123;&#125;&#92;}",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 14",
+    "input": "x {#a&amp;&#123;&#125;&#92;}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 14",
+    "input": "x {#a&amp;&#123;&#125;&#92;}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 15",
+    "input": "x {#a\nb}",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 15",
+    "input": "x {#a\nb}",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 15",
+    "input": "x {#a\nb}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 15",
+    "input": "x {#a\nb}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 16",
+    "input": "x {#a\rb}",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 16",
+    "input": "x {#a\rb}",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 16",
+    "input": "x {#a\rb}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 16",
+    "input": "x {#a\rb}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 17",
+    "input": "x {#a\r\nb}",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 17",
+    "input": "x {#a\r\nb}",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 17",
+    "input": "x {#a\r\nb}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 17",
+    "input": "x {#a\r\nb}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 18",
+    "input": "x {#a{#b}}",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 18",
+    "input": "x {#a{#b}}",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 18",
+    "input": "x {#a{#b}}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 18",
+    "input": "x {#a{#b}}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 19",
+    "input": "x {#a*_[x](y) `z`}",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 19",
+    "input": "x {#a*_[x](y) `z`}",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 19",
+    "input": "x {#a*_[x](y) `z`}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 19",
+    "input": "x {#a*_[x](y) `z`}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 20",
+    "input": "- x {#list}\n\n> # y {#quote}",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 20",
+    "input": "- x {#list}\n\n> # y {#quote}",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 20",
+    "input": "- x {#list}\n\n> # y {#quote}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 20",
+    "input": "- x {#list}\n\n> # y {#quote}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 21",
+    "input": "| x {#id} |\n| --- |\n| {#cell} |",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 21",
+    "input": "| x {#id} |\n| --- |\n| {#cell} |",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 21",
+    "input": "| x {#id} |\n| --- |\n| {#cell} |",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 21",
+    "input": "| x {#id} |\n| --- |\n| {#cell} |",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 22",
+    "input": "[x {#id}](url)",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 22",
+    "input": "[x {#id}](url)",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 22",
+    "input": "[x {#id}](url)",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 22",
+    "input": "[x {#id}](url)",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 23",
+    "input": "![x {#id}](url)",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 23",
+    "input": "![x {#id}](url)",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 23",
+    "input": "![x {#id}](url)",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 23",
+    "input": "![x {#id}](url)",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 24",
+    "input": "`{#id}`",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 24",
+    "input": "`{#id}`",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 24",
+    "input": "`{#id}`",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 24",
+    "input": "`{#id}`",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 25",
+    "input": "x <Box>{#id} {expr}</Box>",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 25",
+    "input": "x <Box>{#id} {expr}</Box>",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 25",
+    "input": "x <Box>{#id} {expr}</Box>",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 25",
+    "input": "x <Box>{#id} {expr}</Box>",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 26",
+    "input": "<Box>{#id}</Box>",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 26",
+    "input": "<Box>{#id}</Box>",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 26",
+    "input": "<Box>{#id}</Box>",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 26",
+    "input": "<Box>{#id}</Box>",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 27",
+    "input": "<Box>\n{#id}\n</Box>",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 27",
+    "input": "<Box>\n{#id}\n</Box>",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 27",
+    "input": "<Box>\n{#id}\n</Box>",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 27",
+    "input": "<Box>\n{#id}\n</Box>",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 28",
+    "input": "<Box>\nx {#id} {expr}\n</Box>",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 28",
+    "input": "<Box>\nx {#id} {expr}\n</Box>",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 28",
+    "input": "<Box>\nx {#id} {expr}\n</Box>",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 28",
+    "input": "<Box>\nx {#id} {expr}\n</Box>",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 29",
+    "input": "# {#a\tb}",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 29",
+    "input": "# {#a\tb}",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 29",
+    "input": "# {#a\tb}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 29",
+    "input": "# {#a\tb}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 30",
+    "input": "# {#a|b}",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 30",
+    "input": "# {#a|b}",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 30",
+    "input": "# {#a|b}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 30",
+    "input": "# {#a|b}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 31",
+    "input": "# {#a&#10;&#13;}",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 31",
+    "input": "# {#a&#10;&#13;}",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 31",
+    "input": "# {#a&#10;&#13;}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id 31",
+    "input": "# {#a&#10;&#13;}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 0",
+    "input": "[x {#a[link](url)}](outer)",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 0",
+    "input": "[x {#a[link](url)}](outer)",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 0",
+    "input": "[x {#a[link](url)}](outer)",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 0",
+    "input": "[x {#a[link](url)}](outer)",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 1",
+    "input": "[x {#a]b}](outer)",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 1",
+    "input": "[x {#a]b}](outer)",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 1",
+    "input": "[x {#a]b}](outer)",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 1",
+    "input": "[x {#a]b}](outer)",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 2",
+    "input": "[x {#a&#93;b}](outer)",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 2",
+    "input": "[x {#a&#93;b}](outer)",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 2",
+    "input": "[x {#a&#93;b}](outer)",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 2",
+    "input": "[x {#a&#93;b}](outer)",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 3",
+    "input": "| x {#a\\|b} |\n| --- |",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 3",
+    "input": "| x {#a\\|b} |\n| --- |",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 3",
+    "input": "| x {#a\\|b} |\n| --- |",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 3",
+    "input": "| x {#a\\|b} |\n| --- |",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 4",
+    "input": "x {#a\\*b}",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 4",
+    "input": "x {#a\\*b}",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 4",
+    "input": "x {#a\\*b}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 4",
+    "input": "x {#a\\*b}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 5",
+    "input": "# {#a\u0000b}",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 5",
+    "input": "# {#a\u0000b}",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 5",
+    "input": "# {#a\u0000b}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 5",
+    "input": "# {#a\u0000b}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 6",
+    "input": "# {#é😀}",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 6",
+    "input": "# {#é😀}",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 6",
+    "input": "# {#é😀}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 6",
+    "input": "# {#é😀}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 7",
+    "input": "x {#a} {#b}",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 7",
+    "input": "x {#a} {#b}",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 7",
+    "input": "x {#a} {#b}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 7",
+    "input": "x {#a} {#b}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 8",
+    "input": "# {#a} ###",
+    "syntax": [
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 8",
+    "input": "# {#a} ###",
+    "syntax": [
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 8",
+    "input": "# {#a} ###",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "heading-id extra 8",
+    "input": "# {#a} ###",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  },
+  {
+    "name": "empty heading ID in MDX flow",
+    "input": "{#}",
+    "syntax": [
+      "mdx",
+      "headingId"
+    ]
+  },
+  {
+    "name": "empty heading ID in MDX flow",
+    "input": "{#}",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "headingId"
+    ]
+  }
+]

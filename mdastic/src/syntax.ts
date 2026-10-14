@@ -22,13 +22,18 @@ export interface FrontmatterSyntax {
   readonly toml: boolean
 }
 
-export type Syntax = GfmSyntax | MdxSyntax | FrontmatterSyntax
+export interface HeadingIdSyntax {
+  readonly name: 'headingId'
+}
+
+export type Syntax = GfmSyntax | MdxSyntax | FrontmatterSyntax | HeadingIdSyntax
 
 /** Resolved, flat view of a syntax list. Built once per call site, read in hot loops. */
 export interface Config {
   gfm: GfmSyntax | undefined
   mdx: MdxSyntax | undefined
   frontmatter: FrontmatterSyntax | undefined
+  headingId?: HeadingIdSyntax
   positions: boolean
 }
 
@@ -38,13 +43,17 @@ export function resolveConfig(syntax: readonly Syntax[] = [], positions = true):
     if (s.name === 'gfm') config.gfm = s
     else if (s.name === 'mdx') config.mdx = s
     else if (s.name === 'frontmatter') config.frontmatter = s
+    else if (s.name === 'headingId') config.headingId = s
   }
   return config
 }
 
-/** MDX syntax error. Same fields as the VFileMessage micromark throws. */
+/**
+ * MDX syntax error. Same fields as the VFileMessage micromark throws: `message` is the reason
+ * and `name` is the place (`'1:6'`, `'1:1'` when unknown), so `String(error)` is `1:6: reason`.
+ */
 export class MdxParseError extends Error {
-  readonly name = 'MdxParseError'
+  override readonly name: string
   readonly reason: string
   readonly place: Point | undefined
   readonly line: number | undefined
@@ -52,8 +61,10 @@ export class MdxParseError extends Error {
   readonly ruleId: string
   readonly source: string
   readonly url: string | undefined
+  readonly fatal = true
   constructor(options: { reason: string; place?: Point; ruleId: string; source: string; url?: string; cause?: unknown }) {
-    super(options.place ? `${options.place.line}:${options.place.column}: ${options.reason}` : options.reason, { cause: options.cause })
+    super(options.reason, { cause: options.cause })
+    this.name = options.place ? `${options.place.line}:${options.place.column}` : '1:1'
     this.reason = options.reason
     this.place = options.place
     this.line = options.place?.line

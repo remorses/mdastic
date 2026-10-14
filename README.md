@@ -29,7 +29,7 @@ const markdown = stringify(tree, { syntax }) // same string as remark-stringify
 
 ## Features
 
-- **Exact remark output.** 9,696 of 9,696 conformance fixtures match the real remark stack, including positions and estree.
+- **Exact remark output.** 9,854 of 9,854 conformance fixtures match the real remark stack, including positions and estree.
 - **Fast.** 28x faster than remark on markdown, 17x on MDX, 6x on stringify. Faster than markdown-it, close to native Rust.
 - **One syntax list.** The same `syntax` array drives `parse` and `stringify`. No separate micromark, from-markdown and to-markdown extension arrays.
 - **MDX built in.** JSX, ESM and `{expressions}` with `data.estree`. Only `mdastic/mdx` imports Acorn, so plain markdown bundles stay small.
@@ -128,6 +128,39 @@ Each syntax is a subpath export. Pass the same list to `parse` and `stringify`.
 | `gfm()` from `mdastic/gfm` | tables, strikethrough, footnotes, task lists, autolink literals | `singleTilde` (default `true`) |
 | `mdx()` from `mdastic/mdx` | JSX, ESM, `{expressions}` | `estree` (default `true`) attaches `data.estree` |
 | `frontmatter()` from `mdastic/frontmatter` | `---` yaml and `+++` toml blocks | `['yaml', 'toml']` |
+| `headingId()` from `mdastic/heading-id` | `{#custom-id}` text nodes, also outside headings | none |
+
+```ts
+import { headingId } from 'mdastic/heading-id'
+
+parse('# Title {#custom-id}', { syntax: [headingId()] })
+```
+
+**Heading IDs** emit `idString` nodes. Their positions cover the value, not the `{#` and `}` markers.
+With MDX, valid IDs win over text expressions. MDX flow expressions still take priority, so a
+standalone `{#id}` line fails. A failed ID attempt falls back to the ordinary MDX expression parser.
+
+**Stringify difference:** `mdast-heading-id` has no to-markdown handler, so remark-stringify throws
+on `idString`. mdastic writes `{#value}`, with character references where needed for a round trip.
+
+### `remarkTransform(plugin, ...options)`
+
+Run an existing **tree-only remark plugin**, without unified:
+
+```ts
+import { remarkTransform } from 'mdastic/remark'
+import remarkSqueezeParagraphs from 'remark-squeeze-paragraphs'
+
+const transform = remarkTransform(remarkSqueezeParagraphs)
+const tree = parse(source)
+if (tree instanceof Error) throw tree
+await transform(tree)
+```
+
+Attachment receives a minimal processor with `data()`. Transforms can be synchronous, return a
+Promise, or use `next(error?)`. Pass your own file as the second argument, or use the default file
+with `data`, `messages` and `message()`. Plugins that add parser or serializer extensions fail at
+attachment. Use the built-in syntax descriptors instead.
 
 ### `visit(tree, filter?, visitor)`
 
@@ -190,7 +223,7 @@ source ──► scan.ts ──► block.ts ──► deferred inline.ts ──�
 The **real remark stack is the oracle.** `conformance/` pins `remark`, `micromark`, `mdast-util-*` and their extensions. Every fixture is parsed by both, and the full JSON trees are compared.
 
 ```
- upstream test suites ──► 9,696 inputs ──┬──► remark (pinned) ──► mdast JSON ──┐
+ upstream test suites ──► 9,854 inputs ──┬──► remark (pinned) ──► mdast JSON ──┐
                                          │                                     ├──► deep equal
                                          └──► mdastic ──────────► mdast JSON ──┘
                                                                   positions, estree, errors
@@ -206,14 +239,15 @@ The **real remark stack is the oracle.** `conformance/` pins `remark`, `micromar
 | mdx-js and mdxjs-rs tests | 243 |
 | Real documents (READMEs, Mintlify, Holocron) | 992 |
 | Smoke and regressions | 12 |
-| **Total, all pass** | **9,696** |
+| Heading IDs, upstream and edge cases | 158 |
+| **Total, all pass** | **9,854** |
 
-Stringify is checked with **838 tree-to-markdown cases** from mdast-util-to-markdown, a round trip of every parse fixture, and 20,000 random trees. Full results per fixture file are in [docs/parser-conformance.md](docs/parser-conformance.md).
+Stringify is checked with **838 tree-to-markdown cases** from mdast-util-to-markdown, every parse fixture the oracle can serialize, and 20,000 random trees. Heading IDs use separate round-trip tests. Full results per fixture file are in [docs/parser-conformance.md](docs/parser-conformance.md).
 
 ```bash
 cd conformance
 pnpm exec tsx src/report.ts parse   # pass rate per fixture file
-pnpm exec vitest run                # 20,231 tests
+pnpm exec vitest run                # full differential suite
 ```
 
 ## Limits
@@ -221,7 +255,9 @@ pnpm exec vitest run                # 20,231 tests
 - **Not reentrant.** The parser reuses module-level buffers. Do not call `parse` from inside a parse hook.
 - **Deep nesting** can hit the JavaScript call stack limit, because containers and links still recurse.
 - **No HTML output.** mdastic stops at mdast. Use `mdast-util-to-hast` for HTML.
-- **No syntax plugins.** Only GFM, MDX and frontmatter. Math, directives and other micromark extensions are not supported.
+- **No syntax plugins.** Only GFM, MDX, frontmatter and heading IDs. Math, directives and other micromark extensions are not supported.
+- **Limited remark adapter.** Tree mutation plugins only. No processor `use()`, parsing, compilation or full vfile implementation.
+- **Empty heading IDs.** The pinned micromark-heading-id oracle hangs on `{#}` outside MDX flow. mdastic emits an empty `idString`; this case is tested separately, not counted as oracle conformance.
 
 ## Repository layout
 
