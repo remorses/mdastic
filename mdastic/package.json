@@ -1,6 +1,6 @@
 {
   "name": "mdastic",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "Fast markdown and MDX parser and serializer that outputs the exact same mdast as remark. MDX, GFM and frontmatter built in.",
   "type": "module",
   "repository": {
