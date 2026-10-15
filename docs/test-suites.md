@@ -9,9 +9,9 @@ mdastic tests are **differential**: a fixture is only `{ name, input, syntax }`,
 remark oracle computes the expected tree. So any corpus of inputs is useful, even when the
 upstream suite only asserts HTML. This page lists the corpora other markdown projects use.
 
-> **Status at `04050a6`:** 10 new fixture files, **3,936 new inputs**. Stringify passes
-> 3,936/3,936. Parse passes **3,890/3,936**: 46 failures, grouped into 17 bugs below.
-> The full parse report is now 13,748/13,794. The pathological perf check fails 63 of 114 runs.
+> **Status after conformance fixes:** all **3,936 new inputs** pass parse and stringify.
+> All 17 bugs below are fixed and have regression fixtures. The full parse and stringify
+> reports pass **13,817/13,817**. The pathological perf check still fails 63 of 114 runs.
 
 ```text
 upstream test files ──► scripts/extract-*.ts ──► fixtures/*.json ──┬──► remark ───┐
@@ -33,16 +33,16 @@ upstream test files ──► scripts/extract-*.ts ──► fixtures/*.json ─
 
 | Fixture file | Script | Inputs | Parse | Stringify |
 | --- | --- | ---: | ---: | ---: |
-| `pulldown-cmark-specs.json` | `extract-spec-files.ts` | 346 | 343 | 346 |
-| `cmark-tests.json` (cmark, cmark-gfm x2, commonmark.js, spec master) | `extract-spec-files.ts` | 160 | 159 | 160 |
-| `comrak-fixtures.json` | `extract-spec-files.ts` | 88 | 85 | 88 |
-| `md4c-tests.json` | `extract-spec-files.ts` | 386 | 375 | 386 |
-| `markdown-it-fixtures.json` | `extract-spec-files.ts` | 421 | 418 | 421 |
-| `flexmark-specs.json` | `extract-spec-files.ts` | 1,877 | 1,860 | 1,877 |
-| `goldmark-tests.json` | `extract-spec-files.ts` | 130 | 126 | 130 |
-| `benchmark-samples.json` (markdown-it, pulldown bench docs) | `extract-spec-files.ts` | 60 | 58 | 60 |
+| `pulldown-cmark-specs.json` | `extract-spec-files.ts` | 346 | 346 | 346 |
+| `cmark-tests.json` (cmark, cmark-gfm x2, commonmark.js, spec master) | `extract-spec-files.ts` | 160 | 160 | 160 |
+| `comrak-fixtures.json` | `extract-spec-files.ts` | 88 | 88 | 88 |
+| `md4c-tests.json` | `extract-spec-files.ts` | 386 | 386 | 386 |
+| `markdown-it-fixtures.json` | `extract-spec-files.ts` | 421 | 421 | 421 |
+| `flexmark-specs.json` | `extract-spec-files.ts` | 1,877 | 1,877 | 1,877 |
+| `goldmark-tests.json` | `extract-spec-files.ts` | 130 | 130 | 130 |
+| `benchmark-samples.json` (markdown-it, pulldown bench docs) | `extract-spec-files.ts` | 60 | 60 | 60 |
 | `realworld-mintlify-docs.json` (real Mintlify source MDX) | `extract-docs-repos.ts` | 350 | 350 | 350 |
-| `pathological.json` (1/100 of upstream sizes) | `pathological.ts fixtures` | 118 | 116 | 118 |
+| `pathological.json` (1/100 of upstream sizes) | `pathological.ts fixtures` | 118 | 118 | 118 |
 
 Inputs already present in another fixture file with the same syntax are skipped, so these
 counts are new inputs only. Regenerate from `conformance/`:
@@ -127,10 +127,10 @@ multiple of 3, link openers and emph closers, `[ (](`, backticks, `**_* `, `` ``
 trailing asterisks, `*_* _ `, `a**b`, comrak emphasis mod three, `a***b~~`, `a<?`. These still
 fail the check: cmark keeps all of them linear, and mdastic should too.
 
-## New failures
+## Fixed failures
 
-Minimal repros, verified against the oracle at `04050a6`. Fix them after the readability
-refactor, then add each repro to `regressions.json`. `got` is mdastic, `want` is remark.
+Minimal repros first verified against the oracle at `04050a6`. All rows are now fixed,
+with inputs in `regressions.json`. `got` describes the old mdastic result; `want` is remark.
 
 | # | Repro | Diff | Fixtures |
 | ---: | --- | --- | --- |
@@ -139,17 +139,17 @@ refactor, then add each repro to `regressions.json`. `got` is mdastic, `want` is
 | 3 | `- <?\n\n  x\n` | html in list item: got `'<?\n\nx'`, want `'<?\n\nx\n'` | md4c #37 |
 | 4 | `>>\n>\n` | inner blockquote `position.end.line`: got 2, want 1 (also `- > > a\n  >\n`) | comrak #46 #62 #63; cmark-tests #62 |
 | 5 | `>> a\n> 1. b\n` | the outer quote's list item must end the inner paragraph; inner quote `end.line` got 1, want 2 | flexmark #750 |
-| 6 | `> 1. one\n2. two\n` | `2.` cannot interrupt a paragraph, so it is a lazy line; got a second listItem | flexmark #215 |
+| 6 | `> 1. one\n2. two\n` | a missing quote prefix resets container interruption; `2.` starts a separate list outside the quote | flexmark #215 |
 | 7 | `> - - x\n>\n>\n` | inner list `spread`: got false, want true | md4c #147; pathological #38 #39 |
 | 8 | `* a\n  # b\n       # c\n       \n  * d\n` | outer item `spread`: got true, want false | flexmark #397 #398 |
 | 9 | `[^a]: b\n\n    - c\n    \n    [^d]: e\n` (gfm) | list in footnote `spread`: got false, want true | flexmark #1024 |
-| 10 | `[![a](b[)](c)\n` | an unmatched `[` inside an image destination must not break the outer link; got text, want link | md4c #133 to #139 |
-| 11 | `<http://a\x7fb>\n` (U+007F) | DEL is not allowed in an autolink; got link, want text | md4c #149 |
+| 10 (fixed) | `[![a](b[)](c)\n` | image destination brackets do not participate in the outer label | md4c #133 to #139 |
+| 11 (fixed) | `<http://a\x7fb>\n` (U+007F) | DEL is not allowed in an autolink | md4c #149 |
 | 12 | `- a\n b\n===\n` | lazy `===` / `--` lines continue the list paragraph; got `'a\nb'`, want `'a\nb\n==='` (also `- a\n--\n`) | markdown-it #240; goldmark #109 |
 | 13 | `-   a\|b\n---\|---\n` (gfm) | a list item line cannot start a table; got table, want list. Also `    \| a \|\n  \| - \|\n` wants code | markdown-it #372 #387 |
-| 14 | `[![[b](c)](x)](y)\n` | a link inside an image label disables the outer link; got link, want text | goldmark #39 |
+| 14 (fixed) | `[![[b](c)](x)](y)\n` | a link inside an image label disables the outer link | goldmark #39 |
 | 15 | `a\n*  \n` | an empty item with trailing spaces cannot interrupt a paragraph; want `'a\n*'` | goldmark #40 |
-| 16 | `<a b=c/d\n/>\n` | unquoted attribute value with `/` before a line ending is not html; got html, want text | goldmark #55 |
+| 16 (fixed) | `<a b=c/d\n/>\n` | a slash after the first unquoted attribute character ends the value | goldmark #55 |
 | 17 | `   - 3\n    - 4\n     - 5\n    - 4\n` | the last line is a lazy continuation; got `'5'`, want `'5\n- 4'` | benchmark-samples #10 #40 |
 
 Fixture numbers are the `#index` printed by `report.ts parse <file> --fail 100`.

@@ -344,11 +344,13 @@ const htmlBlocks = new Set([
   'track',
   'ul',
 ])
+const rawHtmlEnd = /<\/(?:script|pre|style|textarea)>/i
+
 function htmlBlock(
   source: string,
   line: Line,
   interrupt: boolean,
-): { start: number; until: string | null; tag?: string } | undefined {
+): { start: number; until: string | RegExp | null } | undefined {
   const scan = indentation(source, line)
   const start = scan.start
   if (scan.indent > MAX_BLOCK_INDENT || source.charCodeAt(start) !== Char.LessThan) return
@@ -373,7 +375,8 @@ function htmlBlock(
       source.charCodeAt(i) !== 47 &&
       (tag === 'script' || tag === 'pre' || tag === 'style' || tag === 'textarea')
     )
-      return { start, until: '</' + tag + '>', tag }
+      // Quirk: any raw closing tag ends the block, not just the opening tag's name.
+      return { start, until: rawHtmlEnd }
     if (htmlBlocks.has(tag)) return { start, until: null }
   }
   // CommonMark HTML type 7 cannot interrupt an existing paragraph.
@@ -403,7 +406,7 @@ function interrupts(context: BlockContext, line: Line): boolean {
     (!m.ordered ||
       (source.charCodeAt(m.start) === 49 &&
         (source.charCodeAt(m.start + 1) === 46 || source.charCodeAt(m.start + 1) === 41))) &&
-    m.content < line.end
+    !blank(source, { start: m.content, end: line.end, next: line.next, padding: m.padding })
   )
 }
 
@@ -713,8 +716,21 @@ function row(context: BlockContext, line: Line, parent: number): void {
   }
 }
 
-function tableStart(context: BlockContext, input: Line[], i: number): AlignType[] | undefined {
+function tableStart(
+  context: BlockContext,
+  input: Line[],
+  i: number,
+  paragraph = false,
+): AlignType[] | undefined {
   if (!context.config.gfm || !input[i + 1] || input[i + 1].lazy) return
+  const source = context.source
+  const headerLine = input[i]
+  if (
+    (!mdxMode && indentation(source, headerLine).indent >= CODE_INDENT) ||
+    (marker(source, headerLine) && (!paragraph || interrupts(context, headerLine))) ||
+    quote(source, headerLine) >= 0
+  )
+    return
   const align = tableAlign(context.source, input[i + 1])
   // A setext underline or list marker wins over a possible table delimiter row.
   if (!align || setext(context.source, input[i + 1]) || marker(context.source, input[i + 1]))
@@ -725,8 +741,14 @@ function tableStart(context: BlockContext, input: Line[], i: number): AlignType[
   return align
 }
 
-function parseTable(context: BlockContext, input: Line[], i: number, parent: number): number {
-  const align = tableStart(context, input, i)
+function parseTable(
+  context: BlockContext,
+  input: Line[],
+  i: number,
+  parent: number,
+  paragraph: boolean,
+): number {
+  const align = tableStart(context, input, i, paragraph)
   if (!align) return 0
   const source = context.source
   const n = node(Kind.Table, indentation(source, input[i]).start, input[i + 1].end, parent)
@@ -861,13 +883,14 @@ function parseHtmlBlock(
   const source = context.source
   const line = input[i]
   let j = i
+  let closed = false
   for (; j < input.length; j++) {
     if (line.lazy && j > i) break
     if (!html.until && blank(source, input[j])) break
     if (html.until) {
-      let value = source.slice(input[j].start, input[j].end)
-      if (html.tag) value = value.toLowerCase()
-      if (value.includes(html.until)) {
+      const value = source.slice(input[j].start, input[j].end)
+      if (typeof html.until === 'string' ? value.includes(html.until) : html.until.test(value)) {
+        closed = true
         j++
         break
       }
@@ -878,9 +901,9 @@ function parseHtmlBlock(
   // Unterminated root/container HTML retains its final line ending.
   const unclosed =
     html.until &&
-    (tree.kind[parent] === Kind.Root || nextContainer) &&
-    j === input.length &&
-    !source.slice(last.start, last.end).toLowerCase().includes(html.until)
+    !closed &&
+    (tree.kind[parent] === Kind.Root || nextContainer || last.next === source.length) &&
+    j === input.length
   const n = node(Kind.Html, line.start, unclosed ? last.next : last.end, parent)
   const content = input.slice(i, j)
   tree.value[n] = viewFor(source, content, false).source
@@ -927,6 +950,7 @@ function parseFootnoteDefinition(
   tree.extra[n] = { identifier, label: decode(raw) }
   context.footnotes.add(identifier)
   parseBlocks(context, content, n, false, InterruptState.None, input[j] ?? boundary)
+  if (tree.last[n]) tree.end[n] = Math.max(tree.end[n], tree.end[tree.last[n]])
   return j - i
 }
 
@@ -969,14 +993,27 @@ export function parseBlocks(
     const line = input[i]
     if (blank(source, line)) {
       const previous = tree.last[parent]
+      // Quirk: EOF after a quote prefix does not emit a blank line-ending token.
       if (
         previous &&
         quotePrefix(source, line) &&
-        ((tree.kind[previous] === Kind.Blockquote && i + 1 === input.length) ||
+        ((tree.kind[previous] === Kind.Blockquote &&
+          line.next === source.length &&
+          line.end === line.next &&
+          i > 0 &&
+          !blank(source, input[i - 1])) ||
           tree.kind[previous] === Kind.List ||
           tree.kind[previous] === Kind.FootnoteDefinition)
-      )
+      ) {
+        if (
+          tree.kind[previous] === Kind.List &&
+          i > 0 &&
+          blank(source, input[i - 1]) &&
+          tree.end[tree.last[previous]] < input[i - 1].end
+        )
+          tree.extra[previous] = true
         tree.end[previous] = line.end
+      }
       if (residual !== InterruptState.IndentedCode) residual = InterruptState.None
       i++
       continue
@@ -1056,7 +1093,7 @@ export function parseBlocks(
           content.push(item)
           // Tables cannot receive ordinary lazy paragraph continuation.
           lazy = !table && lazyParagraph(context, item)
-        } else if (lazy && !interrupts(context, current)) {
+        } else if (lazy && !interrupts(context, current) && !marker(source, current)) {
           const html = !context.config.mdx && htmlBlock(source, current, false)
           if (html && current.next === current.end) break
           content.push({ ...current, lazy: true })
@@ -1068,6 +1105,9 @@ export function parseBlocks(
       }
       const n = node(Kind.Blockquote, scan.start, input[j - 1].end, parent)
       parseBlocks(context, content, n, false, residual, input[j] ?? boundary)
+      // Quirk: a new container after a stripped quote prefix closes at that prefix.
+      if (j < input.length && quotePrefix(source, input[j]) && marker(source, input[j]))
+        tree.end[n] = input[j].start
       if (tree.last[n]) tree.end[n] = Math.max(tree.end[n], tree.end[tree.last[n]])
       pendingLazy = j < input.length && !blank(source, input[j])
       residual = InterruptState.None
@@ -1075,13 +1115,13 @@ export function parseBlocks(
       continue
     }
     // ── GFM tables precede list and paragraph recognition ──
-    const tableCount = parseTable(context, input, i, parent)
+    const tableCount = parseTable(context, input, i, parent, residual === InterruptState.Paragraph)
     if (tableCount) {
       i += tableCount
       continue
     }
     // ── Reject list starts that cannot interrupt retained paragraph-like content ──
-    let m = marker(source, line)
+    let m = line.lazy ? undefined : marker(source, line)
     if (
       m &&
       residual &&
@@ -1143,7 +1183,7 @@ export function parseBlocks(
             continue
           }
           const scan = indentation(source, current)
-          if (scan.indent < mark.indent && marker(source, current)) break
+          if (scan.indent < mark.indent && marker(source, current) && !current.lazy) break
           if (scan.indent >= mark.indent) {
             const stripped = stripIndent(source, current, mark.indent)
             if (blank(source, stripped) || interrupts(context, stripped)) table = false
@@ -1157,7 +1197,7 @@ export function parseBlocks(
             lastContent = j
             lazy = !table && lazyParagraph(context, stripped, lazy || residual > 0)
             sawBlank = false
-          } else if (lazy && !interrupts(context, current) && !setext(source, current)) {
+          } else if (lazy && (current.lazy || !interrupts(context, current))) {
             const html = !context.config.mdx && htmlBlock(source, current, false)
             if (html && current.next === current.end) break
             content.push({ ...current, lazy: true })
@@ -1223,7 +1263,7 @@ export function parseBlocks(
           const next = tree.next[child]
           for (let k = itemStart; k < lastContent; k++)
             if (
-              input[k].end >= tree.end[child] &&
+              input[k].end > tree.end[child] &&
               input[k].next <= tree.start[next] &&
               blank(source, input[k])
             )
@@ -1245,10 +1285,26 @@ export function parseBlocks(
           tree.end[item] = nextMark.start
         if (sibling && sawBlank && tree.kind[parent] === Kind.FootnoteDefinition)
           tree.a[item] = 1
+        if (
+          j < input.length &&
+          tree.kind[parent] === Kind.FootnoteDefinition &&
+          footnoteLabel(source, input[j])
+        ) {
+          tree.end[item] = input[j].start
+          if (sawBlank) tree.a[item] = 1
+        }
         if (sibling && sawBlank && tree.end[item] <= input[lastContent].end) spread = true
         tree.end[list] = tree.end[item]
         if (!sibling && j > lastContent + 1 && quotePrefix(source, input[j - 1]))
           tree.end[list] = input[j - 1].end
+        // prepareList counts trailing quoted blank endings only outside nested containers.
+        if (
+          !sibling &&
+          j > lastContent + 2 &&
+          quotePrefix(source, input[j - 1]) &&
+          tree.end[item] <= input[lastContent].end
+        )
+          spread = true
         if (!sibling) break
       }
       tree.extra[list] = spread
@@ -1293,21 +1349,14 @@ export function parseBlocks(
           last = j
         } else break
       }
-      // EOF indentation is content even when its final line is otherwise blank.
-      const preserveEofIndent =
-        input[j - 1].end === source.length &&
-        indentation(source, input[j - 1]).indent >= CODE_INDENT
-      while (content.length && blank(source, content[content.length - 1]) && !preserveEofIndent)
-        content.pop()
-      let end = input[last].end
-      if (!pendingLazy)
-        for (let k = last + 1; k < j; k++)
-          if (indentation(source, input[k]).indent >= CODE_INDENT) end = input[k].end
-          else break
-      if (preserveEofIndent) end = input[j - 1].end
-      const n = node(Kind.Code, line.start, end, parent)
+      // Micromark commits blank lines with a full code indent, even with no value.
+      let committed = last
+      for (let k = last + 1; k < j; k++)
+        if (indentation(source, input[k]).indent >= CODE_INDENT) committed = k
+      content.length = committed - i + 1
+      const n = node(Kind.Code, line.start, input[committed].end, parent)
       tree.value[n] = viewFor(source, content, false).source
-      if (preserveEofIndent && blank(source, content[content.length - 1])) {
+      if (blank(source, content[content.length - 1])) {
         const value = tree.value[n]!
         if (value.charCodeAt(value.length - 1) === 10)
           tree.value[n] = value.slice(0, value.charCodeAt(value.length - 2) === 13 ? -2 : -1)
@@ -1350,9 +1399,9 @@ export function parseBlocks(
       }
       depth = input[j].lazy ? 0 : setext(source, input[j])
       if (depth) break
-      if (interrupts(context, input[j])) break
+      if (!input[j].lazy && interrupts(context, input[j])) break
       if (input[j].lazy && !context.config.mdx && htmlBlock(source, input[j], false)) break
-      if (tableStart(context, input, j)) break
+      if (tableStart(context, input, j, true)) break
       content.push(input[j])
     }
     let start = scan.start

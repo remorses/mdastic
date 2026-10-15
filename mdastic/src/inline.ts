@@ -405,6 +405,11 @@ function bracketEnd(
     else if (c === 93) {
       if (!depth) return i
       depth--
+      // Resource destinations and titles are not part of the enclosing label.
+      if (source.charCodeAt(i + 1) === Char.LeftParen) {
+        const match = resource(source, i + 1, end)
+        if (match) i = match.end - 1
+      }
     }
   }
   return -1
@@ -454,10 +459,12 @@ function attributeValueEnd(source: string, at: number, end: number, loose: boole
       return stop < 0 || stop >= end ? -1 : stop + 1
     }
     const begin = i
+    // Micromark quirk: only the first unquoted character can be a slash.
+    if (!loose) i++
     while (
       i < end &&
       !isWhitespace(source.charCodeAt(i)) &&
-      !(loose ? '"\'=/<>`' : '"\'=<>`').includes(source[i])
+      !'"\'=/<>`'.includes(source[i])
     )
       i++
     if (i === begin) return -1
@@ -536,6 +543,7 @@ function autolink(
     i < end &&
     source.charCodeAt(i) !== 62 &&
     source.charCodeAt(i) > 32 &&
+    source.charCodeAt(i) !== Char.Delete &&
     source.charCodeAt(i) !== 60
   )
     i++
@@ -994,6 +1002,8 @@ function containsLink(view: View, start: number, end: number, context: InlineCon
     if (c === 33 && source.charCodeAt(i + 1) === 91) {
       const close = bracketEnd(source, i + 2, end, view, context)
       if (close >= 0) {
+        // A link deactivates earlier link openings even through an image label.
+        if (containsLink(view, i + 2, close, context)) return true
         let stop = close + 1
         if (source.charCodeAt(stop) === 40) stop = resource(source, stop, end)?.end ?? stop
         else if (source.charCodeAt(stop) === 91) {
