@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.1
+
+1. **Fixed 17 parse differences from remark** found by new conformance suites (cmark, md4c, flexmark, goldmark, markdown-it, comrak, pulldown-cmark). mdastic now matches remark on all 13,817 fixtures. Fixes include:
+   - raw HTML blocks (`<script>`, `<pre>`, `<style>`, `<textarea>`) end at any raw closing tag
+   - trailing blank lines in indented code
+   - lazy continuation lines and list `spread` inside blockquotes and footnotes
+   - tables no longer start on list item or blockquote lines
+   - links nested inside image labels and brackets inside image destinations
+   - DEL is rejected in autolinks; `/` in unquoted HTML attribute values
+
 ## 0.1.0
 
 1. **New `mdastic/heading-id` syntax.** Parses `{#custom-id}` into `idString` nodes, the same tree as `micromark-heading-id` + `mdast-heading-id`:
