@@ -30,5 +30,9 @@
   { "name": "noninitial ordered list markers take precedence over tables", "input": "2. a|b\n-|-", "syntax": ["gfm"] },
   { "name": "noninitial ordered table headers can interrupt paragraphs", "input": "x\n2. a|b\n-|-", "syntax": ["gfm"] },
   { "name": "empty list items with trailing spaces cannot interrupt paragraphs", "input": "a\n*  \n", "syntax": [] },
-  { "name": "lazy list markers remain text after nested list indentation", "input": "   - 3\n    - 4\n     - 5\n    - 4\n", "syntax": [] }
+  { "name": "lazy list markers remain text after nested list indentation", "input": "   - 3\n    - 4\n     - 5\n    - 4\n", "syntax": [] },
+  { "name": "a final line of stripped fence indentation at EOF adds no line ending", "input": " ```\n a\n\n ", "syntax": [] },
+  { "name": "unclosed fenced code ends before a final list indent while the item reaches EOF", "input": "- ```\n  a\n  ", "syntax": [] },
+  { "name": "unclosed fenced code in a list in a quote excludes the final line ending", "input": "> - ```\n>   a\n>   \n", "syntax": [] },
+  { "name": "unclosed fenced code in a footnote definition keeps the final line ending", "input": "[^a]: ```\n    a\n", "syntax": ["gfm"] }
 ]

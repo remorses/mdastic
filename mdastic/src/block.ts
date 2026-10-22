@@ -78,6 +78,8 @@ const INITIAL_TASK_CAPACITY = 1024
 const TASK_CLEANUP_PENDING = 1
 
 let mdxMode = false
+// Open blockquotes; nothing inside one keeps the final EOF line ending.
+let quoteDepth = 0
 
 let taskCount = 0
 let taskParents = new Int32Array(INITIAL_TASK_CAPACITY)
@@ -85,6 +87,7 @@ let taskStarts = new Int32Array(INITIAL_TASK_CAPACITY)
 const taskViews: (View | undefined)[] = []
 
 export function resetBlocks(): void {
+  quoteDepth = 0
   taskCount = 0
   taskViews.length = 0
 }
@@ -838,8 +841,19 @@ function parseFencedCode(
   const keepEnding =
     tree.kind[parent] === Kind.Root ||
     !!nextContainer ||
-    (tree.kind[parent] === Kind.ListItem && last.next === source.length)
-  const n = node(Kind.Code, opening.start, closed || !keepEnding ? last.end : last.next, parent)
+    ((tree.kind[parent] === Kind.ListItem || tree.kind[parent] === Kind.FootnoteDefinition) &&
+      last.next === source.length &&
+      !quoteDepth)
+  // A last EOF line of only container prefixes is outside the code but inside its parent.
+  const prefixOnly =
+    !closed && j > i + 1 && last.start === last.end && last.end === source.length && !last.padding
+  const n = node(
+    Kind.Code,
+    opening.start,
+    prefixOnly ? input[j - 2].next : closed || !keepEnding ? last.end : last.next,
+    parent,
+  )
+  if (prefixOnly) tree.end[parent] = Math.max(tree.end[parent], last.end)
   let info = opening.content
   while (space(source.charCodeAt(info))) info++
   let word = info
@@ -851,14 +865,13 @@ function parseFencedCode(
     meta: meta === line.end ? null : decode(source.slice(meta, line.end)),
   }
   tree.value[n] = content.length ? viewFor(source, content, false).source : ''
-  // A blank line ending a non-EOF container is not part of its unclosed code value.
+  // A blank line ending its container, or an empty last line at EOF, is not part of the value.
+  const tail = content[content.length - 1]
   if (
     !closed &&
-    !nextContainer &&
-    tree.kind[parent] !== Kind.Root &&
-    last.next < source.length &&
-    content.length &&
-    blank(source, last)
+    tail &&
+    ((!keepEnding && blank(source, last)) ||
+      (tail.start === tail.end && tail.end === source.length))
   ) {
     const value = tree.value[n]!
     if (value.charCodeAt(value.length - 1) === Char.LineFeed)
@@ -1104,7 +1117,9 @@ export function parseBlocks(
         } else break
       }
       const n = node(Kind.Blockquote, scan.start, input[j - 1].end, parent)
+      quoteDepth++
       parseBlocks(context, content, n, false, residual, input[j] ?? boundary)
+      quoteDepth--
       // Quirk: a new container after a stripped quote prefix closes at that prefix.
       if (j < input.length && quotePrefix(source, input[j]) && marker(source, input[j]))
         tree.end[n] = input[j].start
