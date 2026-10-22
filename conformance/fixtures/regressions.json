@@ -30,5 +30,11 @@
   { "name": "noninitial ordered list markers take precedence over tables", "input": "2. a|b\n-|-", "syntax": ["gfm"] },
   { "name": "noninitial ordered table headers can interrupt paragraphs", "input": "x\n2. a|b\n-|-", "syntax": ["gfm"] },
   { "name": "empty list items with trailing spaces cannot interrupt paragraphs", "input": "a\n*  \n", "syntax": [] },
-  { "name": "lazy list markers remain text after nested list indentation", "input": "   - 3\n    - 4\n     - 5\n    - 4\n", "syntax": [] }
+  { "name": "lazy list markers remain text after nested list indentation", "input": "   - 3\n    - 4\n     - 5\n    - 4\n", "syntax": [] },
+  { "name": "headings cut text expressions spanning lines", "input": "{<MDX>\n# d</MDX>}}\n", "syntax": ["mdx"] },
+  { "name": "fences cut attribute values spanning lines", "input": "<a b=\"\n```\">e</a>\n", "syntax": ["mdx"] },
+  { "name": "setext underlines cut attribute values spanning lines", "input": "<a b=\"\n===\n\"/>;\n", "syntax": ["mdx"] },
+  { "name": "flow expressions cut text expressions spanning lines", "input": "{`\n<div>\n`} x\n", "syntax": ["mdx"] },
+  { "name": "spans on later paragraph lines keep containers from starting", "input": "x\n<a b=\"\n> y\n\"/>;\n", "syntax": ["mdx"] },
+  { "name": "lines a cut tag still spans cannot start containers", "input": "<v\n\n>>{\n<", "syntax": ["mdx"] }
 ]

@@ -386,18 +386,18 @@ function htmlBlock(
   }
 }
 
-function interrupts(context: BlockContext, line: Line): boolean {
+// Interrupters that still end a paragraph while an MDX span covers the line.
+function flowInterrupts(context: BlockContext, line: Line): boolean {
   const source = context.source
   if (context.interrupt?.(line)) return true
-  if (
-    blank(source, line) ||
-    thematic(source, line) ||
-    atx(source, line) ||
-    fence(source, line) ||
-    quote(source, line) >= 0
-  )
+  if (blank(source, line) || thematic(source, line) || atx(source, line) || fence(source, line))
     return true
-  if (!context.config.mdx && htmlBlock(source, line, true)) return true
+  return !context.config.mdx && !!htmlBlock(source, line, true)
+}
+
+function interrupts(context: BlockContext, line: Line): boolean {
+  const source = context.source
+  if (flowInterrupts(context, line) || quote(source, line) >= 0) return true
   if (context.config.gfm && footnoteLabel(source, line)) return true
   const m = marker(source, line)
   // Only nonempty ordered items starting with 1 can interrupt a paragraph.
@@ -987,6 +987,8 @@ export function parseBlocks(
   // Definitions survive adjacent lines; only indented code retains its state across blanks.
   let residual = inheritedInterrupt
   let pendingLazy = false
+  // Lines an MDX flow tag or expression attempt still spans cannot start containers.
+  let spanEnd = 0
   while (i < input.length) {
     // ── Route flow parents, handle blank lines, then allow extension flow syntax ──
     parent = context.flowParent?.(owner) ?? owner
@@ -1052,7 +1054,8 @@ export function parseBlocks(
       continue
     }
     // ── Blockquotes collect prefixed lines and permitted lazy continuation ──
-    const q = quote(source, line)
+    const spanned = line.start < spanEnd
+    const q = spanned ? -1 : quote(source, line)
     if (q >= 0) {
       const previous = tree.last[parent]
       if (previous && tree.kind[previous] === Kind.List && quotePrefix(source, line)) {
@@ -1121,7 +1124,7 @@ export function parseBlocks(
       continue
     }
     // ── Reject list starts that cannot interrupt retained paragraph-like content ──
-    let m = line.lazy ? undefined : marker(source, line)
+    let m = line.lazy || spanned ? undefined : marker(source, line)
     if (
       m &&
       residual &&
@@ -1375,7 +1378,7 @@ export function parseBlocks(
       continue
     }
     // ── Footnotes collect indented blocks and lazy paragraph continuation ──
-    const footnote = context.config.gfm && footnoteLabel(source, line)
+    const footnote = context.config.gfm && !spanned && footnoteLabel(source, line)
     if (footnote) {
       i += parseFootnoteDefinition(context, input, i, parent, footnote, scan.start, boundary)
       continue
@@ -1389,18 +1392,19 @@ export function parseBlocks(
     }
     // ── Gather paragraph lines, or promote them to a setext heading ──
     const content: Line[] = [line]
-    const continuationEnd = context.continuationEnd?.(line) ?? line.end
+    if (context.continuationEnd) spanEnd = Math.max(spanEnd, context.continuationEnd(line))
     let j = i + 1
     let depth = 0
     for (; j < input.length; j++) {
-      if (input[j].start < continuationEnd) {
-        content.push(input[j])
-        continue
-      }
       depth = input[j].lazy ? 0 : setext(source, input[j])
       if (depth) break
-      if (!input[j].lazy && interrupts(context, input[j])) break
-      if (input[j].lazy && !context.config.mdx && htmlBlock(source, input[j], false)) break
+      if (input[j].start < spanEnd) {
+        if (flowInterrupts(context, input[j])) break
+      } else {
+        if (!input[j].lazy && interrupts(context, input[j])) break
+        if (input[j].lazy && !context.config.mdx && htmlBlock(source, input[j], false)) break
+        if (context.continuationEnd) spanEnd = context.continuationEnd(input[j])
+      }
       if (tableStart(context, input, j, true)) break
       content.push(input[j])
     }
