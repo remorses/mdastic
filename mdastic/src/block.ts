@@ -125,7 +125,7 @@ function indentation(source: string, line: Line): { start: number; indent: numbe
   }
   return { start, indent }
 }
-function blank(source: string, line: Line): boolean {
+export function blank(source: string, line: Line): boolean {
   return indentation(source, line).start === line.end
 }
 function trimEnd(source: string, start: number, end: number): number {
@@ -268,7 +268,7 @@ function marker(source: string, line: Line, mdx = mdxMode): Marker | undefined {
   }
 }
 
-function quote(source: string, line: Line, mdx = mdxMode): number {
+export function quote(source: string, line: Line, mdx = mdxMode): number {
   const scan = indentation(source, line)
   if (
     (!mdx && scan.indent > MAX_BLOCK_INDENT) ||
