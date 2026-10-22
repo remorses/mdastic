@@ -470,6 +470,109 @@ function lazyParagraph(context: BlockContext, line: Line, interrupted = false): 
   return false
 }
 
+// Indent that continues indented code opened on this line, possibly in nested list items,
+// -2 for fenced code or HTML, or -1. Code in nested quotes is not tracked.
+function codeIndent(source: string, line: Line): number {
+  let current = line
+  let need = 0
+  let quoted = false
+  for (let depth = 0; depth < MAX_LAZY_CONTAINER_PROBES; depth++) {
+    const scan = indentation(source, current)
+    if (scan.start < line.end && scan.indent >= CODE_INDENT) return quoted ? -1 : need
+    if (fence(source, current) || htmlBlock(source, current, false)) return -2
+    const q = quote(source, current)
+    if (q >= 0) {
+      quoted = true
+      current = { start: q, end: line.end, next: line.next }
+      continue
+    }
+    const m = marker(source, current)
+    if (!m) return -1
+    need += m.indent
+    current = { start: m.content, end: line.end, next: line.next, padding: m.padding }
+  }
+  return -1
+}
+
+// Flow state of a list item's lines, packed into one number to keep `parseBlocks` frames small.
+const enum ItemFlow {
+  Lazy = 1, // an open paragraph takes lazy lines
+  Direct = 2, // that paragraph is directly in the item
+  Setext = 4, // that paragraph can end at a setext underline, unless it may be a definition
+  Opaque = 8, // after fenced code or HTML, or in MDX, only lazy lines are tracked
+  Nested = 16, // the line opened a nested container
+  CodeShift = 5, // higher bits: indent that continues open indented code, plus one
+}
+
+function itemFlow(context: BlockContext, line: Line, interrupted: boolean): number {
+  const source = context.source
+  const lazy = lazyParagraph(context, line, interrupted)
+  const code = context.config.mdx ? -2 : codeIndent(source, line)
+  let flow = lazy ? ItemFlow.Lazy : 0
+  flow |= code === -2 ? ItemFlow.Opaque : (code + 1) << ItemFlow.CodeShift
+  if (
+    quote(source, line) >= 0 ||
+    (marker(source, line) && (!interrupted || interrupts(context, line)))
+  )
+    flow |= ItemFlow.Nested
+  else if (lazy) {
+    const bracket = source.charCodeAt(indentation(source, line).start) === Char.LeftBracket
+    flow |= ItemFlow.Direct | (bracket ? 0 : ItemFlow.Setext)
+  }
+  return flow
+}
+
+function nextFlow(context: BlockContext, line: Line, flow: number, table: boolean): number {
+  const source = context.source
+  const paragraph = (flow & ItemFlow.Lazy) !== 0
+  // Outer containers only pass lazy lines that continue the open paragraph.
+  if (line.lazy) return table ? flow & ~ItemFlow.Lazy : flow | ItemFlow.Lazy
+  if (flow & ItemFlow.Opaque)
+    return !table && lazyParagraph(context, line, paragraph)
+      ? flow | ItemFlow.Lazy
+      : flow & ~ItemFlow.Lazy
+  const code = (flow >> ItemFlow.CodeShift) - 1
+  const scan = indentation(source, line)
+  // Open indented code, possibly in a nested item, continues on lines indented past it.
+  if (code >= 0 && scan.indent >= code + CODE_INDENT) return flow & ~ItemFlow.Nested
+  if (scan.indent >= CODE_INDENT) {
+    const open = paragraph && flow & ItemFlow.Direct ? ItemFlow.Direct | ItemFlow.Setext : 0
+    if (open && !table) return open | ItemFlow.Lazy
+    return open | (flow & ItemFlow.Nested ? 0 : 1 << ItemFlow.CodeShift)
+  }
+  const interrupted = paragraph || (code >= 0 && scan.indent >= code)
+  const opened = codeIndent(source, line)
+  const opaque = opened === -2
+  const quoted = quote(source, line) >= 0
+  const container =
+    quoted || (!!marker(source, line) && (!interrupted || interrupts(context, line)))
+  let lazy = false
+  let direct = (flow & ItemFlow.Direct) !== 0
+  let setextable = (flow & ItemFlow.Setext) !== 0
+  if (!paragraph) {
+    // Quirk: a paragraph opened in a quote under open code does not take lazy lines.
+    lazy = lazyParagraph(context, line, interrupted && !quoted)
+    direct = lazy && !container
+    setextable = direct && source.charCodeAt(scan.start) !== Char.LeftBracket
+  } else if (!direct || opaque) lazy = lazyParagraph(context, line, true)
+  else if (!setextable || !setext(source, line)) {
+    lazy = lazyParagraph(context, line, true)
+    direct = !container
+  }
+  // Tables cannot receive ordinary lazy paragraph continuation.
+  if (table) lazy = false
+  // Quirk: code right after a nested container closes does not make the next line interrupt.
+  const next = !opaque && !lazy && (container || !(flow & ItemFlow.Nested)) ? opened : -1
+  return (
+    (lazy ? ItemFlow.Lazy : 0) |
+    (direct ? ItemFlow.Direct : 0) |
+    (setextable ? ItemFlow.Setext : 0) |
+    (opaque ? ItemFlow.Opaque : 0) |
+    (container ? ItemFlow.Nested : 0) |
+    ((next + 1) << ItemFlow.CodeShift)
+  )
+}
+
 function quotePrefix(source: string, line: Line): boolean {
   for (
     let i = line.start - 1;
@@ -1159,7 +1262,7 @@ export function parseBlocks(
           },
         ]
         j++
-        let lazy = lazyParagraph(context, content[0], residual > 0)
+        let flow = itemFlow(context, content[0], residual > 0)
         let sawBlank = false
         let lastContent = itemStart
         let itemSpread = false
@@ -1179,7 +1282,7 @@ export function parseBlocks(
             }
             content.push(stripIndent(source, current, mark.indent))
             sawBlank = true
-            lazy = false
+            flow &= ~(ItemFlow.Lazy | ItemFlow.Nested)
             continue
           }
           const scan = indentation(source, current)
@@ -1195,9 +1298,9 @@ export function parseBlocks(
               table = true
             content.push(stripped)
             lastContent = j
-            lazy = !table && lazyParagraph(context, stripped, lazy || residual > 0)
+            flow = nextFlow(context, stripped, flow, table)
             sawBlank = false
-          } else if (lazy && (current.lazy || !interrupts(context, current))) {
+          } else if (flow & ItemFlow.Lazy && (current.lazy || !interrupts(context, current))) {
             const html = !context.config.mdx && htmlBlock(source, current, false)
             if (html && current.next === current.end) break
             content.push({ ...current, lazy: true })
@@ -1218,6 +1321,8 @@ export function parseBlocks(
         tree.a[item] = itemSpread ? 1 : 0
         const taskStart = taskCount
         parseBlocks(context, content, item, false, residual, input[j] ?? boundary)
+        // Only the first item can follow the interrupted paragraph.
+        residual = InterruptState.None
         // Skip the checkbox now; deferred inline cleanup removes one separator later.
         if (context.config.gfm) {
           let first = tree.child[item]

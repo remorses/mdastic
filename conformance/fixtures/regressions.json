@@ -30,5 +30,14 @@
   { "name": "noninitial ordered list markers take precedence over tables", "input": "2. a|b\n-|-", "syntax": ["gfm"] },
   { "name": "noninitial ordered table headers can interrupt paragraphs", "input": "x\n2. a|b\n-|-", "syntax": ["gfm"] },
   { "name": "empty list items with trailing spaces cannot interrupt paragraphs", "input": "a\n*  \n", "syntax": [] },
-  { "name": "lazy list markers remain text after nested list indentation", "input": "   - 3\n    - 4\n     - 5\n    - 4\n", "syntax": [] }
+  { "name": "lazy list markers remain text after nested list indentation", "input": "   - 3\n    - 4\n     - 5\n    - 4\n", "syntax": [] },
+  { "name": "only the first list item inherits an interrupted paragraph", "input": "a\n- b\n- -\n", "syntax": [] },
+  { "name": "later item lines do not inherit an interrupted paragraph", "input": "a\n- # h\n  -\nx\n", "syntax": [] },
+  { "name": "indented code after a list marker keeps an empty nested item as paragraph text", "input": "-     |a|b|\n  - \ntext\n", "syntax": [] },
+  { "name": "indented lines continue a paragraph in a later list line", "input": "a\n- a\n      y\n  2.\ntext\n", "syntax": [] },
+  { "name": "a setext underline in a list item ends lazy continuation", "input": "- a\n      y\n  -\ntext\n", "syntax": [] },
+  { "name": "an empty item after quoted text in open code starts a list", "input": "- >       y\n    -\nt\n", "syntax": [] },
+  { "name": "a lazy line in a quoted list item is not a setext underline", "input": "> - a\nb\n  ===\n> c\n", "syntax": [] },
+  { "name": "fenced code in a nested list item hides later list item lines", "input": "-\n  - ```\n    a\n      b\nc\n", "syntax": [] },
+  { "name": "indented code in a nested list item continues past deeper lines", "input": "*\n  -     x\n        e\n          P\n   1.\nb\n", "syntax": [] }
 ]
