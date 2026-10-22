@@ -30,5 +30,7 @@
   { "name": "noninitial ordered list markers take precedence over tables", "input": "2. a|b\n-|-", "syntax": ["gfm"] },
   { "name": "noninitial ordered table headers can interrupt paragraphs", "input": "x\n2. a|b\n-|-", "syntax": ["gfm"] },
   { "name": "empty list items with trailing spaces cannot interrupt paragraphs", "input": "a\n*  \n", "syntax": [] },
-  { "name": "lazy list markers remain text after nested list indentation", "input": "   - 3\n    - 4\n     - 5\n    - 4\n", "syntax": [] }
+  { "name": "lazy list markers remain text after nested list indentation", "input": "   - 3\n    - 4\n     - 5\n    - 4\n", "syntax": [] },
+  { "name": "quoted attribute continuation lines skip any leading whitespace", "input": "<x c=\"a\n\u2028b\r\u3000c\r\n\u000b\fd\"/>\n\n<x c=\"\n\u00a0e\"/>\n", "syntax": ["mdx"] },
+  { "name": "lazy lines in quoted attribute values report before leading whitespace", "input": "> <A b=\"\n> a\n\u00a0\nb", "syntax": ["mdx"] }
 ]
