@@ -227,7 +227,7 @@ function fence(
   return { start: scan.start, content: i, char: c, length: i - scan.start, indent: scan.indent }
 }
 
-function marker(source: string, line: Line, mdx = mdxMode): Marker | undefined {
+function marker(source: string, line: Line, mdx = mdxMode, wide = mdx): Marker | undefined {
   const scan = indentation(source, line)
   if (!mdx && scan.indent > MAX_BLOCK_INDENT) return
   let i = scan.start
@@ -252,7 +252,8 @@ function marker(source: string, line: Line, mdx = mdxMode): Marker | undefined {
   }
   let remaining = 0
   // Oversized padding consumes just one separator; the remainder belongs to content.
-  if (padding > MAX_LIST_PADDING || i === line.end) {
+  // MDX has no indented code, so wide markers keep all of it.
+  if ((!wide && padding > MAX_LIST_PADDING) || i === line.end) {
     remaining = source.charCodeAt(markerEnd) === 9 ? tabWidth(source, markerEnd) - 1 : 0
     i = markerEnd < line.end ? markerEnd + 1 : markerEnd
     padding = 1
@@ -408,6 +409,29 @@ function interrupts(context: BlockContext, line: Line): boolean {
         (source.charCodeAt(m.start + 1) === 46 || source.charCodeAt(m.start + 1) === 41))) &&
     !blank(source, { start: m.content, end: line.end, next: line.next, padding: m.padding })
   )
+}
+
+// Items with MDX syntax keep the CommonMark width until lazy MDX lines match micromark.
+function mdxSyntaxAhead(context: BlockContext, input: Line[], at: number, indent: number): boolean {
+  const source = context.source
+  for (let k = at; k < input.length; k++) {
+    const line = input[k]
+    if (blank(source, line)) {
+      const next = input[k + 1]
+      if (next && !blank(source, next) && indentation(source, next).indent < indent) break
+      continue
+    }
+    const scan = indentation(source, line)
+    if (source.startsWith('import', scan.start) || source.startsWith('export', scan.start))
+      return true
+    for (let i = line.start; i < line.end; i++) {
+      const c = source.charCodeAt(i)
+      if (c === Char.LessThan || c === Char.LeftBrace) return true
+    }
+    // Less indented lines end the item unless they are lazy.
+    if (k > at && scan.indent < indent && interrupts(context, line)) break
+  }
+  return false
 }
 
 function footnoteLabel(source: string, line: Line): { end: number; raw: string } | undefined {
@@ -1141,7 +1165,7 @@ export function parseBlocks(
       let j = i
       let spread = false
       while (j < input.length) {
-        const mark = marker(source, input[j])
+        let mark = marker(source, input[j])
         if (
           !mark ||
           mark.ordered !== m.ordered ||
@@ -1149,6 +1173,11 @@ export function parseBlocks(
           thematic(source, input[j])
         )
           break
+        if (mdxMode) {
+          const narrow = marker(source, input[j], true, false)!
+          if (narrow.indent !== mark.indent && mdxSyntaxAhead(context, input, j, narrow.indent))
+            mark = narrow
+        }
         const itemStart = j
         const content: Line[] = [
           {

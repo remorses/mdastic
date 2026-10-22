@@ -30,5 +30,9 @@
   { "name": "noninitial ordered list markers take precedence over tables", "input": "2. a|b\n-|-", "syntax": ["gfm"] },
   { "name": "noninitial ordered table headers can interrupt paragraphs", "input": "x\n2. a|b\n-|-", "syntax": ["gfm"] },
   { "name": "empty list items with trailing spaces cannot interrupt paragraphs", "input": "a\n*  \n", "syntax": [] },
-  { "name": "lazy list markers remain text after nested list indentation", "input": "   - 3\n    - 4\n     - 5\n    - 4\n", "syntax": [] }
+  { "name": "lazy list markers remain text after nested list indentation", "input": "   - 3\n    - 4\n     - 5\n    - 4\n", "syntax": [] },
+  { "name": "MDX list items keep wide marker padding", "input": "*\t\t```\n\tf\n", "syntax": ["mdx"] },
+  { "name": "MDX nested lists measure from wide marker padding", "input": "-      a\n\n      - c\n", "syntax": ["mdx"] },
+  { "name": "MDX wide list items with lazy JSX keep CommonMark width", "input": "-     y\n  <a c=\"\n x\"/>\n", "syntax": ["mdx"] },
+  { "name": "MDX wide list items with expressions keep CommonMark width", "input": "-     { a { b }\n  -\n", "syntax": ["mdx"] }
 ]
