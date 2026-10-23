@@ -34,5 +34,7 @@
   { "name": "ordered lists not starting at 1 can follow a table after a paragraph", "input": "a\n|||\n-|-\n3.\n", "syntax": ["gfm"] },
   { "name": "ordered lists not starting at 1 can follow a table after indented code", "input": "    code\n|a|\n-|\n3.\n", "syntax": ["gfm"] },
   { "name": "ESM lines end GFM tables", "input": "a|b\n-|-\nexport const x = 1\n\n{x}\n", "syntax": ["mdx", "gfm"] },
-  { "name": "invalid ESM after a GFM table is an MDX error", "input": "g|||\n-|-|-\nexport ", "syntax": ["mdx", "gfm"] }
+  { "name": "invalid ESM after a GFM table is an MDX error", "input": "g|||\n-|-|-\nexport ", "syntax": ["mdx", "gfm"] },
+  { "name": "a line holding only U+FEFF does not end an ESM chunk", "input": "export const F = 1\n\ufeff\n\n{F}\n", "syntax": ["mdx"] },
+  { "name": "only spaces and tabs before > continue a block quote inside unclosed JSX", "input": "> <a\n\u00a0>", "syntax": ["mdx"] }
 ]

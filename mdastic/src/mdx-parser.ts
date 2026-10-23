@@ -5,7 +5,7 @@ import { MdxParseError } from './syntax.ts'
 import { alpha, Char, digit, entity, isWhitespace, point, position, space } from './scan.ts'
 import { append, Kind, node, tree } from './tree.ts'
 import { offset, type View } from './inline.ts'
-import type { BlockContext, Line } from './block.ts'
+import { blank, type BlockContext, type Line, quote } from './block.ts'
 import type { MdxJsxAttribute, MdxJsxExpressionAttribute } from './types.ts'
 import { acornProgram, expression, mdxError } from './mdx-scan.ts'
 
@@ -383,8 +383,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
       map[k] = input.at(-1)!.next
       view = { source: chunks.join(''), base: 0, map, lazy }
     }
-    if (boundary && !source.slice(boundary.start, boundary.end).trimStart().startsWith('>'))
-      view.boundary = boundary.start
+    if (boundary && quote(source, boundary) < 0) view.boundary = boundary.start
     const result = { view, starts }
     views.set(input, result)
     return result
@@ -441,8 +440,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
     let j = at
     // Incomplete ESM retries another blank-delimited chunk, not every source line.
     for (;;) {
-      while (j + 1 < input.length && source.slice(input[j + 1].start, input[j + 1].end).trim())
-        j++
+      while (j + 1 < input.length && !blank(source, input[j + 1])) j++
       const end = input[j].end
       const value = source.slice(begin, end)
       // Prior imports satisfy Acorn scope validation; remove this declaration afterward.
