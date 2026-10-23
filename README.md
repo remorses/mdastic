@@ -252,7 +252,6 @@ pnpm exec vitest run                # full differential suite
 
 ## Limits
 
-- **Not reentrant.** The parser reuses module-level buffers. Do not call `parse` from inside a parse hook.
 - **Deep nesting** can hit the JavaScript call stack limit, because containers and links still recurse.
 - **No HTML output.** mdastic stops at mdast. Use `mdast-util-to-hast` for HTML.
 - **No syntax plugins.** Only GFM, MDX, frontmatter and heading IDs. Math, directives and other micromark extensions are not supported.

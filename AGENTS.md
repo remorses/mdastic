@@ -77,7 +77,8 @@ them as plain text, and mdastic must too.
    mdast objects are built once, in one materialization pass, with monomorphic factories: same
    keys in the same order as remark (`title: null`, never add keys later, never `delete`).
 5. **Non-reentrant.** Module-level arenas reset on every `parseDocument`. A hook must never call
-   `parse` recursively. Reset buffers even when a parse fails.
+   `parse` recursively. Reset buffers even when a parse fails. Hooks are internal; user code
+   (transforms, `remarkTransform` plugins) runs after `parse` returns, so it may call `parse`.
 6. **No perf regressions.** Run the benchmark before and after any parser or serializer change.
    Results must stay within noise. Hot loops use `charCodeAt`, typed tables, native `indexOf` /
    global-regex `lastIndex` jumps. No closures per character, no per-line string copies.
