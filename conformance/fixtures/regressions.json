@@ -38,5 +38,9 @@
   { "name": "a line holding only U+FEFF does not end an ESM chunk", "input": "export const F = 1\n\ufeff\n\n{F}\n", "syntax": ["mdx"] },
   { "name": "only spaces and tabs before > continue a block quote inside unclosed JSX", "input": "> <a\n\u00a0>", "syntax": ["mdx"] },
   { "name": "quoted attribute continuation lines skip any leading whitespace", "input": "<x c=\"a\n\u2028b\r\u3000c\r\n\u000b\fd\"/>\n\n<x c=\"\n\u00a0e\"/>\n", "syntax": ["mdx"] },
-  { "name": "lazy lines in quoted attribute values report before leading whitespace", "input": "> <A b=\"\n> a\n\u00a0\nb", "syntax": ["mdx"] }
+  { "name": "lazy lines in quoted attribute values report before leading whitespace", "input": "> <A b=\"\n> a\n\u00a0\nb", "syntax": ["mdx"] },
+  { "name": "a final line of stripped fence indentation at EOF adds no line ending", "input": " ```\n a\n\n ", "syntax": [] },
+  { "name": "unclosed fenced code ends before a final list indent while the item reaches EOF", "input": "- ```\n  a\n  ", "syntax": [] },
+  { "name": "unclosed fenced code in a list in a quote excludes the final line ending", "input": "> - ```\n>   a\n>   \n", "syntax": [] },
+  { "name": "unclosed fenced code in a footnote definition keeps the final line ending", "input": "[^a]: ```\n    a\n", "syntax": ["gfm"] }
 ]
