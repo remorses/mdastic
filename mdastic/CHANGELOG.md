@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.2
+
+1. **Fixed MDX parse differences from remark** in container and multi-line constructs:
+   - list items keep wide marker padding in MDX, which has no indented code
+   - JSX tags and expressions that span lines end at headings, fences, blank lines and new list items, with the same `unexpected-eof` and `unexpected-lazy` errors as remark
+   - MDX flow constructs take no lazy lines; closing-tag mismatch errors are reported in remark's order
+   - `import` / `export` lines end a GFM table and parse as ESM
+   - only spaces and tabs count as blank in ESM and JSX lines (`\ufeff`, NBSP no longer do)
+   - quoted attribute values skip any whitespace after a line ending, like micromark
+2. **Fixed markdown parse differences from remark**:
+   - fenced code inside block quotes, list items and footnotes takes no lazy lines
+   - a setext underline inside a block quote closes the paragraph (`> x\n> ===\ny`)
+   - unclosed fenced code at end of file gets the right value and position inside containers
+   - lists can start right after a table (`a\n|||\n-|-\n3.`)
+
+Thanks @rgodha24 for #1, #2, #3, #4, #5 and #6!
+
 ## 0.1.1
 
 1. **Fixed 17 parse differences from remark** found by new conformance suites (cmark, md4c, flexmark, goldmark, markdown-it, comrak, pulldown-cmark). mdastic now matches remark on all 13,817 fixtures. Fixes include:
