@@ -10,6 +10,8 @@ const EXPRESSION_KEY_STRIDE = 4
 const SPREAD_KEY_BIT = 2
 const ALLOW_EMPTY_KEY_BIT = 1
 const MDX_CONTINUATION_INDENT = 2
+const LAZY_EXPRESSION =
+  'Unexpected lazy line in expression in container, expected line to be prefixed with `>` when in a block quote, whitespace when in a list, etc'
 
 const options = {
   ecmaVersion: ACORN_LANGUAGE_VERSION,
@@ -245,9 +247,18 @@ export function expression(
     }
     lastCrash = result.error
   }
+  // An unclosed expression reads into the first lazy line after it.
+  let lazy = -1
+  for (const at of view.lazy ?? []) if (at > start && at < end && (lazy < 0 || at < lazy)) lazy = at
+  if (lazy >= 0)
+    mdxError(
+      LAZY_EXPRESSION,
+      offset(view, lazy),
+      'unexpected-lazy',
+    )
   if (view.boundary !== undefined)
     mdxError(
-      'Unexpected lazy line in expression in container, expected line to be prefixed with `>` when in a block quote, whitespace when in a list, etc',
+      LAZY_EXPRESSION,
       view.boundary,
       'unexpected-lazy',
     )
@@ -270,13 +281,15 @@ export function collect(
   let value = ''
   let virtual = false
   let ending = offset(view, start)
-  for (let i = start; i < end; i++) {
+  // `end` is checked too: a lazy line may start with the closing brace.
+  for (let i = start; i <= end; i++) {
     if (view.lazy?.has(i))
       mdxError(
-        'Unexpected lazy line in expression in container, expected line to be prefixed with `>` when in a block quote, whitespace when in a list, etc',
+        LAZY_EXPRESSION,
         offset(view, i),
         'unexpected-lazy',
       )
+    if (i === end) break
     const c = view.source.charCodeAt(i)
     indices.push(offset(view, i))
     value += view.source[i]

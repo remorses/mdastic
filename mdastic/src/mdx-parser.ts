@@ -5,7 +5,7 @@ import { MdxParseError } from './syntax.ts'
 import { alpha, Char, digit, entity, isWhitespace, point, position, space } from './scan.ts'
 import { append, Kind, node, tree } from './tree.ts'
 import { offset, type View } from './inline.ts'
-import { blank, type BlockContext, type Line, quote } from './block.ts'
+import { blank, type BlockContext, type Line, startsContainer } from './block.ts'
 import type { MdxJsxAttribute, MdxJsxExpressionAttribute } from './types.ts'
 import { acornProgram, expression, mdxError } from './mdx-scan.ts'
 
@@ -356,7 +356,13 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
   const imports: string[] = []
   const views = new WeakMap<Line[], { view: View; starts: Int32Array }>()
   const current = (parent: number) => stacks.get(parent)?.at(-1)?.node ?? parent
-  function flowView(input: Line[], boundary?: Line): { view: View; starts: Int32Array } {
+  // mdast-util-mdx-jsx reports tag mismatches after micromark tokenized the whole document.
+  let mismatched: (() => never) | undefined
+  function flowView(
+    context: BlockContext,
+    input: Line[],
+    boundary?: Line,
+  ): { view: View; starts: Int32Array } {
     // Cache the remaining container once, rather than rebuilding it for each flow tag.
     const cached = views.get(input)
     if (cached) return cached
@@ -391,7 +397,8 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
       map[k] = input.at(-1)!.next
       view = { source: chunks.join(''), base: 0, map, lazy }
     }
-    if (boundary && quote(source, boundary) < 0) view.boundary = boundary.start
+    // A line that starts a new container ends the flow; any other next line is lazy.
+    if (boundary && !startsContainer(context, boundary)) view.boundary = boundary.start
     const result = { view, starts }
     views.set(input, result)
     return result
@@ -519,7 +526,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
     )
       return 0
     // ── Probe a line containing only qualifying tags/expressions ──
-    const mapped = flowView(input, boundary)
+    const mapped = flowView(context, input, boundary)
     const view = mapped.view
     const text = view.source
     const found: (
@@ -589,7 +596,8 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
           }
           continue
         }
-        if (open.tag.name !== item.name) mismatch(item, open.tag, view)
+        if (open.tag.name !== item.name)
+          mismatched ??= () => mismatch(item, open.tag, view)
         tree.end[open.node] = offset(view, item.end)
         tree.b[open.node] = offset(view, item.start)
         stack.pop()
@@ -669,11 +677,16 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
         return source.charCodeAt(i) === Char.LessThan
           ? (tag(view, i, source.length, syntax)?.end ?? line.end)
           : expression(view, i, source.length, syntax).end
-      } catch {
-        return line.end
+      } catch (error) {
+        // Failed expressions and unclosed tags read every following line before failing.
+        return source.charCodeAt(i) === Char.LeftBrace ||
+          (error as MdxParseError).ruleId === 'unexpected-eof'
+          ? source.length
+          : line.end
       }
     },
     finish() {
+      mismatched?.()
       const types: Partial<Record<Kind, string>> = {
         [Kind.Root]: 'root',
         [Kind.Paragraph]: 'paragraph',

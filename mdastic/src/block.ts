@@ -256,7 +256,8 @@ function marker(source: string, line: Line, mdx = mdxMode): Marker | undefined {
   }
   let remaining = 0
   // Oversized padding consumes just one separator; the remainder belongs to content.
-  if (padding > MAX_LIST_PADDING || i === line.end) {
+  // MDX has no indented code, so there the item keeps all of it.
+  if ((!mdx && padding > MAX_LIST_PADDING) || i === line.end) {
     remaining = source.charCodeAt(markerEnd) === 9 ? tabWidth(source, markerEnd) - 1 : 0
     i = markerEnd < line.end ? markerEnd + 1 : markerEnd
     padding = 1
@@ -414,6 +415,14 @@ function interrupts(context: BlockContext, line: Line): boolean {
   )
 }
 
+// A lazy line opening a multi-line MDX flow tag or expression stays in the container, so
+// micromark's laziness check runs on the lines it spans.
+function lazyFlowSpan(context: BlockContext, line: Line): boolean {
+  return (
+    !!context.interrupt?.(line) && (context.continuationEnd?.(line) ?? line.end) > line.end
+  )
+}
+
 function footnoteLabel(source: string, line: Line): { end: number; raw: string } | undefined {
   const scan = indentation(source, line)
   if (scan.indent > MAX_BLOCK_INDENT || !source.startsWith('[^', scan.start)) return
@@ -437,6 +446,16 @@ function footnoteLabel(source: string, line: Line): { end: number; raw: string }
   )
     return
   return { end: i + 2, raw: source.slice(scan.start + 2, i) }
+}
+
+// The line opens a block quote, list item or footnote definition.
+export function startsContainer(context: BlockContext, line: Line): boolean {
+  const source = context.source
+  return (
+    quote(source, line) >= 0 ||
+    (!!marker(source, line) && !thematic(source, line)) ||
+    (!!context.config.gfm && !!footnoteLabel(source, line))
+  )
 }
 
 function lazyParagraph(context: BlockContext, line: Line, interrupted = false): boolean {
@@ -824,6 +843,8 @@ function parseFencedCode(
   // Collect stripped content until a matching closing fence or container end.
   for (; j < input.length; j++) {
     const current = input[j]
+    // Fenced code takes no lazy lines; parseBlocks hands them back to the container.
+    if (current.lazy) break
     const scan = indentation(source, current)
     let k = scan.start
     while (source.charCodeAt(k) === opening.char) k++
@@ -838,7 +859,8 @@ function parseFencedCode(
     content.push(stripIndent(source, current, opening.indent))
   }
   const last = closed ? input[j] : input[Math.max(i, j - 1)]
-  const nextContainer = boundary && (quote(source, boundary) >= 0 || marker(source, boundary))
+  const nextContainer =
+    !input[j]?.lazy && boundary && (quote(source, boundary) >= 0 || marker(source, boundary))
   // Unclosed root/EOF fences retain the ending; closed fences end at their marker.
   const keepEnding =
     tree.kind[parent] === Kind.Root ||
@@ -964,7 +986,11 @@ function parseFootnoteDefinition(
   const n = node(Kind.FootnoteDefinition, start, end, parent)
   tree.extra[n] = { identifier, label: decode(raw) }
   context.footnotes.add(identifier)
-  parseBlocks(context, content, n, false, InterruptState.None, input[j] ?? boundary)
+  const stop = parseBlocks(context, content, n, false, InterruptState.None, input[j] ?? boundary)
+  if (stop < content.length) {
+    j = i + stop
+    tree.end[n] = input[j - 1].end
+  }
   if (tree.last[n]) tree.end[n] = Math.max(tree.end[n], tree.end[tree.last[n]])
   return j - i
 }
@@ -993,7 +1019,7 @@ export function parseBlocks(
   document = false,
   inheritedInterrupt = InterruptState.None,
   boundary?: Line,
-): void {
+): number {
   mdxMode = !!context.config.mdx
   const owner = parent
   const source = context.source
@@ -1041,6 +1067,7 @@ export function parseBlocks(
       if (count) {
         residual = InterruptState.None
         i += count
+        if (input[i]?.lazy) return i
         continue
       }
     }
@@ -1058,6 +1085,8 @@ export function parseBlocks(
     const opening = fence(source, line)
     if (opening) {
       i += parseFencedCode(context, input, i, parent, opening, boundary)
+      // A lazy line closes every container up to the one that accepted it.
+      if (input[i]?.lazy) return i
       residual = InterruptState.None
       continue
     }
@@ -1111,7 +1140,11 @@ export function parseBlocks(
           content.push(item)
           // Tables cannot receive ordinary lazy paragraph continuation.
           lazy = !table && lazyParagraph(context, item)
-        } else if (lazy && !interrupts(context, current) && !marker(source, current)) {
+        } else if (
+          lazy &&
+          ((!interrupts(context, current) && !marker(source, current)) ||
+            lazyFlowSpan(context, current))
+        ) {
           const html = !context.config.mdx && htmlBlock(source, current, false)
           if (html && current.next === current.end) break
           content.push({ ...current, lazy: true })
@@ -1123,8 +1156,13 @@ export function parseBlocks(
       }
       const n = node(Kind.Blockquote, scan.start, input[j - 1].end, parent)
       quoteDepth++
-      parseBlocks(context, content, n, false, residual, input[j] ?? boundary)
+      const stop = parseBlocks(context, content, n, false, residual, input[j] ?? boundary)
       quoteDepth--
+      if (stop < content.length) {
+        j = i + stop
+        tree.end[n] = input[j - 1].end
+        if (input[j].lazy) return j
+      }
       // Quirk: a new container after a stripped quote prefix closes at that prefix.
       if (j < input.length && quotePrefix(source, input[j]) && marker(source, input[j]))
         tree.end[n] = input[j].start
@@ -1218,7 +1256,10 @@ export function parseBlocks(
             lastContent = j
             lazy = !table && lazyParagraph(context, stripped, lazy || residual > 0)
             sawBlank = false
-          } else if (lazy && (current.lazy || !interrupts(context, current))) {
+          } else if (
+            lazy &&
+            (current.lazy || !interrupts(context, current) || lazyFlowSpan(context, current))
+          ) {
             const html = !context.config.mdx && htmlBlock(source, current, false)
             if (html && current.next === current.end) break
             content.push({ ...current, lazy: true })
@@ -1229,16 +1270,21 @@ export function parseBlocks(
             }
           } else break
         }
+        const item = node(Kind.ListItem, mark.start, input[lastContent].end, list)
+        tree.a[item] = itemSpread ? 1 : 0
+        const taskStart = taskCount
+        const stop = parseBlocks(context, content, item, false, residual, input[j] ?? boundary)
+        if (stop < content.length) {
+          j = itemStart + stop
+          lastContent = j - 1
+          tree.end[item] = input[lastContent].end
+        }
         const nextMark = j < input.length ? marker(source, input[j]) : undefined
         const sibling =
           nextMark &&
           nextMark.ordered === m.ordered &&
           nextMark.char === m.char &&
           !thematic(source, input[j])
-        const item = node(Kind.ListItem, mark.start, input[lastContent].end, list)
-        tree.a[item] = itemSpread ? 1 : 0
-        const taskStart = taskCount
-        parseBlocks(context, content, item, false, residual, input[j] ?? boundary)
         // Skip the checkbox now; deferred inline cleanup removes one separator later.
         if (context.config.gfm) {
           let first = tree.child[item]
@@ -1329,6 +1375,7 @@ export function parseBlocks(
         if (!sibling) break
       }
       tree.extra[list] = spread
+      if (input[j]?.lazy) return j
       let after = j
       while (after < input.length && blank(source, input[after])) after++
       pendingLazy =
@@ -1399,6 +1446,7 @@ export function parseBlocks(
     const footnote = context.config.gfm && !spanned && footnoteLabel(source, line)
     if (footnote) {
       i += parseFootnoteDefinition(context, input, i, parent, footnote, scan.start, boundary)
+      if (input[i]?.lazy) return i
       continue
     }
     // ── Ordinary reference definitions precede paragraph fallback ──
@@ -1421,6 +1469,7 @@ export function parseBlocks(
       } else {
         if (!input[j].lazy && interrupts(context, input[j])) break
         if (input[j].lazy && !context.config.mdx && htmlBlock(source, input[j], false)) break
+        if (input[j].lazy && lazyFlowSpan(context, input[j])) break
         if (context.continuationEnd) spanEnd = context.continuationEnd(input[j])
       }
       if (tableStart(context, input, j, true)) break
@@ -1452,7 +1501,10 @@ export function parseBlocks(
     queue(context, n, content)
     residual = depth ? InterruptState.None : InterruptState.Paragraph
     i = j + (depth ? 1 : 0)
+    // A setext underline closes the paragraph, so no lazy line can follow it.
+    if (depth && input[i]?.lazy) return i
   }
+  return input.length
 }
 
 export function runInlineTasks(context: BlockContext): void {
