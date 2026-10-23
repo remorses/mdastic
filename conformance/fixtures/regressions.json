@@ -30,5 +30,14 @@
   { "name": "noninitial ordered list markers take precedence over tables", "input": "2. a|b\n-|-", "syntax": ["gfm"] },
   { "name": "noninitial ordered table headers can interrupt paragraphs", "input": "x\n2. a|b\n-|-", "syntax": ["gfm"] },
   { "name": "empty list items with trailing spaces cannot interrupt paragraphs", "input": "a\n*  \n", "syntax": [] },
-  { "name": "lazy list markers remain text after nested list indentation", "input": "   - 3\n    - 4\n     - 5\n    - 4\n", "syntax": [] }
+  { "name": "lazy list markers remain text after nested list indentation", "input": "   - 3\n    - 4\n     - 5\n    - 4\n", "syntax": [] },
+  { "name": "fenced code in a block quote takes no lazy lines", "input": "> ```\n> 1\n1\n", "syntax": [] },
+  { "name": "fenced code in a list item takes no lazy lines", "input": "* a\n  ```\n  1\n1\n\n* - ```\n    1\n1\n", "syntax": [] },
+  { "name": "lazy lines continue once the container holding fenced code closes", "input": "> > ```\n> 1\n1\n\n- - ```\n  1\n1\n\n> - a\n>   ```\n> 1\n1\n", "syntax": [] },
+  { "name": "fences indented four spaces do not close fenced code in containers", "input": "> ```\n>     ```\n> 1\n1\n", "syntax": [] },
+  { "name": "ordered markers that cannot interrupt a paragraph open no fenced code", "input": "> a\n> 2. ```\n> 1\nb\n", "syntax": [] },
+  { "name": "closing fences may sit inside earlier list items", "input": "> - a\n>   ```\n>   x\n>     ```\n>   b\nc\n", "syntax": [] },
+  { "name": "a fence after less indented code lines may close the fenced code", "input": ">\t```\n>     ```\n>```\n>a\nx\n\n>   ```\n>`\n>```\n>1\nc\n", "syntax": [] },
+  { "name": "fenced code in a wide mdx list item with jsx", "input": "-     <>\n  ```\n  c\nh{", "syntax": ["mdx"] },
+  { "name": "a paragraph with jsx after fenced code in a list item", "input": "2) ```\n\tl\nb\n   <>\n<\n</A>", "syntax": ["mdx"] }
 ]

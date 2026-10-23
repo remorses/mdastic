@@ -72,6 +72,7 @@ const MIN_THEMATIC_MARKERS = 3
 const MIN_FENCE_LENGTH = 3
 const MAX_ORDERED_MARKER_DIGITS = 9
 const MAX_LIST_PADDING = 4
+const MIN_ITEM_INDENT = 2
 const MAX_LABEL_LENGTH = 999
 const MAX_LAZY_CONTAINER_PROBES = 100
 const INITIAL_TASK_CAPACITY = 1024
@@ -410,6 +411,29 @@ function interrupts(context: BlockContext, line: Line): boolean {
   )
 }
 
+// Items with MDX syntax keep the CommonMark width until lazy MDX lines match micromark.
+function mdxSyntaxAhead(context: BlockContext, input: Line[], at: number, indent: number): boolean {
+  const source = context.source
+  for (let k = at; k < input.length; k++) {
+    const line = input[k]
+    if (blank(source, line)) {
+      const next = input[k + 1]
+      if (next && !blank(source, next) && indentation(source, next).indent < indent) break
+      continue
+    }
+    const scan = indentation(source, line)
+    if (source.startsWith('import', scan.start) || source.startsWith('export', scan.start))
+      return true
+    for (let i = line.start; i < line.end; i++) {
+      const c = source.charCodeAt(i)
+      if (c === Char.LessThan || c === Char.LeftBrace) return true
+    }
+    // Less indented lines end the item unless they are lazy.
+    if (k > at && scan.indent < indent && interrupts(context, line)) break
+  }
+  return false
+}
+
 function footnoteLabel(source: string, line: Line): { end: number; raw: string } | undefined {
   const scan = indentation(source, line)
   if (scan.indent > MAX_BLOCK_INDENT || !source.startsWith('[^', scan.start)) return
@@ -468,6 +492,137 @@ function lazyParagraph(context: BlockContext, line: Line, interrupted = false): 
     current = { start, end: line.end, next: line.next }
   }
   return false
+}
+
+// Prefixes of the opening line: `~column` of a quote's `>`, or a list item's content column.
+type OpenFence = { char: number; length: number; indent: number; steps: number[] }
+// The line closes the fence.
+const CLOSED_FENCE: OpenFence = { char: 0, length: 0, indent: 0, steps: [] }
+// Unclear whether the line is code; later fences could close it, so tracking stops.
+const LOST_FENCE: OpenFence = { char: 0, length: 0, indent: 0, steps: [] }
+const fenceSteps: number[] = []
+
+// micromark keeps wide marker padding in MDX, so such items may be wider than here.
+function widePadding(source: string, m: Marker): boolean {
+  return mdxMode && (m.padding > 0 || space(source.charCodeAt(m.content)))
+}
+
+function afterQuote(source: string, line: Line, q: number): Line {
+  const padding = source.charCodeAt(q - 1) === 9 ? tabWidth(source, q - 1) - 1 : 0
+  return { start: q, end: line.end, next: line.next, padding }
+}
+
+// Fenced code takes no lazy lines. Items opened on earlier lines are unknown, so a line is code
+// only when it is indented at least as deep as the opening line wherever such an item could be.
+function trackFence(
+  source: string,
+  line: Line,
+  open: OpenFence | undefined,
+  paragraph: boolean,
+): OpenFence | undefined {
+  if (open === LOST_FENCE) return open
+  if (open && open !== CLOSED_FENCE) {
+    const inside = continueFence(source, line, open)
+    if (inside) return inside
+  }
+  let c = line.start
+  while (c < line.end && c - line.start < CODE_INDENT && space(source.charCodeAt(c))) c++
+  // Outside MDX, indented lines open no containers or fences.
+  if (!mdxMode && c - line.start === CODE_INDENT) return
+  // Only container prefixes may precede an opening fence.
+  for (; c < line.start + MAX_LAZY_CONTAINER_PROBES; c++) {
+    if (c === line.end) return
+    const d = source.charCodeAt(c)
+    if (d === 96 || d === 126) break
+    // `>`, `-`, `*`, `+`, `.` and `)` may belong to quote and list prefixes.
+    if (
+      !space(d) &&
+      !digit(d) &&
+      d !== 62 &&
+      d !== 45 &&
+      d !== 42 &&
+      d !== 43 &&
+      d !== 46 &&
+      d !== 41
+    )
+      return
+  }
+  let current = line
+  let unsure = false
+  fenceSteps.length = 0
+  // Same probe cap as lazyParagraph, so deep container nesting stays linear.
+  for (let depth = 0; depth < MAX_LAZY_CONTAINER_PROBES; depth++) {
+    const q = quote(source, current)
+    if (q >= 0) {
+      fenceSteps.push(~indentation(source, current).indent)
+      current = afterQuote(source, current, q)
+      continue
+    }
+    const m = marker(source, current)
+    if (!m) break
+    // Only `1.` or `1)` starts an ordered list inside a paragraph.
+    if (
+      paragraph &&
+      m.ordered &&
+      (source.charCodeAt(m.start) !== 49 || digit(source.charCodeAt(m.start + 1)))
+    )
+      return
+    if (widePadding(source, m)) unsure = true
+    fenceSteps.push(m.indent)
+    current = { start: m.content, end: current.end, next: current.next, padding: m.padding }
+  }
+  const opening = fence(source, current)
+  if (!opening) return
+  if (unsure) return LOST_FENCE
+  return {
+    char: opening.char,
+    length: opening.length,
+    indent: opening.indent,
+    steps: fenceSteps.slice(),
+  }
+}
+
+// Undefined when the container holding the fence has closed.
+function continueFence(source: string, line: Line, open: OpenFence): OpenFence | undefined {
+  let current = line
+  for (const step of open.steps) {
+    const scan = indentation(source, current)
+    if (step < 0) {
+      const q = ~step >= MIN_ITEM_INDENT && scan.indent < ~step ? -1 : quote(source, current)
+      if (q < 0) return ~step >= MIN_ITEM_INDENT ? LOST_FENCE : undefined
+      current = afterQuote(source, current, q)
+    } else {
+      if (scan.start < current.end && scan.indent < step) return
+      current = stripIndent(source, current, step)
+    }
+  }
+  const scan = indentation(source, current)
+  if (scan.start === current.end) return open
+  if (open.indent >= MIN_ITEM_INDENT && scan.indent < open.indent) return LOST_FENCE
+  let k = scan.start
+  while (source.charCodeAt(k) === open.char) k++
+  if (k - scan.start < open.length || trimEnd(source, k, current.end) !== k) return open
+  if (mdxMode || scan.indent <= MAX_BLOCK_INDENT) return CLOSED_FENCE
+  // Unknown items may take up to `open.indent` columns.
+  return scan.indent <= MAX_BLOCK_INDENT + open.indent ? LOST_FENCE : open
+}
+
+// Lazy MDX lines do not match micromark yet, so code followed by MDX syntax still takes them.
+function fenceLazy(
+  context: BlockContext,
+  open: OpenFence | undefined,
+  input: Line[],
+  at: number,
+  indent: number,
+  last: Line,
+): boolean {
+  return (
+    mdxMode &&
+    !!open &&
+    open !== LOST_FENCE &&
+    lazyParagraph(context, last) &&
+    mdxSyntaxAhead(context, input, at, indent)
+  )
 }
 
 function quotePrefix(source: string, line: Line): boolean {
@@ -1070,6 +1225,7 @@ export function parseBlocks(
       let j = i
       let lazy = false
       let table = false
+      let quoteFence: OpenFence | undefined
       for (; j < input.length; j++) {
         const current = input[j]
         const stripped = quote(source, current)
@@ -1083,6 +1239,15 @@ export function parseBlocks(
             padding,
             lazy: current.lazy,
           }
+          if (!current.lazy) {
+            quoteFence = trackFence(source, item, quoteFence, lazy)
+            if (quoteFence && quoteFence !== LOST_FENCE) {
+              table = false
+              content.push(item)
+              lazy = false
+              continue
+            }
+          }
           if (blank(source, item) || interrupts(context, item)) table = false
           const align =
             context.config.gfm && content.length && !setext(source, item)
@@ -1093,7 +1258,16 @@ export function parseBlocks(
           content.push(item)
           // Tables cannot receive ordinary lazy paragraph continuation.
           lazy = !table && lazyParagraph(context, item)
-        } else if (lazy && !interrupts(context, current) && !marker(source, current)) {
+        } else if (
+          (lazy ||
+            fenceLazy(context, quoteFence, input, j, Infinity, content[content.length - 1])) &&
+          !interrupts(context, current) &&
+          !marker(source, current)
+        ) {
+          if (!lazy) {
+            lazy = true
+            quoteFence = LOST_FENCE
+          }
           const html = !context.config.mdx && htmlBlock(source, current, false)
           if (html && current.next === current.end) break
           content.push({ ...current, lazy: true })
@@ -1164,6 +1338,9 @@ export function parseBlocks(
         let lastContent = itemStart
         let itemSpread = false
         let table = false
+        let itemFence = widePadding(source, mark)
+          ? LOST_FENCE
+          : trackFence(source, content[0], undefined, false)
         for (; j < input.length; j++) {
           const current = input[j]
           if (blank(source, current)) {
@@ -1186,6 +1363,16 @@ export function parseBlocks(
           if (scan.indent < mark.indent && marker(source, current) && !current.lazy) break
           if (scan.indent >= mark.indent) {
             const stripped = stripIndent(source, current, mark.indent)
+            if (!current.lazy)
+              itemFence = trackFence(source, stripped, itemFence, lazy || residual > 0)
+            if (!current.lazy && itemFence && itemFence !== LOST_FENCE) {
+              table = false
+              content.push(stripped)
+              lastContent = j
+              lazy = false
+              sawBlank = false
+              continue
+            }
             if (blank(source, stripped) || interrupts(context, stripped)) table = false
             if (
               context.config.gfm &&
@@ -1197,7 +1384,15 @@ export function parseBlocks(
             lastContent = j
             lazy = !table && lazyParagraph(context, stripped, lazy || residual > 0)
             sawBlank = false
-          } else if (lazy && (current.lazy || !interrupts(context, current))) {
+          } else if (
+            (lazy ||
+              fenceLazy(context, itemFence, input, j, mark.indent, content[content.length - 1])) &&
+            (current.lazy || !interrupts(context, current))
+          ) {
+            if (!lazy) {
+              lazy = true
+              itemFence = LOST_FENCE
+            }
             const html = !context.config.mdx && htmlBlock(source, current, false)
             if (html && current.next === current.end) break
             content.push({ ...current, lazy: true })
