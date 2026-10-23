@@ -1118,6 +1118,7 @@ export function parseBlocks(
     const tableCount = parseTable(context, input, i, parent, residual === InterruptState.Paragraph)
     if (tableCount) {
       i += tableCount
+      residual = InterruptState.None
       continue
     }
     // ── Reject list starts that cannot interrupt retained paragraph-like content ──
