@@ -278,8 +278,16 @@ function tag(view: View, start: number, end: number, syntax: MdxSyntax): Tag | u
           if (
             c === Char.LineFeed ||
             (c === Char.CarriageReturn && source.charCodeAt(i) !== Char.LineFeed)
-          )
-            while (space(source.charCodeAt(i))) i++
+          ) {
+            // Continuation indentation is any whitespace, skipped after the lazy check.
+            checkLazy()
+            while (
+              isWhitespace(source.charCodeAt(i)) &&
+              source.charCodeAt(i) !== Char.LineFeed &&
+              source.charCodeAt(i) !== Char.CarriageReturn
+            )
+              i++
+          }
         }
         if (i >= end)
           crash(
