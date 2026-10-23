@@ -42,5 +42,11 @@
   { "name": "a final line of stripped fence indentation at EOF adds no line ending", "input": " ```\n a\n\n ", "syntax": [] },
   { "name": "unclosed fenced code ends before a final list indent while the item reaches EOF", "input": "- ```\n  a\n  ", "syntax": [] },
   { "name": "unclosed fenced code in a list in a quote excludes the final line ending", "input": "> - ```\n>   a\n>   \n", "syntax": [] },
-  { "name": "unclosed fenced code in a footnote definition keeps the final line ending", "input": "[^a]: ```\n    a\n", "syntax": ["gfm"] }
+  { "name": "unclosed fenced code in a footnote definition keeps the final line ending", "input": "[^a]: ```\n    a\n", "syntax": ["gfm"] },
+  { "name": "headings cut text expressions spanning lines", "input": "{<MDX>\n# d</MDX>}}\n", "syntax": ["mdx"] },
+  { "name": "fences cut attribute values spanning lines", "input": "<a b=\"\n```\">e</a>\n", "syntax": ["mdx"] },
+  { "name": "setext underlines cut attribute values spanning lines", "input": "<a b=\"\n===\n\"/>;\n", "syntax": ["mdx"] },
+  { "name": "flow expressions cut text expressions spanning lines", "input": "{`\n<div>\n`} x\n", "syntax": ["mdx"] },
+  { "name": "spans on later paragraph lines keep containers from starting", "input": "x\n<a b=\"\n> y\n\"/>;\n", "syntax": ["mdx"] },
+  { "name": "lines a cut tag still spans cannot start containers", "input": "<v\n\n>>{\n<", "syntax": ["mdx"] }
 ]
