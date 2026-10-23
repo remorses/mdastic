@@ -71,6 +71,7 @@ const FOOTNOTE_INDENT = 4
 const MAX_HEADING_DEPTH = 6
 const MIN_THEMATIC_MARKERS = 3
 const MIN_FENCE_LENGTH = 3
+const MIN_MATH_FENCE_LENGTH = 2
 const MAX_ORDERED_MARKER_DIGITS = 9
 const MAX_LIST_PADDING = 4
 const MAX_LABEL_LENGTH = 999
@@ -79,6 +80,7 @@ const INITIAL_TASK_CAPACITY = 1024
 const TASK_CLEANUP_PENDING = 1
 
 let mdxMode = false
+let mathMode = false
 // Open blockquotes; nothing inside one keeps the final EOF line ending.
 let quoteDepth = 0
 
@@ -223,11 +225,13 @@ function fence(
   const scan = indentation(source, line)
   if (!mdx && scan.indent > MAX_BLOCK_INDENT) return
   const c = source.charCodeAt(scan.start)
-  if (c !== 96 && c !== 126) return
+  const math = c === Char.Dollar
+  if (c !== Char.Backtick && c !== Char.Tilde && !(math && mathMode)) return
   let i = scan.start
   while (source.charCodeAt(i) === c) i++
-  if (i - scan.start < MIN_FENCE_LENGTH) return
-  if (c === 96) for (let j = i; j < line.end; j++) if (source.charCodeAt(j) === 96) return
+  if (i - scan.start < (math ? MIN_MATH_FENCE_LENGTH : MIN_FENCE_LENGTH)) return
+  // Backtick and dollar fences cannot repeat their marker in the info string.
+  if (c !== Char.Tilde) for (let j = i; j < line.end; j++) if (source.charCodeAt(j) === c) return
   return { start: scan.start, content: i, char: c, length: i - scan.start, indent: scan.indent }
 }
 
@@ -871,8 +875,9 @@ function parseFencedCode(
   // A last EOF line of only container prefixes is outside the code but inside its parent.
   const prefixOnly =
     !closed && j > i + 1 && last.start === last.end && last.end === source.length && !last.padding
+  const math = opening.char === Char.Dollar
   const n = node(
-    Kind.Code,
+    math ? Kind.Math : Kind.Code,
     opening.start,
     prefixOnly ? input[j - 2].next : closed || !keepEnding ? last.end : last.next,
     parent,
@@ -884,10 +889,15 @@ function parseFencedCode(
   while (word < line.end && !space(source.charCodeAt(word))) word++
   let meta = word
   while (space(source.charCodeAt(meta))) meta++
-  tree.extra[n] = {
-    lang: info === line.end ? null : decode(source.slice(info, word)),
-    meta: meta === line.end ? null : decode(source.slice(meta, line.end)),
-  }
+  // Math fences have no language; the whole info string is the meta.
+  tree.extra[n] = math
+    ? info === line.end
+      ? null
+      : decode(source.slice(info, line.end))
+    : {
+        lang: info === line.end ? null : decode(source.slice(info, word)),
+        meta: meta === line.end ? null : decode(source.slice(meta, line.end)),
+      }
   tree.value[n] = content.length ? viewFor(source, content, false).source : ''
   // A blank line ending its container, or an empty last line at EOF, is not part of the value.
   const tail = content[content.length - 1]
@@ -1021,6 +1031,7 @@ export function parseBlocks(
   boundary?: Line,
 ): number {
   mdxMode = !!context.config.mdx
+  mathMode = !!context.config.math
   const owner = parent
   const source = context.source
   let i = document ? frontmatter(context, input, parent) : 0

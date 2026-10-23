@@ -33,9 +33,11 @@ export enum Kind {
   Toml,
   Mdx,
   IdString,
+  Math,
+  InlineMath,
 }
 
-const parents = new Uint8Array(29)
+const parents = new Uint8Array(31)
 for (const kind of [
   Kind.Root,
   Kind.Paragraph,
@@ -79,6 +81,7 @@ let capacity = INITIAL_NODE_CAPACITY
 // Other MDX             unused                  unused             MDX fields
 // Links / definitions   unused                  unused             named metadata
 // Table                 unused                  unused             alignment array
+// Math                  unused                  unused             meta
 export const tree = {
   count: 0,
   kind: new Uint8Array(capacity),
@@ -301,6 +304,28 @@ export function materialize(n: number): RootContent {
       return p
         ? { type: 'footnoteReference', identifier: e.identifier, label: e.label, position: p }
         : { type: 'footnoteReference', identifier: e.identifier, label: e.label }
+    case Kind.Math: {
+      const code = {
+        type: 'element',
+        tagName: 'code',
+        properties: { className: ['language-math', 'math-display'] },
+        children: [{ type: 'text', value }],
+      }
+      const data = { hName: 'pre', hChildren: [code] }
+      return p
+        ? { type: 'math', meta: e ?? null, value, data, position: p }
+        : { type: 'math', meta: e ?? null, value, data }
+    }
+    case Kind.InlineMath: {
+      const data = {
+        hName: 'code',
+        hProperties: { className: ['language-math', 'math-inline'] },
+        hChildren: [{ type: 'text', value }],
+      }
+      return p
+        ? { type: 'inlineMath', value, data, position: p }
+        : { type: 'inlineMath', value, data }
+    }
     case Kind.Yaml:
       return p ? { type: 'yaml', value, position: p } : { type: 'yaml', value }
     case Kind.Toml:

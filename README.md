@@ -129,6 +129,7 @@ Each syntax is a subpath export. Pass the same list to `parse` and `stringify`.
 | `mdx()` from `mdastic/mdx` | JSX, ESM, `{expressions}` | `estree` (default `true`) attaches `data.estree` |
 | `frontmatter()` from `mdastic/frontmatter` | `---` yaml and `+++` toml blocks | `['yaml', 'toml']` |
 | `headingId()` from `mdastic/heading-id` | `{#custom-id}` text nodes, also outside headings | none |
+| `math()` from `mdastic/math` | `$$` math blocks and `$x$` inline math, like remark-math | `singleDollarTextMath` (default `true`) |
 
 ```ts
 import { headingId } from 'mdastic/heading-id'
@@ -254,7 +255,7 @@ pnpm exec vitest run                # full differential suite
 
 - **Deep nesting** can hit the JavaScript call stack limit, because containers and links still recurse.
 - **No HTML output.** mdastic stops at mdast. Use `mdast-util-to-hast` for HTML.
-- **No syntax plugins.** Only GFM, MDX, frontmatter and heading IDs. Math, directives and other micromark extensions are not supported.
+- **No syntax plugins.** Only GFM, MDX, frontmatter, heading IDs and opt-in math. Directives and other micromark extensions are not supported.
 - **Limited remark adapter.** Tree mutation plugins only. No processor `use()`, parsing, compilation or full vfile implementation.
 - **Empty heading IDs.** The pinned micromark-heading-id oracle hangs on `{#}` outside MDX flow. mdastic emits an empty `idString`; this case is tested separately, not counted as oracle conformance.
 

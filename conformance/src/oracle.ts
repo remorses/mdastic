@@ -10,8 +10,10 @@ import { frontmatterFromMarkdown, frontmatterToMarkdown } from 'mdast-util-front
 import type { Root } from 'mdast'
 import { micromarkHeadingId } from 'micromark-heading-id'
 import { mdastHeadingId } from 'mdast-heading-id'
+import { math } from 'micromark-extension-math'
+import { mathFromMarkdown, mathToMarkdown } from 'mdast-util-math'
 
-export type SyntaxName = 'gfm' | 'mdx' | 'frontmatter' | 'headingId'
+export type SyntaxName = 'gfm' | 'mdx' | 'frontmatter' | 'headingId' | 'math'
 
 export type Fixture = {
   name: string
@@ -36,7 +38,8 @@ export type OracleError = {
   source?: string
 }
 
-// Same order remark-mdx + remark-frontmatter(['yaml','toml']) + remark-gfm register them in safe-mdx.
+// Same order remark-mdx + remark-frontmatter(['yaml','toml']) + remark-gfm register them in safe-mdx,
+// then remark-math with its defaults.
 function extensions(syntax: SyntaxName[]) {
   const micromark: any[] = []
   const from: any[] = []
@@ -55,6 +58,11 @@ function extensions(syntax: SyntaxName[]) {
     micromark.push(gfm())
     from.push(gfmFromMarkdown())
     to.push(gfmToMarkdown())
+  }
+  if (syntax.includes('math')) {
+    micromark.push(math())
+    from.push(mathFromMarkdown())
+    to.push(mathToMarkdown())
   }
   if (syntax.includes('headingId')) {
     micromark.push(micromarkHeadingId())

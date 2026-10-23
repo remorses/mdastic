@@ -44,7 +44,12 @@ const enum CharacterKind {
 }
 import type { Nodes } from './types.ts'
 import type * as M from './types.ts'
-import { gfmToMarkdown, mdxToMarkdown, frontmatterToMarkdown } from './stringify-extensions.ts'
+import {
+  gfmToMarkdown,
+  mdxToMarkdown,
+  frontmatterToMarkdown,
+  mathToMarkdown,
+} from './stringify-extensions.ts'
 export interface StringifyOptions {
   bullet?: '*' | '+' | '-' | null
   bulletOther?: '*' | '+' | '-' | null
@@ -166,7 +171,7 @@ function hardBreak(_: any, _1: any, state: State, info: Info) {
   }
   return '\\\n'
 }
-function longestStreak(value: string, marker: string): number {
+export function longestStreak(value: string, marker: string): number {
   let longest = 0
   const code = marker.charCodeAt(0)
   for (
@@ -555,22 +560,31 @@ function imageReferencePeek() {
 inlineCode.peek = inlineCodePeek
 export function inlineCode(node: M.InlineCode, _: any, state: State) {
   let value = node.value || ''
-  const streaks = new Set<number>()
-  for (let index = value.indexOf('`'); index !== -1; index = value.indexOf('`', index + 1)) {
-    const start = index
-    while (value.charCodeAt(index + 1) === Char.Backtick) index++
-    streaks.add(index - start + 1)
-  }
-  let width = 1
-  while (streaks.has(width)) width++
-  const sequence = '`'.repeat(width)
+  const sequence = spanFence(value, '`', 1)
   if (
     /[^ \r\n]/.test(value) &&
     ((/^[ \r\n]/.test(value) && /[ \r\n]$/.test(value)) || /^`|`$/.test(value))
   ) {
     value = ' ' + value + ' '
   }
-  if (!value.includes('\n') && !value.includes('\r')) return sequence + value + sequence
+  return sequence + breaksToSpaces(value, state) + sequence
+}
+// Shortest run of `marker`, at least `min` long, that no run in the value matches.
+export function spanFence(value: string, marker: string, min: number): string {
+  const code = marker.charCodeAt(0)
+  const streaks = new Set<number>()
+  for (let index = value.indexOf(marker); index !== -1; index = value.indexOf(marker, index + 1)) {
+    const start = index
+    while (value.charCodeAt(index + 1) === code) index++
+    streaks.add(index - start + 1)
+  }
+  let width = min
+  while (streaks.has(width)) width++
+  return marker.repeat(width)
+}
+// Eols followed by block syntax become spaces; spans cannot escape them.
+export function breaksToSpaces(value: string, state: State): string {
+  if (!value.includes('\n') && !value.includes('\r')) return value
   for (const expression of state.rules.breaks) {
     expression.lastIndex = 0
     let match: RegExpExecArray | null
@@ -582,7 +596,7 @@ export function inlineCode(node: M.InlineCode, _: any, state: State) {
       value = value.slice(0, position) + ' ' + value.slice(match.index + 1)
     }
   }
-  return sequence + value + sequence
+  return value
 }
 function inlineCodePeek() {
   return '`'
@@ -1496,6 +1510,7 @@ export function toMarkdown(tree: Nodes, config: Config, options: StringifyOption
       ]),
     )
   if (config.gfm) extensions.push(gfmToMarkdown(options))
+  if (config.math) extensions.push(mathToMarkdown(config.math.singleDollarTextMath))
   if (config.headingId)
     extensions.push({
       handlers: {

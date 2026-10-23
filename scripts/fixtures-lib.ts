@@ -15,9 +15,9 @@ export function syntaxKey(syntax: SyntaxName[]) {
   return [...syntax].sort().join(',')
 }
 
-/** Canonical syntax order (mdx, frontmatter, gfm) so files diff nicely. */
+/** Canonical syntax order (mdx, frontmatter, gfm, math) so files diff nicely. */
 export function sortSyntax(syntax: SyntaxName[]): SyntaxName[] {
-  const order: SyntaxName[] = ['mdx', 'frontmatter', 'gfm']
+  const order: SyntaxName[] = ['mdx', 'frontmatter', 'gfm', 'math']
   return order.filter((s) => syntax.includes(s))
 }
 

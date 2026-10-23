@@ -17,6 +17,7 @@ import { writeFixtures } from './fixtures-lib.ts'
 const range = (n: number) => Array.from({ length: n }, (_, i) => i)
 const gfm: SyntaxName[] = ['gfm']
 const mdx: SyntaxName[] = ['mdx']
+const math: SyntaxName[] = ['math']
 
 // `n` is the upstream size. Generators must stay deterministic.
 const cases: { name: string; n: number; syntax: SyntaxName[]; input: (n: number) => string }[] = [
@@ -86,6 +87,10 @@ const cases: { name: string; n: number; syntax: SyntaxName[]; input: (n: number)
   { name: 'mdx nested braces', n: 20000, syntax: mdx, input: (n) => '{'.repeat(n) + '}'.repeat(n) },
   { name: 'mdx expressions then unclosed', n: 20000, syntax: mdx, input: (n) => '{a}'.repeat(n) + '{' },
   { name: 'mdx many attributes', n: 20000, syntax: mdx, input: (n) => '<a ' + 'b={1} '.repeat(n) + '/>' },
+  // Math: dollar runs mirror cmark backticks
+  { name: 'math dollars', n: 2500, syntax: math, input: (n) => range(n).map((i) => 'e' + '$'.repeat(i + 1)).join('') },
+  { name: 'math unmatched dollars', n: 100000, syntax: math, input: (n) => 'a $b '.repeat(n) },
+  { name: 'math unclosed fences in quotes', n: 20000, syntax: math, input: (n) => '> $$\n'.repeat(n) },
 ]
 
 const FIXTURE_SCALE = 100

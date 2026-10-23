@@ -1,4 +1,4 @@
-// GFM, MDX and frontmatter serializer ports (MIT; license in stringify.ts).
+// GFM, MDX, frontmatter and math serializer ports (MIT; license in stringify.ts).
 // Handler factories capture formatting options once, outside the token loops.
 import type * as M from './types.ts'
 import type { Unsafe } from './stringify-safe.ts'
@@ -12,9 +12,13 @@ const enum TableAlignment {
 }
 const FOOTNOTE_INDENT = 4
 const JSX_INDENT = 2
+const MIN_MATH_FENCE_LENGTH = 2
 import {
+  breaksToSpaces,
   inlineCode,
   listItem,
+  longestStreak,
+  spanFence,
   type StringifyOptions,
   type State,
   type Info,
@@ -665,4 +669,52 @@ export function frontmatterToMarkdown(types: string[]) {
     unsafe.push({ atBreak: true, character: marker, after: '\\' + marker })
   }
   return { handlers, unsafe }
+}
+
+export function mathToMarkdown(single: boolean) {
+  inlineMath.peek = inlineMathPeek
+  return {
+    unsafe: [
+      { character: '\r', inConstruct: 'mathFlowMeta' },
+      { character: '\n', inConstruct: 'mathFlowMeta' },
+      // Quirk: `after` stays present when undefined; `safe` checks `'after' in pattern`.
+      { character: '$', after: single ? undefined : '\\$', inConstruct: 'phrasing' },
+      { character: '$', inConstruct: 'mathFlowMeta' },
+      { atBreak: true, character: '$', after: '\\$' },
+    ],
+    handlers: { math, inlineMath },
+  }
+  function math(node: M.Math, _: any, state: State, info: Info) {
+    const raw = node.value || ''
+    const tracker = state.createTracker(info)
+    const sequence = '$'.repeat(Math.max(longestStreak(raw, '$') + 1, MIN_MATH_FENCE_LENGTH))
+    const exit = state.enter('mathFlow')
+    let value = tracker.move(sequence)
+    if (node.meta) {
+      const subexit = state.enter('mathFlowMeta')
+      value += tracker.move(
+        state.safe(node.meta, { after: '\n', before: value, encode: ['$'], ...tracker.current() }),
+      )
+      subexit()
+    }
+    value += tracker.move('\n')
+    if (raw) value += tracker.move(raw + '\n')
+    value += tracker.move(sequence)
+    exit()
+    return value
+  }
+  function inlineMath(node: M.InlineMath, _: any, state: State) {
+    let value = node.value || ''
+    const sequence = spanFence(value, '$', single ? 1 : 2)
+    if (
+      /[^ \r\n]/.test(value) &&
+      ((/^[ \r\n]/.test(value) && /[ \r\n]$/.test(value)) || /^\$|\$$/.test(value))
+    ) {
+      value = ' ' + value + ' '
+    }
+    return sequence + breaksToSpaces(value, state) + sequence
+  }
+}
+function inlineMathPeek() {
+  return '$'
 }

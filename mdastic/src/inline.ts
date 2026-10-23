@@ -79,8 +79,12 @@ for (let c = 0; c < ASCII_SIZE; c++) {
   )
     emailStops[c] = 1
 }
+const mathEmailStops = emailStops.slice()
+mathEmailStops[Char.Dollar] = 1
 const markdownMarkers = /[\n\r!*<[\]\\_`{~]/g
 const gfmMarkers = /[\n\r!*<[\]\\_`{~]|https?:\/\/|www\./gi
+const mathMarkers = /[\n\r!$*<[\]\\_`{~]/g
+const gfmMathMarkers = /[\n\r!$*<[\]\\_`{~]|https?:\/\/|www\./gi
 
 const enum DelimiterFlag {
   CanOpen = 1,
@@ -102,9 +106,19 @@ let delimiterStart = new Int32Array(delimiterCapacity)
 let delimiterLength = new Int32Array(delimiterCapacity)
 let delimiterChar = new Uint8Array(delimiterCapacity)
 let delimiterFlags = new Uint8Array(delimiterCapacity)
+// Shortest `$` run that opens inline math; 0 when math is off.
+let mathRun = 0
+// Candidate scanners for this parse; math adds `$`.
+let markdownCandidates = markdownMarkers
+let gfmCandidates = gfmMarkers
+let emailCandidates = emailStops
 
-export function resetInline(): void {
+export function resetInline(config: Config): void {
   delimiterCount = 0
+  mathRun = config.math ? (config.math.singleDollarTextMath ? 1 : 2) : 0
+  markdownCandidates = mathRun ? mathMarkers : markdownMarkers
+  gfmCandidates = mathRun ? gfmMathMarkers : gfmMarkers
+  emailCandidates = mathRun ? mathEmailStops : emailStops
 }
 
 function delimiter(
@@ -392,10 +406,10 @@ function bracketEnd(
         continue
       }
     }
-    if (c === 96) {
+    if (c === 96 || (c === Char.Dollar && mathRun)) {
       let run = i + 1
-      while (source.charCodeAt(run) === 96) run++
-      const close = codeEnd(source, run, end, run - i)
+      while (source.charCodeAt(run) === c) run++
+      const close = spanEnd(source, run, end, run - i, c)
       if (close >= 0) {
         i = close + run - i - 1
         continue
@@ -415,18 +429,23 @@ function bracketEnd(
   return -1
 }
 
-function codeEnd(source: string, start: number, end: number, length: number): number {
+function codeEnd(source: string, start: number, end: number, length: number, char = 96): number {
   for (let i = start; i < end; ) {
-    if (source.charCodeAt(i) !== 96) {
+    if (source.charCodeAt(i) !== char) {
       i++
       continue
     }
     let j = i + 1
-    while (source.charCodeAt(j) === 96) j++
+    while (source.charCodeAt(j) === char) j++
     if (j - i === length) return i
     i = j
   }
   return -1
+}
+
+// Closing run of a code or math span; math needs an opening run of at least `mathRun`.
+function spanEnd(source: string, start: number, end: number, length: number, char: number): number {
+  return char === Char.Dollar && length < mathRun ? -1 : codeEnd(source, start, end, length, char)
 }
 
 function codeValue(source: string, start: number, end: number): string {
@@ -656,9 +675,9 @@ export function parseInline(
   let textStart = start
   const emailAt = context.config.gfm && !inLink ? source.indexOf('@', start) : -1
   const email = emailAt >= 0 && emailAt < end
-  const stops = email ? emailStops : context.config.gfm && !inLink ? linkStops : inlineStops
+  const stops = email ? emailCandidates : context.config.gfm && !inLink ? linkStops : inlineStops
   const scanText = !context.inline || context.inlineMarkers
-  const markers = context.config.gfm && !inLink ? gfmMarkers : markdownMarkers
+  const markers = context.config.gfm && !inLink ? gfmCandidates : markdownCandidates
   let i = start
   let unbalanced = 0
   while (i < end) {
@@ -775,6 +794,22 @@ export function parseInline(
         const n = node(Kind.InlineCode, offset(view, i), offset(view, stop), parent)
         tree.value[n] = codeValue(source, run, close)
         if (view.table) tree.value[n] = unescapePipes(tree.value[n]!)
+        i = textStart = stop
+        continue
+      }
+      i = run
+      continue
+    }
+    // ── Math spans follow the code span rules with `$` ──
+    if (c === Char.Dollar && mathRun) {
+      let run = i + 1
+      while (source.charCodeAt(run) === Char.Dollar) run++
+      const close = spanEnd(source, run, end, run - i, c)
+      if (close >= 0) {
+        if (textStart < i) plainText(view, textStart, i, parent)
+        const stop = close + run - i
+        const n = node(Kind.InlineMath, offset(view, i), offset(view, stop), parent)
+        tree.value[n] = codeValue(source, run, close)
         i = textStart = stop
         continue
       }
@@ -983,10 +1018,10 @@ function containsLink(view: View, start: number, end: number, context: InlineCon
       i++
       continue
     }
-    if (c === 96) {
+    if (c === 96 || (c === Char.Dollar && mathRun)) {
       let j = i + 1
-      while (source.charCodeAt(j) === 96) j++
-      const close = codeEnd(source, j, end, j - i)
+      while (source.charCodeAt(j) === c) j++
+      const close = spanEnd(source, j, end, j - i, c)
       if (close >= 0) {
         i = close + j - i - 1
         continue

@@ -26,7 +26,13 @@ export interface HeadingIdSyntax {
   readonly name: 'headingId'
 }
 
-export type Syntax = GfmSyntax | MdxSyntax | FrontmatterSyntax | HeadingIdSyntax
+export interface MathSyntax {
+  readonly name: 'math'
+  /** Allow `$x$` with one dollar, like micromark-extension-math `singleDollarTextMath`. Default true. */
+  readonly singleDollarTextMath: boolean
+}
+
+export type Syntax = GfmSyntax | MdxSyntax | FrontmatterSyntax | HeadingIdSyntax | MathSyntax
 
 /** Resolved, flat view of a syntax list. Built once per call site, read in hot loops. */
 export interface Config {
@@ -34,6 +40,7 @@ export interface Config {
   mdx: MdxSyntax | undefined
   frontmatter: FrontmatterSyntax | undefined
   headingId?: HeadingIdSyntax
+  math?: MathSyntax
   positions: boolean
 }
 
@@ -44,6 +51,7 @@ export function resolveConfig(syntax: readonly Syntax[] = [], positions = true):
     else if (s.name === 'mdx') config.mdx = s
     else if (s.name === 'frontmatter') config.frontmatter = s
     else if (s.name === 'headingId') config.headingId = s
+    else if (s.name === 'math') config.math = s
   }
   return config
 }

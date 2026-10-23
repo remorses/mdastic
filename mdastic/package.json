@@ -45,6 +45,10 @@
       "types": "./dist/heading-id.d.ts",
       "default": "./dist/heading-id.js"
     },
+    "./math": {
+      "types": "./dist/math.d.ts",
+      "default": "./dist/math.js"
+    },
     "./remark": {
       "types": "./dist/remark.d.ts",
       "default": "./dist/remark.js"

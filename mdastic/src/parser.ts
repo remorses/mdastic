@@ -23,7 +23,7 @@ export function parseDocument(source: string, config: Config, hooks?: ParserHook
   resetTree()
   resetBlocks()
   // A failed MDX parse can leave delimiters behind before recursive scope restoration.
-  resetInline()
+  resetInline(config)
   const root = node(Kind.Root, 0, source.length)
   const mdx = config.mdx ? mdxHooks(source, config.mdx) : undefined
   const inline: BlockContext['inline'] = config.headingId
