@@ -32,5 +32,7 @@
   { "name": "empty list items with trailing spaces cannot interrupt paragraphs", "input": "a\n*  \n", "syntax": [] },
   { "name": "lazy list markers remain text after nested list indentation", "input": "   - 3\n    - 4\n     - 5\n    - 4\n", "syntax": [] },
   { "name": "ordered lists not starting at 1 can follow a table after a paragraph", "input": "a\n|||\n-|-\n3.\n", "syntax": ["gfm"] },
-  { "name": "ordered lists not starting at 1 can follow a table after indented code", "input": "    code\n|a|\n-|\n3.\n", "syntax": ["gfm"] }
+  { "name": "ordered lists not starting at 1 can follow a table after indented code", "input": "    code\n|a|\n-|\n3.\n", "syntax": ["gfm"] },
+  { "name": "ESM lines end GFM tables", "input": "a|b\n-|-\nexport const x = 1\n\n{x}\n", "syntax": ["mdx", "gfm"] },
+  { "name": "invalid ESM after a GFM table is an MDX error", "input": "g|||\n-|-|-\nexport ", "syntax": ["mdx", "gfm"] }
 ]

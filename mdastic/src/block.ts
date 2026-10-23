@@ -47,6 +47,7 @@ export interface BlockContext extends InlineContext {
   ) => number
   flowParent?: (parent: number) => number
   interrupt?: (line: Line) => boolean
+  esm?: (line: Line) => boolean
   continuationEnd?: (line: Line) => number
 }
 interface Marker {
@@ -760,6 +761,7 @@ function parseTable(
     j < input.length &&
     !input[j].lazy &&
     !interrupts(context, input[j]) &&
+    !context.esm?.(input[j]) &&
     !marker(source, input[j]) &&
     (mdxMode || indentation(source, input[j]).indent < CODE_INDENT) &&
     (context.config.mdx || !htmlBlock(source, input[j], false));

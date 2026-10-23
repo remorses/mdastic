@@ -490,6 +490,12 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
       return j - at + 1
     }
   }
+  function esm(line: Line): boolean {
+    return (
+      (source.startsWith('import ', line.start) || source.startsWith('export ', line.start)) &&
+      point(line.start).column === 1
+    )
+  }
   function flow(
     context: BlockContext,
     input: Line[],
@@ -500,12 +506,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
     const line = input[at]
     let begin = line.start
     while (space(source.charCodeAt(begin))) begin++
-    if (
-      begin === line.start &&
-      point(begin).column === 1 &&
-      (source.startsWith('import ', begin) || source.startsWith('export ', begin))
-    )
-      return parseEsmFlow(input, at, begin, parent)
+    if (esm(line)) return parseEsmFlow(input, at, begin, parent)
     if (
       source.charCodeAt(begin) !== Char.LessThan &&
       source.charCodeAt(begin) !== Char.LeftBrace
@@ -617,6 +618,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
     inline,
     flow,
     flowParent: current,
+    esm,
     interrupt(line: Line) {
       let i = line.start
       while (space(source.charCodeAt(i))) i++
