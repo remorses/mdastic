@@ -81,6 +81,9 @@ const TASK_CLEANUP_PENDING = 1
 
 let mdxMode = false
 let mathMode = false
+// Quirk: micromark attempts an unclosed frontmatter fence up to EOF, and no line that
+// concrete attempt spans starts a container.
+let noContainers = false
 // Open blockquotes; nothing inside one keeps the final EOF line ending.
 let quoteDepth = 0
 
@@ -237,7 +240,7 @@ function fence(
 
 function marker(source: string, line: Line, mdx = mdxMode): Marker | undefined {
   const scan = indentation(source, line)
-  if (!mdx && scan.indent > MAX_BLOCK_INDENT) return
+  if (noContainers || (!mdx && scan.indent > MAX_BLOCK_INDENT)) return
   let i = scan.start
   const c = source.charCodeAt(i)
   let number = 0
@@ -280,6 +283,7 @@ function marker(source: string, line: Line, mdx = mdxMode): Marker | undefined {
 export function quote(source: string, line: Line, mdx = mdxMode): number {
   const scan = indentation(source, line)
   if (
+    noContainers ||
     (!mdx && scan.indent > MAX_BLOCK_INDENT) ||
     source.charCodeAt(scan.start) !== Char.GreaterThan
   )
@@ -429,7 +433,12 @@ function lazyFlowSpan(context: BlockContext, line: Line): boolean {
 
 function footnoteLabel(source: string, line: Line): { end: number; raw: string } | undefined {
   const scan = indentation(source, line)
-  if (scan.indent > MAX_BLOCK_INDENT || !source.startsWith('[^', scan.start)) return
+  if (
+    noContainers ||
+    (!mdxMode && scan.indent > MAX_BLOCK_INDENT) ||
+    !source.startsWith('[^', scan.start)
+  )
+    return
   let i = scan.start + 2
   for (; i < line.end; i++) {
     const c = source.charCodeAt(i)
@@ -573,8 +582,9 @@ function parseDefinition(
   const original = context.source
   const line = input[at]
   const scan = indentation(original, line)
+  // MDX has no indented code, so definitions and footnote labels take any indent.
   if (
-    (!continued && scan.indent > MAX_BLOCK_INDENT) ||
+    (!continued && !mdxMode && scan.indent > MAX_BLOCK_INDENT) ||
     original.charCodeAt(scan.start) !== Char.LeftBracket
   )
     return 0
@@ -799,21 +809,27 @@ function parseTable(
   return j - i
 }
 
-function frontmatter(context: BlockContext, input: Line[], parent: number): number {
+// The first line opens a frontmatter fence.
+function frontmatterOpen(context: BlockContext, input: Line[]): boolean {
   const config = context.config.frontmatter
-  if (!config || !input.length) return 0
+  if (!config || !input.length) return false
   const source = context.source
   const line = input[0]
   const c = source.charCodeAt(line.start)
-  const yaml = c === 45 && config.yaml
-  const toml = c === 43 && config.toml
-  if (
-    (!yaml && !toml) ||
-    trimEnd(source, line.start, line.end) - line.start !== 3 ||
-    source.charCodeAt(line.start + 1) !== c ||
-    source.charCodeAt(line.start + 2) !== c
+  return (
+    !!((c === 45 && config.yaml) || (c === 43 && config.toml)) &&
+    trimEnd(source, line.start, line.end) - line.start === 3 &&
+    source.charCodeAt(line.start + 1) === c &&
+    source.charCodeAt(line.start + 2) === c
   )
-    return 0
+}
+
+function frontmatter(context: BlockContext, input: Line[], parent: number): number {
+  if (!frontmatterOpen(context, input)) return 0
+  const source = context.source
+  const line = input[0]
+  const c = source.charCodeAt(line.start)
+  const yaml = c === 45
   for (let j = 1; j < input.length; j++) {
     const next = input[j]
     const end = trimEnd(source, next.start, next.end)
@@ -1035,6 +1051,7 @@ export function parseBlocks(
   const owner = parent
   const source = context.source
   let i = document ? frontmatter(context, input, parent) : 0
+  if (document) noContainers = !i && frontmatterOpen(context, input)
   // Residual state controls list interruption and indented-code eligibility.
   // Definitions survive adjacent lines; only indented code retains its state across blanks.
   let residual = inheritedInterrupt
