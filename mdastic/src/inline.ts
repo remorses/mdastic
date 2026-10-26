@@ -108,6 +108,7 @@ let delimiterChar = new Uint8Array(delimiterCapacity)
 let delimiterFlags = new Uint8Array(delimiterCapacity)
 // Shortest `$` run that opens inline math; 0 when math is off.
 let mathRun = 0
+const mathClosers = new Map<string, Map<number, number[]>>()
 // Candidate scanners for this parse; math adds `$`.
 let markdownCandidates = markdownMarkers
 let gfmCandidates = gfmMarkers
@@ -115,6 +116,7 @@ let emailCandidates = emailStops
 
 export function resetInline(config: Config): void {
   delimiterCount = 0
+  mathClosers.clear()
   mathRun = config.math ? (config.math.singleDollarTextMath ? 1 : 2) : 0
   markdownCandidates = mathRun ? mathMarkers : markdownMarkers
   gfmCandidates = mathRun ? gfmMathMarkers : gfmMarkers
@@ -414,6 +416,8 @@ function bracketEnd(
         i = close + run - i - 1
         continue
       }
+      // An unmatched math run stays whole; its suffix cannot open a shorter span.
+      if (c === Char.Dollar) i = run - 1
     }
     if (c === 91) depth++
     else if (c === 93) {
@@ -445,7 +449,34 @@ function codeEnd(source: string, start: number, end: number, length: number, cha
 
 // Closing run of a code or math span; math needs an opening run of at least `mathRun`.
 function spanEnd(source: string, start: number, end: number, length: number, char: number): number {
-  return char === Char.Dollar && length < mathRun ? -1 : codeEnd(source, start, end, length, char)
+  if (char !== Char.Dollar) return codeEnd(source, start, end, length, char)
+  if (length < mathRun) return -1
+  // Index each view's dollar runs once; unmatched lengths must not rescan its suffix.
+  let runs = mathClosers.get(source)
+  if (!runs) {
+    runs = new Map()
+    for (let i = source.indexOf('$'); i !== -1; ) {
+      let j = i + 1
+      while (source.charCodeAt(j) === Char.Dollar) j++
+      const width = j - i
+      const positions = runs.get(width)
+      if (positions) positions.push(i)
+      else runs.set(width, [i])
+      i = source.indexOf('$', j)
+    }
+    mathClosers.set(source, runs)
+  }
+  const positions = runs.get(length)
+  if (!positions) return -1
+  let low = 0
+  let high = positions.length
+  while (low < high) {
+    const mid = (low + high) >>> 1
+    if (positions[mid] < start) low = mid + 1
+    else high = mid
+  }
+  const close = positions[low]
+  return close < end ? close : -1
 }
 
 function codeValue(source: string, start: number, end: number): string {
@@ -1026,6 +1057,7 @@ function containsLink(view: View, start: number, end: number, context: InlineCon
         i = close + j - i - 1
         continue
       }
+      if (c === Char.Dollar) i = j - 1
     }
     if (c === 60) {
       const stop = autolink(source, i, end)?.end ?? htmlEnd(source, i, end)

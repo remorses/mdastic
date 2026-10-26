@@ -122,6 +122,8 @@ mdast-heading-id. It runs before MDX text hooks; MDX flow hooks keep their origi
 Math has no hooks: `$$` fences reuse fenced code in `block.ts` (two or more `$`, no `lang`, the
 whole info string is `meta`) and inline math reuses the code span rules in `inline.ts`. With math
 off, `$` is neither a fence marker nor an inline candidate, so the hot paths are unchanged.
+Inline math indexes dollar runs by length once per view source, then finds bounded closers by
+binary search. The index resets at parse entry; unmatched run lengths never rescan the suffix.
 `remark.ts` attaches tree-only remark plugins to a minimal data processor, outside parsing.
 It rejects syntax extensions; it does not depend on unified or vfile.
 

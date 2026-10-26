@@ -71,5 +71,8 @@
   { "name": "lazy lines opening multi-line flow tags stay in the container", "input": "> y\n<a c=\"\n> x\"/>\n", "syntax": ["mdx"] },
   { "name": "a lazy line may start with the closing brace of a flow expression", "input": "> y\n{\n}\n", "syntax": ["mdx"] },
   { "name": "unclosed flow expressions read into the next lazy line", "input": "> {\n>   a\n      <a\n", "syntax": ["mdx"] },
-  { "name": "flow tags in list items take no lazy lines", "input": "  - <a\n      />\n<a c=\"\n    x\"/>\n", "syntax": ["mdx"] }
+  { "name": "flow tags in list items take no lazy lines", "input": "  - <a\n      />\n<a c=\"\n    x\"/>\n", "syntax": ["mdx"] },
+  { "name": "unmatched dollar runs never retry suffixes inside link labels", "input": "[$$]()$\n\n[$$$]()$\n\n[![a](x)$$](u)$\n\n[$$][ref]$\n\n[ref]: /url\n", "syntax": ["math"] },
+  { "name": "GFM unmatched dollar runs never retry suffixes inside link labels", "input": "[$$]()$\n\n[$$$]()$\n\n[![a](x)$$](u)$\n\n[$$][ref]$\n\n[ref]: /url\n", "syntax": ["gfm", "math"] },
+  { "name": "MDX unmatched dollar runs never retry suffixes inside link labels", "input": "[$$]()$\n\n[$$$]()$\n\n[![a](x)$$](u)$\n\n[$$][ref]$\n\n[ref]: /url\n", "syntax": ["mdx", "frontmatter", "gfm", "math"] }
 ]
