@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.0
+
+1. **New opt-in math syntax.** Parse and serialize `$x$` inline math and `$$` blocks with the same nodes, positions and markdown as remark-math:
+
+   ```ts
+   import { parse, stringify } from 'mdastic'
+   import { math } from 'mdastic/math'
+
+   const syntax = [math()]
+   const tree = parse('Energy: $E = mc^2$', { syntax })
+   if (tree instanceof Error) throw tree
+   const markdown = stringify(tree, { syntax })
+   ```
+
+   Use `math({ singleDollarTextMath: false })` to require at least two dollars for inline math. Without `math()`, dollar signs remain ordinary text.
+
+Thanks @rgodha24 for #10!
+
 ## 0.1.2
 
 1. **Fixed MDX parse differences from remark** in container and multi-line constructs:
