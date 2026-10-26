@@ -40,20 +40,20 @@ The original plan is `docs/mdastic-plan.md`.
 
 | In scope | Not in scope |
 | --- | --- |
-| CommonMark, GFM, MDX (JSX, ESM, expressions), frontmatter (yaml, toml), `{#id}` heading IDs | HTML output (use `mdast-util-to-hast`) |
-| mdast with positions (UTF-16 offsets) and `data.estree` | math, directives, wikilinks, definition lists, smart punctuation |
+| CommonMark, GFM, MDX (JSX, ESM, expressions), frontmatter (yaml, toml), `{#id}` heading IDs, opt-in math | HTML output (use `mdast-util-to-hast`) |
+| mdast with positions (UTF-16 offsets) and `data.estree` | directives, wikilinks, definition lists, smart punctuation |
 | `stringify` with every `mdast-util-to-markdown` option | a micromark-style syntax plugin API |
 | `visit`, `toString`, central node types (`NodeOf<'heading'>`) | full `unified` / `vfile` implementation |
 | `remarkTransform()` for tree-only remark plugins | remark plugins that add syntax (they throw a clear error) |
 
-Inputs with unsupported syntax (math `$`, `==mark==`, `[[wiki]]`) are still tested: remark parses
-them as plain text, and mdastic must too.
+Inputs with unsupported syntax (`==mark==`, `[[wiki]]`, and `$` without `math()`) are still tested:
+remark parses them as plain text, and mdastic must too. Math changes nothing unless enabled.
 
 ## Repository layout
 
 | Folder | What |
 | --- | --- |
-| `mdastic/` | The npm package. `src/` builds to `dist/` with `tsc`. Subpaths: `mdx`, `gfm`, `frontmatter`, `heading-id`, `remark` |
+| `mdastic/` | The npm package. `src/` builds to `dist/` with `tsc`. Subpaths: `mdx`, `gfm`, `frontmatter`, `heading-id`, `math`, `remark` |
 | `conformance/` | Pinned remark oracle, fixtures, differential tests (vitest), realistic benchmark |
 | `scripts/` | Fixture extraction from upstream suites, table generators, micro-benchmarks |
 | `docs/` | `parser-conformance.md` (per-file results, measurements), `test-suites.md` (corpus sources), README figures |
@@ -119,6 +119,9 @@ scan.ts ──► ASCII/Unicode classification, entities, UTF-16 line positions
 
 `heading-id.ts` supplies the inline `{#id}` construct. Its value-only positions match
 mdast-heading-id. It runs before MDX text hooks; MDX flow hooks keep their original priority.
+Math has no hooks: `$$` fences reuse fenced code in `block.ts` (two or more `$`, no `lang`, the
+whole info string is `meta`) and inline math reuses the code span rules in `inline.ts`. With math
+off, `$` is neither a fence marker nor an inline candidate, so the hot paths are unchanged.
 `remark.ts` attaches tree-only remark plugins to a minimal data processor, outside parsing.
 It rejects syntax extensions; it does not depend on unified or vfile.
 
@@ -156,9 +159,10 @@ per-scope candidate tables, so `safe()` scans each value once instead of running
 
 `conformance/src/oracle.ts` runs the real remark stack, pinned to exact versions in
 `conformance/package.json` (mdast-util-from-markdown 2.0.3, mdast-util-to-markdown 2.1.2,
-micromark-extension-gfm 3.0.0, -mdxjs 3.0.0, -frontmatter 2.0.0, micromark-heading-id 2.0.0).
-Extensions are registered in safe-mdx / holocron order: mdx, frontmatter `['yaml', 'toml']`,
-gfm, then headingId. Upgrading the oracle means rerunning everything; differences become work.
+micromark-extension-gfm 3.0.0, -mdxjs 3.0.0, -frontmatter 2.0.0, -math 3.1.0, mdast-util-math 3.0.0,
+micromark-heading-id 2.0.0). Extensions are registered in safe-mdx / holocron order: mdx,
+frontmatter `['yaml', 'toml']`, gfm, math (remark-math defaults), then headingId. Upgrading the
+oracle means rerunning everything; differences become work.
 
 ```text
 fixture { name, input, syntax } ──┬──► oracle (remark) ──► JSON ──┐
@@ -185,6 +189,7 @@ markdown inputs is useful, even suites that only assert HTML.
 | spec-format files of pulldown-cmark, cmark(-gfm), commonmark.js, md4c, comrak, markdown-it, flexmark, goldmark; bench sample docs | `scripts/extract-spec-files.ts` |
 | source MDX of docs sites (mintlify/docs) | `scripts/extract-docs-repos.ts` |
 | cmark-style pathological inputs at 1/100 size | `scripts/pathological.ts fixtures` |
+| micromark-extension-math, mdast-util-math, remark-math, Sätteri and pulldown-cmark math tests; d2l-en; real documents with `$` | `scripts/extract-math.ts` |
 | hand-written bugs and edge cases | `conformance/fixtures/regressions.json`, `smoke.json` |
 
 `conformance/stringify-fixtures/` holds 838 hand-built trees with options, captured from the

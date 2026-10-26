@@ -7,6 +7,7 @@ import { gfm } from 'mdastic/src/gfm'
 import { mdx } from 'mdastic/src/mdx'
 import { frontmatter } from 'mdastic/src/frontmatter'
 import { headingId } from 'mdastic/src/heading-id'
+import { math } from 'mdastic/src/math'
 import {
   normalize,
   oracleParse,
@@ -62,11 +63,12 @@ export function toSyntax(names: SyntaxName[]): Syntax[] {
   const key = names.join(',')
   let syntax = syntaxCache.get(key)
   if (!syntax) {
-    // Same order as the oracle: mdx, frontmatter, gfm.
+    // Same order as the oracle: mdx, frontmatter, gfm, math.
     syntax = []
     if (names.includes('mdx')) syntax.push(mdx())
     if (names.includes('frontmatter')) syntax.push(frontmatter())
     if (names.includes('gfm')) syntax.push(gfm())
+    if (names.includes('math')) syntax.push(math())
     if (names.includes('headingId')) syntax.push(headingId())
     syntaxCache.set(key, syntax)
   }

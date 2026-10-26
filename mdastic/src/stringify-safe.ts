@@ -8,6 +8,8 @@ const enum SyntaxMask {
   Mdx = 2,
   Yaml = 4,
   Toml = 8,
+  Math = 16,
+  SingleDollar = 32,
 }
 const enum EscapeFlag {
   Before = 1,
@@ -95,7 +97,9 @@ export function prepareRules(config: Config, patterns: Unsafe[], custom = false)
     (config.gfm ? SyntaxMask.Gfm : 0) |
     (config.mdx ? SyntaxMask.Mdx : 0) |
     (config.frontmatter?.yaml ? SyntaxMask.Yaml : 0) |
-    (config.frontmatter?.toml ? SyntaxMask.Toml : 0)
+    (config.frontmatter?.toml ? SyntaxMask.Toml : 0) |
+    (config.math ? SyntaxMask.Math : 0) |
+    (config.math?.singleDollarTextMath ? SyntaxMask.SingleDollar : 0)
   let table = !custom ? defaultRules.get(key) : undefined
   if (!table) {
     table = {

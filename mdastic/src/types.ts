@@ -1,5 +1,5 @@
 // Every mdast node type mdastic can produce, in one place. Shapes match @types/mdast plus the
-// mdast-util-{gfm,mdx-jsx,mdx-expression,mdxjs-esm,frontmatter} augmentations exactly.
+// mdast-util-{gfm,mdx-jsx,mdx-expression,mdxjs-esm,frontmatter,math} augmentations exactly.
 import type { Program } from 'estree'
 
 export interface Point {
@@ -216,17 +216,34 @@ export interface IdString extends NodeBase {
   value: string
 }
 
+// ── Math ───────────────────────────────────────────────────────────────────
+
+export interface MathData extends Data {
+  hName?: string
+  hProperties?: Record<string, unknown>
+  hChildren?: unknown[]
+}
+export interface Math extends LiteralBase {
+  type: 'math'
+  meta?: string | null
+  data?: MathData
+}
+export interface InlineMath extends LiteralBase {
+  type: 'inlineMath'
+  data?: MathData
+}
+
 // ── Unions ─────────────────────────────────────────────────────────────────
 
 export type PhrasingContent =
   | Text | Emphasis | Strong | Delete | InlineCode | Break | Link | Image
   | LinkReference | ImageReference | FootnoteReference | Html
-  | MdxJsxTextElement | MdxTextExpression | IdString
+  | MdxJsxTextElement | MdxTextExpression | IdString | InlineMath
 
 export type FlowContent =
   | Paragraph | Heading | ThematicBreak | Blockquote | List | Html | Code
   | Definition | Table | FootnoteDefinition
-  | MdxJsxFlowElement | MdxFlowExpression | MdxjsEsm
+  | MdxJsxFlowElement | MdxFlowExpression | MdxjsEsm | Math
 
 export type RootContent =
   | FlowContent | PhrasingContent | ListItem | TableRow | TableCell | Yaml | Toml

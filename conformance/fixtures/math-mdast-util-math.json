@@ -1,0 +1,14 @@
+[
+{"name":"mathFromMarkdown > should support math (text)","input":"a $b$ c","syntax":["math"]},
+{"name":"mathFromMarkdown > should support math (flow)","input":"$$\na\n$$","syntax":["math"]},
+{"name":"mathFromMarkdown > should support math (flow) w/ meta","input":"$$a&amp;b\\&c\n","syntax":["math"]},
+{"name":"mathFromMarkdown > should support math (text) w/ EOLs","input":"$a\nb\nb$","syntax":["math"]},
+{"name":"mathFromMarkdown > should support math (text)","input":"a $b$ c","syntax":["gfm","math"]},
+{"name":"mathFromMarkdown > should support math (flow)","input":"$$\na\n$$","syntax":["gfm","math"]},
+{"name":"mathFromMarkdown > should support math (flow) w/ meta","input":"$$a&amp;b\\&c\n","syntax":["gfm","math"]},
+{"name":"mathFromMarkdown > should support math (text) w/ EOLs","input":"$a\nb\nb$","syntax":["gfm","math"]},
+{"name":"mathFromMarkdown > should support math (text)","input":"a $b$ c","syntax":["mdx","frontmatter","gfm","math"]},
+{"name":"mathFromMarkdown > should support math (flow)","input":"$$\na\n$$","syntax":["mdx","frontmatter","gfm","math"]},
+{"name":"mathFromMarkdown > should support math (flow) w/ meta","input":"$$a&amp;b\\&c\n","syntax":["mdx","frontmatter","gfm","math"]},
+{"name":"mathFromMarkdown > should support math (text) w/ EOLs","input":"$a\nb\nb$","syntax":["mdx","frontmatter","gfm","math"]}
+]
