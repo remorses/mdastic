@@ -1290,6 +1290,8 @@ export function parseBlocks(
           lastContent = j - 1
           tree.end[item] = input[lastContent].end
         }
+        // Only the first item can interrupt a paragraph; later items never inherit it.
+        residual = InterruptState.None
         const nextMark = j < input.length ? marker(source, input[j]) : undefined
         const sibling =
           nextMark &&
