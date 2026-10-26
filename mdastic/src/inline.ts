@@ -699,16 +699,18 @@ export function parseInline(
   context: InlineContext,
   inLink = false,
   trim = true,
+  // micromark never starts a literal autolink inside an open link or image label.
+  literals = !inLink,
 ): void {
   // ── Reserve this inline scope and select its candidate scanner ──
   const source = view.source
   const delimiterBegin = delimiterCount
   let textStart = start
-  const emailAt = context.config.gfm && !inLink ? source.indexOf('@', start) : -1
+  const emailAt = context.config.gfm && literals ? source.indexOf('@', start) : -1
   const email = emailAt >= 0 && emailAt < end
-  const stops = email ? emailCandidates : context.config.gfm && !inLink ? linkStops : inlineStops
+  const stops = email ? emailCandidates : context.config.gfm && literals ? linkStops : inlineStops
   const scanText = !context.inline || context.inlineMarkers
-  const markers = context.config.gfm && !inLink ? gfmCandidates : markdownCandidates
+  const markers = context.config.gfm && literals ? gfmCandidates : markdownCandidates
   let i = start
   let unbalanced = 0
   while (i < end) {
@@ -747,7 +749,7 @@ export function parseInline(
         !(ascii[previous] & AsciiFlag.Letter))
     if (
       context.config.gfm &&
-      !inLink &&
+      literals &&
       !unbalanced && // Unmatched label brackets suppress tokenizer autolinks.
       literalStart &&
       ((email &&
@@ -963,7 +965,7 @@ export function parseInline(
           const n = node(kind, offset(view, i), offset(view, stop), parent)
           tree.extra[n] = data
           if (!footnote) {
-            parseInline(view, labelStart, close, n, context, !image, false)
+            parseInline(view, labelStart, close, n, context, !image, false, false)
             // MDX image alt waits for deferred JSX nesting before flattening.
             if (image && !context.config.mdx) {
               tree.value[n] = flatten(n)
