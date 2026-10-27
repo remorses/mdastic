@@ -82,7 +82,7 @@ const TASK_CLEANUP_PENDING = 1
 let mdxMode = false
 let mathMode = false
 // Quirk: micromark attempts an unclosed frontmatter fence up to EOF, and no line that
-// concrete attempt spans starts a container.
+// attempt spans starts a container. Set by frontmatter(), reset per parse.
 let noContainers = false
 // Open blockquotes; nothing inside one keeps the final EOF line ending.
 let quoteDepth = 0
@@ -93,6 +93,7 @@ let taskStarts = new Int32Array(INITIAL_TASK_CAPACITY)
 const taskViews: (View | undefined)[] = []
 
 export function resetBlocks(): void {
+  noContainers = false
   quoteDepth = 0
   taskCount = 0
   taskViews.length = 0
@@ -809,27 +810,21 @@ function parseTable(
   return j - i
 }
 
-// The first line opens a frontmatter fence.
-function frontmatterOpen(context: BlockContext, input: Line[]): boolean {
-  const config = context.config.frontmatter
-  if (!config || !input.length) return false
-  const source = context.source
-  const line = input[0]
-  const c = source.charCodeAt(line.start)
-  return (
-    !!((c === 45 && config.yaml) || (c === 43 && config.toml)) &&
-    trimEnd(source, line.start, line.end) - line.start === 3 &&
-    source.charCodeAt(line.start + 1) === c &&
-    source.charCodeAt(line.start + 2) === c
-  )
-}
-
 function frontmatter(context: BlockContext, input: Line[], parent: number): number {
-  if (!frontmatterOpen(context, input)) return 0
+  const config = context.config.frontmatter
+  if (!config || !input.length) return 0
   const source = context.source
   const line = input[0]
   const c = source.charCodeAt(line.start)
-  const yaml = c === 45
+  const yaml = c === 45 && config.yaml
+  const toml = c === 43 && config.toml
+  if (
+    (!yaml && !toml) ||
+    trimEnd(source, line.start, line.end) - line.start !== 3 ||
+    source.charCodeAt(line.start + 1) !== c ||
+    source.charCodeAt(line.start + 2) !== c
+  )
+    return 0
   for (let j = 1; j < input.length; j++) {
     const next = input[j]
     const end = trimEnd(source, next.start, next.end)
@@ -844,6 +839,7 @@ function frontmatter(context: BlockContext, input: Line[], parent: number): numb
     tree.value[n] = source.slice(line.next, j === 1 ? line.next : input[j - 1].end)
     return j + 1
   }
+  noContainers = true
   return 0
 }
 
@@ -1051,7 +1047,6 @@ export function parseBlocks(
   const owner = parent
   const source = context.source
   let i = document ? frontmatter(context, input, parent) : 0
-  if (document) noContainers = !i && frontmatterOpen(context, input)
   // Residual state controls list interruption and indented-code eligibility.
   // Definitions survive adjacent lines; only indented code retains its state across blanks.
   let residual = inheritedInterrupt
