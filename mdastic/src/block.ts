@@ -979,6 +979,7 @@ function parseFootnoteDefinition(
   let j = i + 1
   let last = i
   let lazy = lazyParagraph(context, content[0], residual > 0)
+  const nested = tree.kind[parent] === Kind.FootnoteDefinition
   for (; j < input.length; j++) {
     if (blank(source, input[j])) {
       content.push(input[j])
@@ -988,6 +989,12 @@ function parseFootnoteDefinition(
       content.push(stripped)
       last = j
       lazy = lazyParagraph(context, stripped)
+    } else if (nested && !input[j].lazy && indentation(source, input[j]).indent === 0) {
+      // Quirk: micromark checks the indent token before the line, so a footnote directly
+      // in a footnote takes the outer indent as its own when it has none left.
+      content.push(input[j])
+      last = j
+      lazy = lazyParagraph(context, input[j])
     } else if (
       lazy &&
       ((!interrupts(context, input[j]) && !marker(source, input[j])) ||
