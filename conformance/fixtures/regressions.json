@@ -89,5 +89,19 @@
   { "name": "MDX lazy lines in quoted list items keep their indent in code spans", "input": ">- `a\n  b`\n\n> 1. `a\n   b`\n\n> 1) `a\n   b`\n\n> 10. `a\n    b`\n\n> -   `a\n    b`\n\n> - - `a\n    b`\n\n> > - `a\n  b`\n\n- > - `a\n    b`\n\n***\n\n> - `a\n      b`\n\n> - `a\n\tb`\n\n> - `a\n  b\n  c`\n\n> - **a `b\n  c` d**\n\n> [^a]: `a\n    b`\n\n[^a]\n\n> - *a\n  b*\n\n> - `a\n>   b`\n\n> - ```\n  b\n\n> - a\n>   ===\n  b\n", "syntax": ["mdx", "frontmatter", "gfm"] },
   { "name": "lazy lines in quoted list items keep their indent in inline math", "input": ">- $a\n  b$\n\n> 1. $a\n   b$\n\n> - - $a\n    b$\n\n- > - $a\n    b$\n\n***\n\n> - **a $b\n  c$ d**\n\n> - $a\n>   b$\n\n> - $$\n  b\n", "syntax": ["math"] },
   { "name": "GFM lazy lines in quoted list items keep their indent in inline math", "input": ">- $a\n  b$\n\n> 1. $a\n   b$\n\n> - - $a\n    b$\n\n- > - $a\n    b$\n\n***\n\n> - **a $b\n  c$ d**\n\n> - $a\n>   b$\n\n> - $$\n  b\n", "syntax": ["gfm", "math"] },
-  { "name": "MDX lazy lines in quoted list items keep their indent in inline math", "input": ">- $a\n  b$\n\n> 1. $a\n   b$\n\n> - - $a\n    b$\n\n- > - $a\n    b$\n\n***\n\n> - **a $b\n  c$ d**\n\n> - $a\n>   b$\n\n> - $$\n  b\n", "syntax": ["mdx", "frontmatter", "gfm", "math"] }
+  { "name": "MDX lazy lines in quoted list items keep their indent in inline math", "input": ">- $a\n  b$\n\n> 1. $a\n   b$\n\n> - - $a\n    b$\n\n- > - $a\n    b$\n\n***\n\n> - **a $b\n  c$ d**\n\n> - $a\n>   b$\n\n> - $$\n  b\n", "syntax": ["mdx", "frontmatter", "gfm", "math"] },
+  { "name": "MDX unclosed tags name the gfmFootnoteDefinition token", "input": "[^a]: <b>\n\nc", "syntax": ["mdx", "gfm"] },
+  { "name": "MDX unclosed flow tags name the gfmFootnoteDefinition token", "input": "[^a]: b\n\n    <c>\n\nd", "syntax": ["mdx", "frontmatter", "gfm"] },
+  { "name": "MDX unclosed tags name the atxHeading token", "input": "# a <b>", "syntax": ["mdx"] },
+  { "name": "MDX unclosed tags name the setextHeading token", "input": "a <b>\n===", "syntax": ["mdx"] },
+  { "name": "MDX crossing tags name the atxHeading token", "input": "<a>\n# b </a>", "syntax": ["mdx"] },
+  { "name": "MDX crossing tags name the setextHeading token", "input": "<a>\nb </a>\n===", "syntax": ["mdx"] },
+  { "name": "MDX unclosed tags name the strikethrough token", "input": "~~a <b>~~", "syntax": ["mdx", "gfm"] },
+  { "name": "MDX crossing tags name the strikethrough token", "input": "<b>~~a </b>~~", "syntax": ["mdx", "gfm"] },
+  { "name": "MDX unclosed tags in reference links name the link token", "input": "[a <b>][c]\n\n[c]: d", "syntax": ["mdx"] },
+  { "name": "MDX crossing tags in reference links name the link token", "input": "<b>[a </b>][c]\n\n[c]: d", "syntax": ["mdx"] },
+  { "name": "MDX unclosed tags in reference images name the image token", "input": "![a <b>][c]\n\n[c]: d", "syntax": ["mdx"] },
+  { "name": "MDX unclosed tags name the tableHeader token", "input": "|<b>|\n|-|", "syntax": ["mdx", "gfm"] },
+  { "name": "MDX unclosed tags name the tableData token", "input": "|a|b|\n|-|-|\n|c|<d>|", "syntax": ["mdx", "gfm"] },
+  { "name": "MDX crossing tags name the tableHeader token", "input": "<a>\n|b </a>|\n|-|", "syntax": ["mdx", "gfm"] }
 ]
