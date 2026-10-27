@@ -603,7 +603,8 @@ function parseDefinition(
   }
   const view = viewFor(original, input.slice(at, limit), false)
   const source = view.source
-  let i = scan.start - line.start + 1
+  // The view starts with the line's virtual tab columns.
+  let i = scan.start - line.start + (line.padding ?? 0) + 1
   // ── Read and normalize the reference label ──
   const labelStart = i
   while (
