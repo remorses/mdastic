@@ -87,6 +87,15 @@ const cases: { name: string; n: number; syntax: SyntaxName[]; input: (n: number)
   { name: 'mdx nested braces', n: 20000, syntax: mdx, input: (n) => '{'.repeat(n) + '}'.repeat(n) },
   { name: 'mdx expressions then unclosed', n: 20000, syntax: mdx, input: (n) => '{a}'.repeat(n) + '{' },
   { name: 'mdx many attributes', n: 20000, syntax: mdx, input: (n) => '<a ' + 'b={1} '.repeat(n) + '/>' },
+  // MDX: paragraph interruption probes span container prefixes, so later braces must not be retried
+  { name: 'mdx braces in fenced code in quotes', n: 5000, syntax: mdx, input: (n) => '> ```\n> {\n> }\n> ```\n'.repeat(n) },
+  { name: 'mdx braces in fenced code in quotes in lists', n: 5000, syntax: mdx, input: (n) => '- > ```\n  > {\n  > }\n  > ```\n'.repeat(n) },
+  { name: 'mdx trailing tokens in fenced code in nested quotes', n: 5000, syntax: mdx, input: (n) => '> > ```\n> > {a b\n> > }\n> > ```\n'.repeat(n) },
+  { name: 'mdx templates in fenced code in quotes', n: 5000, syntax: mdx, input: (n) => '> ```\n> {`\n> }\n> ```\n'.repeat(n) },
+  { name: 'mdx attribute expressions in fenced code in quotes', n: 5000, syntax: mdx, input: (n) => '> ```\n> <A {...\n> } b={\n> } />\n> ```\n'.repeat(n) },
+  { name: 'mdx flow expressions in quotes', n: 5000, syntax: mdx, input: (n) => '> {\n> }\n'.repeat(n) },
+  { name: 'mdx text expressions in quotes', n: 5000, syntax: mdx, input: (n) => '> a\n> {\n> b}\n'.repeat(n) },
+  { name: 'mdx attribute expressions in quotes', n: 5000, syntax: mdx, input: (n) => '> <A b={\n> 1} />\n'.repeat(n) },
   // Math: dollar runs mirror cmark backticks
   { name: 'math dollars', n: 2500, syntax: math, input: (n) => range(n).map((i) => 'e' + '$'.repeat(i + 1)).join('') },
   { name: 'math unmatched dollars', n: 100000, syntax: math, input: (n) => 'a $b '.repeat(n) },
