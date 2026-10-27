@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.3.0
+
+1. **New `createStreamParser()` for streaming markdown and MDX**, like an LLM response. Pass the whole text so far on every chunk; each result equals `parse(text)`:
+
+   ```ts
+   import { createStreamParser } from 'mdastic'
+   import { mdx } from 'mdastic/mdx'
+   import { gfm } from 'mdastic/gfm'
+
+   const parser = createStreamParser({ syntax: [mdx(), gfm()] })
+   let text = ''
+   for await (const chunk of response) {
+     text += chunk
+     const tree = parser.parse(text)
+     if (tree instanceof Error) continue // incomplete MDX, keep the last good tree
+     render(tree)
+   }
+   ```
+
+   Top-level blocks that can no longer change are cached and returned as the **same objects** on every call, so a renderer can memoize them. Only the text after the last safe cut is parsed again. Streaming in 32-character chunks is 2.7x to 10x faster than calling `parse` on every chunk. Do not mutate returned trees: cached blocks are shared. Documents with link or footnote definitions or MDX imports are parsed in full on each call.
+
+2. **Fixed footnote definition parsing** to match remark, which treats them as containers like block quotes and list items:
+   - footnote labels are recognized before tables and link definitions (`[a]: b\n[^c]: d`, `[^b]: c\n|-|`)
+   - lazy lines after a footnote can start any list (`[^a]: b\n2) x`)
+   - paragraph interruption carries through footnote labels, footnotes directly inside footnotes take the outer indent
+   - definitions on lines with leftover tab columns, indented code in a container after a definition, and HTML after a definition now parse like remark
+3. **Fixed MDX parse differences from remark**:
+   - link and footnote definitions take any indentation in MDX (`    [e]: f`), since MDX has no indented code
+   - an `import` / `export` line right after a definition stays paragraph text
+   - an unclosed frontmatter fence starts no block quotes, lists or footnotes
+   - `end-tag-mismatch` errors name micromark tokens like remark (`atxHeading`, `gfmFootnoteDefinition`, `strikethrough`, `tableData`)
+4. **Fixed markdown parse differences from remark**:
+   - image alt text no longer keeps escapes or character references from GFM literal autolinks (`![http://a\.b](/x.png)` gives alt `http://a.b`)
+   - unmatched backtick runs inside link and image labels stay text as a whole (``![``a![b`](/x)``)
+   - lazy lines inside quoted list items keep their indentation in code spans and inline math
+   - only the first list item after a paragraph inherits its interruption rules (`0\n- a\n- -`)
+5. **Fixed cubic MDX parse time** for `{` / `}` lines inside block quotes. A 1.2 MB docs page that never finished now parses in under 200 ms.
+
+Thanks @rgodha24 for #11, #12, #13, #14, #15, #16, #17 and #18!
+
 ## 0.2.0
 
 1. **New opt-in math syntax.** Parse and serialize `$x$` inline math and `$$` blocks with the same nodes, positions and markdown as remark-math:
