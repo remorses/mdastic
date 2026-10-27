@@ -416,8 +416,8 @@ function bracketEnd(
         i = close + run - i - 1
         continue
       }
-      // An unmatched math run stays whole; its suffix cannot open a shorter span.
-      if (c === Char.Dollar) i = run - 1
+      // An unmatched run stays whole; its suffix cannot open a shorter span.
+      i = run - 1
     }
     if (c === 91) depth++
     else if (c === 93) {
@@ -1059,7 +1059,7 @@ function containsLink(view: View, start: number, end: number, context: InlineCon
         i = close + j - i - 1
         continue
       }
-      if (c === Char.Dollar) i = j - 1
+      i = j - 1
     }
     if (c === 60) {
       const stop = autolink(source, i, end)?.end ?? htmlEnd(source, i, end)
