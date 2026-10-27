@@ -204,6 +204,44 @@ function candidate(source: string, start: number, syntax: MdxSyntax): number {
   }
 }
 
+// Probes start at every `{` line and read to the end of the source. Cache each view's next
+// `}` so consecutive probes share one forward search instead of each scanning the rest.
+const braces = new WeakMap<View, { from: number; at: number }>()
+function nextBrace(view: View, from: number): number {
+  let cached = braces.get(view)
+  if (!cached) braces.set(view, (cached = { from, at: view.source.indexOf('}', from) }))
+  else if (from < cached.from || (cached.at >= 0 && from > cached.at))
+    cached.at = view.source.indexOf('}', from)
+  cached.from = from
+  return cached.at
+}
+
+// Paragraph probes read raw source, so later lines keep their `> ` prefixes and acorn
+// usually fails on the second line. An error before the end of a prefix cut at a line
+// ending recurs at every longer closing brace, so it decides the expression without
+// tokenizing and collecting up to a distant `}`. Prefixes double in lines and stay under
+// half the distance to the first `}`, so a probe costs at most what one retry would.
+function prefixCrash(view: View, start: number, brace: number, syntax: MdxSyntax): any {
+  const source = view.source
+  let cut = start + 1
+  let lines = 0
+  for (let target = 2; ; target *= 2, cut++) {
+    for (; cut < brace; cut++) {
+      const c = source.charCodeAt(cut)
+      if (
+        (c === Char.LineFeed ||
+          (c === Char.CarriageReturn && source.charCodeAt(cut + 1) !== Char.LineFeed)) &&
+        ++lines === target
+      )
+        break
+    }
+    if (cut >= brace || 2 * (cut - start) > brace - start) return
+    const parsed = collect(view, start + 1, cut, true, false)
+    const result = acornProgram(parsed.value, syntax, parsed.map, true, false, true)
+    if (result.error && !result.swallow) return result.error
+  }
+}
+
 interface Expression {
   end: number
   value: string
@@ -227,29 +265,35 @@ export function expression(
   const cached = expressions.get(view)?.get(key)
   if (cached && cached.end <= end) return cached
   const source = view.source
-  const predicted = candidate(source.slice(0, end), start + 1, syntax)
   let lastCrash: any
-  const first = predicted >= 0 ? predicted : start + 1
-  // Prediction is only an optimization; retry later braces to preserve upstream errors.
-  for (let close = first; close < end; close++) {
-    if (source.charCodeAt(close) !== Char.RightBrace) continue
-    const content = collect(view, start + 1, close, true)
-    const parsed = content.virtual ? collect(view, start + 1, close, true, false) : content
-    const result = acornProgram(parsed.value, syntax, parsed.map, true, spread, allowEmpty)
-    if (result.program) {
-      const match: Expression = { end: close + 1, value: content.value }
-      if (syntax.estree) match.data = { estree: result.program }
-      let cache = expressions.get(view)
-      if (!cache) {
-        cache = new Map()
-        expressions.set(view, cache)
+  // With no `}` left, acorn never runs: only the lazy-line and end-of-file errors remain.
+  const brace = nextBrace(view, start + 1)
+  const closable = brace >= 0 && brace < end
+  if (closable && !spread) lastCrash = prefixCrash(view, start, brace, syntax)
+  if (closable && !lastCrash) {
+    const predicted = candidate(source.slice(0, end), start + 1, syntax)
+    const first = predicted >= 0 ? predicted : brace
+    // Prediction is only an optimization; retry later braces to preserve upstream errors.
+    for (let close = first; close < end; close++) {
+      if (source.charCodeAt(close) !== Char.RightBrace) continue
+      const content = collect(view, start + 1, close, true)
+      const parsed = content.virtual ? collect(view, start + 1, close, true, false) : content
+      const result = acornProgram(parsed.value, syntax, parsed.map, true, spread, allowEmpty)
+      if (result.program) {
+        const match: Expression = { end: close + 1, value: content.value }
+        if (syntax.estree) match.data = { estree: result.program }
+        let cache = expressions.get(view)
+        if (!cache) {
+          cache = new Map()
+          expressions.set(view, cache)
+        }
+        cache.set(key, match)
+        return match
       }
-      cache.set(key, match)
-      return match
+      lastCrash = result.error
+      // Acorn stopped before this brace, so no later brace can close the expression.
+      if (!result.swallow) break
     }
-    lastCrash = result.error
-    // Acorn stopped before this brace, so no later brace can close the expression.
-    if (!result.swallow) break
   }
   // An unclosed expression reads into the first lazy line after it.
   let lazy = -1

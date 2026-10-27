@@ -72,6 +72,48 @@ test('MDX expression probes stop at the first closing brace acorn rejects', () =
   }
 })
 
+test('MDX expression probes never read an unclosed brace to a distant closing brace', () => {
+  // Every `{` line in a block quote is probed against the raw source up to the end.
+  const fence = '```'
+  const shapes = [
+    ['> {\n', '\na\n'],
+    ['> {\n', '}\n'],
+    ['> > {\n', '}\n'],
+    ['> {x\n', '}\n'],
+    [`> ${fence}\n> {\n> ${fence}\n`, ''],
+    [`> ${fence}\n> {\n> ${fence}\n`, '{a}\n'],
+    [`- > ${fence}\n  > {\n  > ${fence}\n`, '{a}\n'],
+  ]
+  let read = 0
+  const base = mdx()
+  class Counting extends base.acorn {
+    static override parse(...args: Parameters<typeof base.acorn.parse>) {
+      read += args[0].length
+      return super.parse(...args)
+    }
+    static override parseExpressionAt(...args: Parameters<typeof base.acorn.parseExpressionAt>) {
+      read += args[0].length
+      return super.parseExpressionAt(...args)
+    }
+    static override tokenizer(...args: Parameters<typeof base.acorn.tokenizer>) {
+      read += args[0].length
+      return super.tokenizer(...args)
+    }
+  }
+  const syntax = [{ ...base, acorn: Counting }]
+  function count(source: string) {
+    read = 0
+    const result = parse(source, { syntax })
+    return { read, result: result instanceof Error ? toOracleError(result) : normalize(result) }
+  }
+  for (const [shape, end] of shapes) {
+    const small = count(shape.repeat(20) + end)
+    expect(small.result).toEqual(expectedParse(shape.repeat(20) + end, ['mdx']))
+    // Each probe reads a bounded prefix, so acorn input grows with the document.
+    expect(count(shape.repeat(40) + end).read).toBeLessThanOrEqual(2 * small.read + 64)
+  }
+})
+
 for (const { file, fixtures } of loadFixtureFiles()) {
   describe(file, () => {
     test.each(fixtures.map((f, i) => [`${i} ${f.name}`, f] as const))('%s', (_, fixture) => {
