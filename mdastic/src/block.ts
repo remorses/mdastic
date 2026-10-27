@@ -1050,7 +1050,9 @@ export function parseBlocks(
   let i = document ? frontmatter(context, input, parent) : 0
   // Residual state controls list interruption and indented-code eligibility.
   // Definitions survive adjacent lines; only indented code retains its state across blanks.
-  let residual = inheritedInterrupt
+  // A new container's first line may be interrupted, but no definition precedes it there.
+  let residual: InterruptState =
+    inheritedInterrupt === InterruptState.Definition ? InterruptState.Paragraph : inheritedInterrupt
   let pendingLazy = false
   // Lines an MDX flow tag or expression attempt still spans cannot start containers.
   let spanEnd = 0
