@@ -76,5 +76,19 @@
   { "name": "GFM unmatched dollar runs never retry suffixes inside link labels", "input": "[$$]()$\n\n[$$$]()$\n\n[![a](x)$$](u)$\n\n[$$][ref]$\n\n[ref]: /url\n", "syntax": ["gfm", "math"] },
   { "name": "MDX unmatched dollar runs never retry suffixes inside link labels", "input": "[$$]()$\n\n[$$$]()$\n\n[![a](x)$$](u)$\n\n[$$][ref]$\n\n[ref]: /url\n", "syntax": ["mdx", "frontmatter", "gfm", "math"] },
   { "name": "GFM literal autolinks never start inside image labels", "input": "![http://a\\.b](/x.png)\n\n![www.a\\_b\\_c](/x)\n\n![x http://a.b/\\*c\\* y](/x)\n\n![http://a&amp;b/&#65;](/x)\n\n![a ![http://a\\.b](/y) c](/x)\n\n![[a](/y) http://b\\.c](/x)\n\n[![http://a\\.b](/y)](/x)\n\n![a&amp;b@c\\.d](/x)\n\n![<http://a\\.b>](/x)\n\n![http://a\\.b][r] http://c\\.d\n\n[r]: /x\n", "syntax": ["gfm"] },
-  { "name": "MDX literal autolinks never start inside image labels", "input": "![http://a\\.b](/x.png)\n\n![www.a\\_b\\_c](/x)\n\n![x http://a.b/\\*c\\* y](/x)\n\n![http://a&amp;b/&#65;](/x)\n\n![a ![http://a\\.b](/y) c](/x)\n\n![[a](/y) http://b\\.c](/x)\n\n[![http://a\\.b](/y)](/x)\n\n![a&amp;b@c\\.d](/x)\n\n![http://a\\.b][r] http://c\\.d\n\n[r]: /x\n\n![a <b>http://a\\.b</b> {1} www.c\\.d](/x)\n", "syntax": ["mdx", "frontmatter", "gfm"] }
+  { "name": "MDX literal autolinks never start inside image labels", "input": "![http://a\\.b](/x.png)\n\n![www.a\\_b\\_c](/x)\n\n![x http://a.b/\\*c\\* y](/x)\n\n![http://a&amp;b/&#65;](/x)\n\n![a ![http://a\\.b](/y) c](/x)\n\n![[a](/y) http://b\\.c](/x)\n\n[![http://a\\.b](/y)](/x)\n\n![a&amp;b@c\\.d](/x)\n\n![http://a\\.b][r] http://c\\.d\n\n[r]: /x\n\n![a <b>http://a\\.b</b> {1} www.c\\.d](/x)\n", "syntax": ["mdx", "frontmatter", "gfm"] },
+  { "name": "MDX unclosed tags name the gfmFootnoteDefinition token", "input": "[^a]: <b>\n\nc", "syntax": ["mdx", "gfm"] },
+  { "name": "MDX unclosed flow tags name the gfmFootnoteDefinition token", "input": "[^a]: b\n\n    <c>\n\nd", "syntax": ["mdx", "frontmatter", "gfm"] },
+  { "name": "MDX unclosed tags name the atxHeading token", "input": "# a <b>", "syntax": ["mdx"] },
+  { "name": "MDX unclosed tags name the setextHeading token", "input": "a <b>\n===", "syntax": ["mdx"] },
+  { "name": "MDX crossing tags name the atxHeading token", "input": "<a>\n# b </a>", "syntax": ["mdx"] },
+  { "name": "MDX crossing tags name the setextHeading token", "input": "<a>\nb </a>\n===", "syntax": ["mdx"] },
+  { "name": "MDX unclosed tags name the strikethrough token", "input": "~~a <b>~~", "syntax": ["mdx", "gfm"] },
+  { "name": "MDX crossing tags name the strikethrough token", "input": "<b>~~a </b>~~", "syntax": ["mdx", "gfm"] },
+  { "name": "MDX unclosed tags in reference links name the link token", "input": "[a <b>][c]\n\n[c]: d", "syntax": ["mdx"] },
+  { "name": "MDX crossing tags in reference links name the link token", "input": "<b>[a </b>][c]\n\n[c]: d", "syntax": ["mdx"] },
+  { "name": "MDX unclosed tags in reference images name the image token", "input": "![a <b>][c]\n\n[c]: d", "syntax": ["mdx"] },
+  { "name": "MDX unclosed tags name the tableHeader token", "input": "|<b>|\n|-|", "syntax": ["mdx", "gfm"] },
+  { "name": "MDX unclosed tags name the tableData token", "input": "|a|b|\n|-|-|\n|c|<d>|", "syntax": ["mdx", "gfm"] },
+  { "name": "MDX crossing tags name the tableHeader token", "input": "<a>\n|b </a>|\n|-|", "syntax": ["mdx", "gfm"] }
 ]
