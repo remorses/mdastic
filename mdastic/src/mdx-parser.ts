@@ -519,7 +519,12 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
     const line = input[at]
     let begin = line.start
     while (space(source.charCodeAt(begin))) begin++
-    if (esm(line)) return parseEsmFlow(input, at, begin, parent)
+    // ESM cannot interrupt an adjacent definition.
+    const definition =
+      at &&
+      !blank(source, input[at - 1]) &&
+      tree.kind[tree.last[current(parent)]] === Kind.Definition
+    if (esm(line) && !definition) return parseEsmFlow(input, at, begin, parent)
     if (
       source.charCodeAt(begin) !== Char.LessThan &&
       source.charCodeAt(begin) !== Char.LeftBrace
