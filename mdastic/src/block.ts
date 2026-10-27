@@ -890,8 +890,8 @@ function parseFencedCode(
     content.push(stripIndent(source, current, opening.indent))
   }
   const last = closed ? input[j] : input[Math.max(i, j - 1)]
-  const nextContainer =
-    !input[j]?.lazy && boundary && (quote(source, boundary) >= 0 || marker(source, boundary))
+  // micromark closes the flow before a new container (footnotes too, not thematic `- --`).
+  const nextContainer = !input[j]?.lazy && boundary && startsContainer(context, boundary)
   // Unclosed root/EOF fences retain the ending; closed fences end at their marker.
   const keepEnding =
     tree.kind[parent] === Kind.Root ||
@@ -971,7 +971,7 @@ function parseHtmlBlock(
     }
   }
   const last = input[j - 1]
-  const nextContainer = boundary && (quote(source, boundary) >= 0 || marker(source, boundary))
+  const nextContainer = boundary && startsContainer(context, boundary)
   // Unterminated root/container HTML retains its final line ending.
   const unclosed =
     html.until &&
