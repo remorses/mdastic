@@ -965,6 +965,7 @@ function parseFootnoteDefinition(
   parent: number,
   footnote: NonNullable<ReturnType<typeof footnoteLabel>>,
   start: number,
+  residual: InterruptState,
   boundary?: Line,
 ): number {
   const source = context.source
@@ -976,7 +977,7 @@ function parseFootnoteDefinition(
   const content: Line[] = [{ start: first, end: line.end, next: line.next }]
   let j = i + 1
   let last = i
-  let lazy = lazyParagraph(context, content[0])
+  let lazy = lazyParagraph(context, content[0], residual > 0)
   for (; j < input.length; j++) {
     if (blank(source, input[j])) {
       content.push(input[j])
@@ -1007,7 +1008,8 @@ function parseFootnoteDefinition(
   const n = node(Kind.FootnoteDefinition, start, end, parent)
   tree.extra[n] = { identifier, label: decode(raw) }
   context.footnotes.add(identifier)
-  const stop = parseBlocks(context, content, n, false, InterruptState.None, input[j] ?? boundary)
+  // Containers opened on the label line can interrupt only what the label line could.
+  const stop = parseBlocks(context, content, n, false, residual, input[j] ?? boundary)
   if (stop < content.length) {
     j = i + stop
     tree.end[n] = input[j - 1].end
@@ -1197,8 +1199,19 @@ export function parseBlocks(
     // ── Footnotes are containers, so they precede tables and definition continuation ──
     const footnote = context.config.gfm && !spanned && footnoteLabel(source, line)
     if (footnote) {
-      i += parseFootnoteDefinition(context, input, i, parent, footnote, scan.start, boundary)
+      i += parseFootnoteDefinition(
+        context,
+        input,
+        i,
+        parent,
+        footnote,
+        scan.start,
+        residual,
+        boundary,
+      )
       if (input[i]?.lazy) return i
+      // The next line is not continued, so nothing it starts interrupts.
+      residual = InterruptState.None
       continue
     }
     // ── GFM tables precede list and paragraph recognition ──
