@@ -1073,32 +1073,59 @@ function containsLink(view: View, start: number, end: number, context: InlineCon
       if (close >= 0) {
         // A link deactivates earlier link openings even through an image label.
         if (containsLink(view, i + 2, close, context)) return true
-        let stop = close + 1
-        if (source.charCodeAt(stop) === 40) stop = resource(source, stop, end)?.end ?? stop
-        else if (source.charCodeAt(stop) === 91) {
-          const ref = bracketEnd(source, stop + 1, end)
-          if (ref >= 0) stop = ref + 1
-        }
-        i = stop - 1
+        // A failed image reference leaves its trailing brackets to be scanned as labels.
+        const stop = labelTail(source, i + 2, close, end, context)
+        i = (stop < 0 ? close + 1 : stop) - 1
         continue
       }
     }
     if (c !== 91) continue
     const close = bracketEnd(source, i + 1, end, view, context)
     if (close < 0) continue
-    const stop = close + 1
-    if (source.charCodeAt(stop) === 40 && resource(source, stop, end)) return true
-    if (context.definitions.has(normalizeIdentifier(source.slice(i + 1, close)))) return true
-    if (source.charCodeAt(stop) === 91) {
-      const ref = bracketEnd(source, stop + 1, end)
-      if (
-        ref >= 0 &&
-        context.definitions.has(
-          normalizeIdentifier(source.slice(stop + 1, ref) || source.slice(i + 1, close)),
-        )
-      )
-        return true
+    // A defined GFM footnote call takes the whole bracket, never a trailing resource.
+    if (
+      source.charCodeAt(i + 1) === 94 &&
+      close > i + 2 &&
+      context.config.gfm &&
+      context.footnotes.has(normalizeIdentifier(source.slice(i + 2, close))) &&
+      !hasWhitespace(source.slice(i + 2, close))
+    ) {
+      i = close
+      continue
     }
+    if (labelTail(source, i + 1, close, end, context) >= 0) return true
   }
   return false
+}
+
+/**
+ * End of the link or image whose label spans `start..close`, or -1 when it does not form.
+ * Mirrors micromark's label end: a failed resource falls back to a shortcut, but a following
+ * `[` must complete a full or collapsed reference, so `[a][missing]` is no link even with `[a]`.
+ */
+function labelTail(
+  source: string,
+  start: number,
+  close: number,
+  end: number,
+  context: InlineContext,
+): number {
+  const stop = close + 1
+  const c = source.charCodeAt(stop)
+  if (c === 91) {
+    let r = stop + 1
+    while (r < end && source.charCodeAt(r) !== 93 && source.charCodeAt(r) !== 91) {
+      if (source.charCodeAt(r) === 92) r++
+      r++
+    }
+    if (source.charCodeAt(r) !== 93) return -1
+    if (r > stop + 1)
+      return context.definitions.has(normalizeIdentifier(source.slice(stop + 1, r))) ? r + 1 : -1
+    return context.definitions.has(normalizeIdentifier(source.slice(start, close))) ? r + 1 : -1
+  }
+  if (c === 40) {
+    const match = resource(source, stop, end)
+    if (match) return match.end
+  }
+  return context.definitions.has(normalizeIdentifier(source.slice(start, close))) ? stop : -1
 }
