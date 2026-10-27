@@ -696,13 +696,23 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
         [Kind.ListItem]: 'listItem',
         [Kind.Emphasis]: 'emphasis',
         [Kind.Strong]: 'strong',
-        [Kind.Delete]: 'delete',
+        [Kind.Delete]: 'strikethrough',
         [Kind.Link]: 'link',
-        [Kind.LinkReference]: 'linkReference',
+        [Kind.LinkReference]: 'link',
         [Kind.Image]: 'image',
-        [Kind.ImageReference]: 'imageReference',
+        [Kind.ImageReference]: 'image',
+        [Kind.FootnoteDefinition]: 'gfmFootnoteDefinition',
       }
-      function resolveInlineJsx(parent: number, active?: Tag): void {
+      // mdast-util-mdx-jsx names the micromark token, not the mdast node.
+      function tokenType(n: number, header: boolean): string {
+        if (tree.kind[n] === Kind.Heading)
+          return /[\n\r]/.test(source.slice(tree.start[n], tree.end[n]))
+            ? 'setextHeading'
+            : 'atxHeading'
+        if (tree.kind[n] === Kind.TableCell) return header ? 'tableHeader' : 'tableData'
+        return types[tree.kind[n]] ?? 'paragraph'
+      }
+      function resolveInlineJsx(parent: number, active?: Tag, header = false): void {
         const pending: { tag: Tag; node: number }[] = []
         const children: number[] = []
         // Snapshot before destructive sibling rewiring; the old chain cannot be traversed later.
@@ -720,7 +730,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
               if (!open) {
                 if (active) {
                   // Active JSX cannot close across a Markdown container boundary.
-                  const type = types[tree.kind[parent]] ?? 'paragraph'
+                  const type = tokenType(parent, header)
                   mdxError(
                     'Expected the closing tag `' +
                       abbreviated(t) +
@@ -761,7 +771,9 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
                     selfClosing: false,
                   }
                 : undefined
-            if (tree.child[n]) resolveInlineJsx(n, flowTag ?? enclosing)
+            // Cells in a table's first row are header cells.
+            const cells = tree.kind[parent] === Kind.Table ? n === children[0] : header
+            if (tree.child[n]) resolveInlineJsx(n, flowTag ?? enclosing, cells)
             if (tree.kind[n] === Kind.Image || tree.kind[n] === Kind.ImageReference) {
               // Image alt can only be finalized after expressions and JSX have nested.
               tree.value[n] = imageAlt(n)
@@ -779,7 +791,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
               '` (' +
               location(open.tag.start, open.tag.end) +
               ') before the end of `' +
-              (types[tree.kind[parent]] ?? 'paragraph') +
+              tokenType(parent, header) +
               '`',
             tree.start[parent],
             'end-tag-mismatch',
@@ -803,7 +815,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
           mdxError(
             reason +
               ' before the end of `' +
-              (types[tree.kind[parent]] ?? 'footnoteDefinition') +
+              tokenType(parent, header) +
               '`',
             tree.start[parent],
             'end-tag-mismatch',
