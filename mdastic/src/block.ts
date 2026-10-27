@@ -1183,6 +1183,13 @@ export function parseBlocks(
       i = j
       continue
     }
+    // ── Footnotes are containers, so they precede tables and definition continuation ──
+    const footnote = context.config.gfm && !spanned && footnoteLabel(source, line)
+    if (footnote) {
+      i += parseFootnoteDefinition(context, input, i, parent, footnote, scan.start, boundary)
+      if (input[i]?.lazy) return i
+      continue
+    }
     // ── GFM tables precede list and paragraph recognition ──
     const tableCount = parseTable(context, input, i, parent, residual === InterruptState.Paragraph)
     if (tableCount) {
@@ -1451,13 +1458,6 @@ export function parseBlocks(
     if (html) {
       i += parseHtmlBlock(context, input, i, parent, html, boundary)
       residual = InterruptState.None
-      continue
-    }
-    // ── Footnotes collect indented blocks and lazy paragraph continuation ──
-    const footnote = context.config.gfm && !spanned && footnoteLabel(source, line)
-    if (footnote) {
-      i += parseFootnoteDefinition(context, input, i, parent, footnote, scan.start, boundary)
-      if (input[i]?.lazy) return i
       continue
     }
     // ── Ordinary reference definitions precede paragraph fallback ──
