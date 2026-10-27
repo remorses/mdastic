@@ -249,7 +249,7 @@ export function expression(
     }
     lastCrash = result.error
     // Acorn stopped before this brace, so no later brace can close the expression.
-    if (!result.swallow && !(result.error.cause instanceof RangeError)) break
+    if (!result.swallow) break
   }
   // An unclosed expression reads into the first lazy line after it.
   let lazy = -1
