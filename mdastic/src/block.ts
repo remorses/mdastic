@@ -81,6 +81,9 @@ const TASK_CLEANUP_PENDING = 1
 
 let mdxMode = false
 let mathMode = false
+// Quirk: micromark attempts an unclosed frontmatter fence up to EOF, and no line that
+// attempt spans starts a container. Set by frontmatter(), reset per parse.
+let noContainers = false
 // Open blockquotes; nothing inside one keeps the final EOF line ending.
 let quoteDepth = 0
 
@@ -90,6 +93,7 @@ let taskStarts = new Int32Array(INITIAL_TASK_CAPACITY)
 const taskViews: (View | undefined)[] = []
 
 export function resetBlocks(): void {
+  noContainers = false
   quoteDepth = 0
   taskCount = 0
   taskViews.length = 0
@@ -237,7 +241,7 @@ function fence(
 
 function marker(source: string, line: Line, mdx = mdxMode): Marker | undefined {
   const scan = indentation(source, line)
-  if (!mdx && scan.indent > MAX_BLOCK_INDENT) return
+  if (noContainers || (!mdx && scan.indent > MAX_BLOCK_INDENT)) return
   let i = scan.start
   const c = source.charCodeAt(i)
   let number = 0
@@ -280,6 +284,7 @@ function marker(source: string, line: Line, mdx = mdxMode): Marker | undefined {
 export function quote(source: string, line: Line, mdx = mdxMode): number {
   const scan = indentation(source, line)
   if (
+    noContainers ||
     (!mdx && scan.indent > MAX_BLOCK_INDENT) ||
     source.charCodeAt(scan.start) !== Char.GreaterThan
   )
@@ -429,7 +434,12 @@ function lazyFlowSpan(context: BlockContext, line: Line): boolean {
 
 function footnoteLabel(source: string, line: Line): { end: number; raw: string } | undefined {
   const scan = indentation(source, line)
-  if (scan.indent > MAX_BLOCK_INDENT || !source.startsWith('[^', scan.start)) return
+  if (
+    noContainers ||
+    (!mdxMode && scan.indent > MAX_BLOCK_INDENT) ||
+    !source.startsWith('[^', scan.start)
+  )
+    return
   let i = scan.start + 2
   for (; i < line.end; i++) {
     const c = source.charCodeAt(i)
@@ -573,8 +583,9 @@ function parseDefinition(
   const original = context.source
   const line = input[at]
   const scan = indentation(original, line)
+  // MDX has no indented code, so definitions and footnote labels take any indent.
   if (
-    (!continued && scan.indent > MAX_BLOCK_INDENT) ||
+    (!continued && !mdxMode && scan.indent > MAX_BLOCK_INDENT) ||
     original.charCodeAt(scan.start) !== Char.LeftBracket
   )
     return 0
@@ -829,6 +840,7 @@ function frontmatter(context: BlockContext, input: Line[], parent: number): numb
     tree.value[n] = source.slice(line.next, j === 1 ? line.next : input[j - 1].end)
     return j + 1
   }
+  noContainers = true
   return 0
 }
 
@@ -984,7 +996,7 @@ function parseFootnoteDefinition(
     if (blank(source, input[j])) {
       content.push(input[j])
       lazy = false
-    } else if (indentation(source, input[j]).indent >= FOOTNOTE_INDENT) {
+    } else if (!input[j].lazy && indentation(source, input[j]).indent >= FOOTNOTE_INDENT) {
       const stripped = stripIndent(source, input[j], FOOTNOTE_INDENT)
       content.push(stripped)
       last = j
@@ -1295,7 +1307,8 @@ export function parseBlocks(
           }
           const scan = indentation(source, current)
           if (scan.indent < mark.indent && marker(source, current) && !current.lazy) break
-          if (scan.indent >= mark.indent) {
+          // A lazy line skipped this item's continuation, so its indent stays content.
+          if (!current.lazy && scan.indent >= mark.indent) {
             const stripped = stripIndent(source, current, mark.indent)
             if (blank(source, stripped) || interrupts(context, stripped)) table = false
             if (
@@ -1331,6 +1344,8 @@ export function parseBlocks(
           lastContent = j - 1
           tree.end[item] = input[lastContent].end
         }
+        // Only the first item can interrupt a paragraph; later items never inherit it.
+        residual = InterruptState.None
         const nextMark = j < input.length ? marker(source, input[j]) : undefined
         const sibling =
           nextMark &&

@@ -122,8 +122,10 @@ export function acornProgram(
   }
   if (expression && !isEmpty) {
     // parseExpressionAt does not validate any trailing content on its own.
-    if (!empty(source.slice(program.end, source.length - suffix.length)))
-      return { error: { at: mapped(program.end) } }
+    const rest = source.slice(program.end, source.length - suffix.length)
+    // A token after the expression stays in any longer input; only a comment can still close.
+    if (!empty(rest))
+      return { error: { at: mapped(program.end) }, swallow: rest.trimStart()[0] === '/' }
     if (!syntax.estree && !spread) return { program }
     program = {
       type: 'Program',
@@ -246,6 +248,8 @@ export function expression(
       return match
     }
     lastCrash = result.error
+    // Acorn stopped before this brace, so no later brace can close the expression.
+    if (!result.swallow) break
   }
   // An unclosed expression reads into the first lazy line after it.
   let lazy = -1
@@ -295,6 +299,13 @@ export function collect(
     value += view.source[i]
     ending = offset(view, i) + 1
     if (strip && (c === 10 || (c === 13 && view.source.charCodeAt(i + 1) !== 10))) {
+      // Check a lazy line before its indentation is skipped.
+      if (view.lazy?.has(i + 1))
+        mdxError(
+          LAZY_EXPRESSION,
+          offset(view, i + 1),
+          'unexpected-lazy',
+        )
       let size = 0
       while (
         i + 1 < end &&
