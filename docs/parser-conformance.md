@@ -137,7 +137,7 @@ same Acorn error. Upstream tests were read from Eyas/md-heading-id on 2026-10-14
 **Remark transforms:** real remark-squeeze-paragraphs trees match remark's transform output.
 The adapter also checks async/callback completion, file messages and syntax-plugin rejection.
 
-`parseDocument(source, config, hooks?)` supports flow and inline syntax hooks. Flow hooks
+`parseDocument({ source, config, hooks })` supports flow and inline syntax hooks. Flow hooks
 append arena nodes and return consumed line count. Inline hooks return an unattached arena
 node and its ending virtual offset. `offset(view, index)` maps virtual to original offsets.
 

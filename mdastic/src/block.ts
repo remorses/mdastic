@@ -109,9 +109,11 @@ function inlineTask(view: View, parent: number): void {
   taskStarts[taskCount++] = 0
 }
 
-export function lines(source: string): Line[] {
+export function lines(source: string, from = 0): Line[] {
   const result: Line[] = []
-  for (let i = 0; i < lineCount; i++) {
+  let first = 0
+  while (first < lineCount && lineStarts[first] < from) first++
+  for (let i = first; i < lineCount; i++) {
     const start = lineStarts[i]
     const next = i + 1 < lineCount ? lineStarts[i + 1] : source.length
     let end = next

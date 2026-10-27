@@ -33,6 +33,7 @@ const markdown = stringify(tree, { syntax }) // same string as remark-stringify
 - **Fast.** 28x faster than remark on markdown, 17x on MDX, 6x on stringify. Faster than markdown-it, close to native Rust.
 - **One syntax list.** The same `syntax` array drives `parse` and `stringify`. No separate micromark, from-markdown and to-markdown extension arrays.
 - **MDX built in.** JSX, ESM and `{expressions}` with `data.estree`. Only `mdastic/mdx` imports Acorn, so plain markdown bundles stay small.
+- **Streaming parsing.** `createStreamParser()` parses LLM output as it arrives. Closed blocks are not parsed again and keep object identity, and every result still equals `parse(text)`.
 - **Errors as values.** `parse` returns `MdxParseError` instead of throwing. It has the same fields as micromark's `VFileMessage`.
 - **Typed helpers.** `visit` narrows the node type from the filter. `NodeOf<'heading'>` replaces `Extract<RootContent, { type: 'heading' }>`.
 - **Small dependency tree.** Only `acorn` and `acorn-jsx` at runtime, both for MDX. No unified, micromark or vfile.
@@ -110,6 +111,79 @@ if (tree instanceof MdxParseError) {
   tree.ruleId // 'acorn'
 }
 ```
+
+### `createStreamParser(options)`
+
+Parse text that grows at the end, like an LLM response. Pass the **whole text so far** on every chunk:
+
+```ts
+import { createStreamParser } from 'mdastic'
+
+const parser = createStreamParser({ syntax: [mdx(), gfm()] })
+let text = ''
+for await (const chunk of response) {
+  text += chunk
+  const tree = parser.parse(text) // same tree as parse(text)
+  if (tree instanceof Error) continue // incomplete MDX, keep the last good tree
+  render(tree)
+}
+```
+
+A top-level block followed by a blank line and a complete line can no longer change. The parser keeps those blocks and parses only the text after them. They are the **same objects** in every result, so a renderer can skip them:
+
+```tsx
+import { memo, useMemo } from 'react'
+import { createStreamParser, type RootContent } from 'mdastic'
+
+// renderNode is your mdast renderer, for example safe-mdx
+const Block = memo(({ node }: { node: RootContent }) => renderNode(node))
+
+function StreamingAnswer({ text }: { text: string }) {
+  const parser = useMemo(() => createStreamParser({ syntax: [gfm()] }), [])
+  const tree = parser.parse(text)
+  if (tree instanceof Error) return null
+  return tree.children.map((node, index) => <Block key={index} node={node} />)
+}
+```
+
+#### How it works
+
+It is a cache over `parse`, not a different parser. After each call it finds the last **cut**: a line where every block before it is final. The next call parses only from the cut and puts the cached blocks in front.
+
+```
+# Title⏎                     ┐
+⏎                            │ cached blocks: same objects, never parsed again
+Closed paragraph.⏎           ┘
+⏎                       ◄─── cut, the parser starts here on the next call
+| a | b |⏎                   ┐
+| - | - |⏎                   │ tail: parsed on every call
+| 1 | 2                      ┘ still growing
+```
+
+A cut is placed before a block only when appended text can no longer change what came before:
+
+- **A blank line** separates the blocks. Without it, `foo⏎<A⏎/>` is a paragraph and a JSX element until ` x` arrives after `/>`, then it is one paragraph.
+- **The first line of the next block is complete.** `1. a⏎⏎1` is a list and a paragraph until `.` arrives, then it is one list.
+- **Neither block is indented code,** and no frontmatter fence is still open at the start. Both carry parser state across blank lines.
+
+If the text up to the end of that complete line changes, the cache is dropped and the parser starts over. Positions, `data.estree` and errors are computed against the whole text, so they never need shifting.
+
+Tests stream every conformance fixture (character by character up to 400 characters, in 40 chunks above) and compare each result with `parse`. Things to know:
+
+- **Do not mutate** returned trees. Reused blocks are shared between results. Copy before you transform (safe-mdx's `markAndUnravel` mutates).
+- **Link and footnote definitions** and **MDX imports** apply to the whole document. Once a document has one, each call parses all text again.
+- **One big block** is never reused: an answer that is a single list, blockquote or JSX wrapper is parsed in full each time.
+- **Any edit** is detected, for example a regenerated message. The parser starts over.
+
+Streaming each document in 32-character chunks, parsing the text so far after every chunk:
+
+| Corpus | `parse` every chunk | `createStreamParser` |
+| --- | ---: | ---: |
+| READMEs, 2 MB (most have link definitions) | 115 µs per chunk | **35 µs** (3.3x) |
+| Holocron MDX docs, 1 MB | 55 µs per chunk | **20 µs** (2.7x) |
+| Markdown over 16 KB, no definitions | 123 µs per chunk | **12 µs** (10x) |
+
+Run `cd conformance && NODE_ENV=production pnpm exec tsx ../scripts/bench-stream.ts`. A runnable example is in [`mdastic/examples/streaming.ts`](mdastic/examples/streaming.ts).
 
 ### `stringify(tree, options)`
 

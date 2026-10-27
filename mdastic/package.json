@@ -18,7 +18,8 @@
     "parser",
     "commonmark",
     "gfm",
-    "fast"
+    "fast",
+    "streaming"
   ],
   "license": "MIT",
   "main": "./dist/index.js",

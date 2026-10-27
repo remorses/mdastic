@@ -633,6 +633,8 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
     flow,
     flowParent: current,
     esm,
+    // Imports are document scoped: later ESM blocks are validated against them.
+    hasImports: () => imports.length > 0,
     interrupt(line: Line) {
       let i = line.start
       while (space(source.charCodeAt(i))) i++
