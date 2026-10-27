@@ -472,6 +472,18 @@ export function startsContainer(context: BlockContext, line: Line): boolean {
   )
 }
 
+const enum LazyLine {
+  Stop,
+  Take,
+  TakeLast,
+}
+
+// Quirk: lazy HTML ends the container as its last line, but stays outside when it ends the file.
+function lazyLine(context: BlockContext, line: Line): LazyLine {
+  if (context.config.mdx || !htmlBlock(context.source, line, false)) return LazyLine.Take
+  return line.next === line.end ? LazyLine.Stop : LazyLine.TakeLast
+}
+
 function lazyParagraph(context: BlockContext, line: Line, interrupted = false): boolean {
   const source = context.source
   let current = line
@@ -614,7 +626,8 @@ function parseDefinition(
   }
   const view = viewFor(original, input.slice(at, limit), false)
   const source = view.source
-  let i = scan.start - line.start + 1
+  // The view starts with the line's virtual tab columns.
+  let i = scan.start - line.start + (line.padding ?? 0) + 1
   // ── Read and normalize the reference label ──
   const labelStart = i
   while (
@@ -977,6 +990,7 @@ function parseFootnoteDefinition(
   parent: number,
   footnote: NonNullable<ReturnType<typeof footnoteLabel>>,
   start: number,
+  residual: InterruptState,
   boundary?: Line,
 ): number {
   const source = context.source
@@ -988,7 +1002,8 @@ function parseFootnoteDefinition(
   const content: Line[] = [{ start: first, end: line.end, next: line.next }]
   let j = i + 1
   let last = i
-  let lazy = lazyParagraph(context, content[0])
+  let lazy = lazyParagraph(context, content[0], residual > 0)
+  const nested = tree.kind[parent] === Kind.FootnoteDefinition
   for (; j < input.length; j++) {
     if (blank(source, input[j])) {
       content.push(input[j])
@@ -998,9 +1013,26 @@ function parseFootnoteDefinition(
       content.push(stripped)
       last = j
       lazy = lazyParagraph(context, stripped)
-    } else if (lazy && !interrupts(context, input[j])) {
+    } else if (nested && !input[j].lazy && indentation(source, input[j]).indent === 0) {
+      // Quirk: micromark checks the indent token before the line, so a footnote directly
+      // in a footnote takes the outer indent as its own when it has none left.
+      content.push(input[j])
+      last = j
+      lazy = lazyParagraph(context, input[j])
+    } else if (
+      lazy &&
+      ((!interrupts(context, input[j]) && !marker(source, input[j])) ||
+        lazyFlowSpan(context, input[j]))
+    ) {
+      // A lazy line is not continued, so any list marker may open a list there.
+      const take = lazyLine(context, input[j])
+      if (take === LazyLine.Stop) break
       content.push({ ...input[j], lazy: true })
       last = j
+      if (take === LazyLine.TakeLast) {
+        j++
+        break
+      }
     } else break
   }
   let end = input[last].end
@@ -1008,7 +1040,8 @@ function parseFootnoteDefinition(
   const n = node(Kind.FootnoteDefinition, start, end, parent)
   tree.extra[n] = { identifier, label: decode(raw) }
   context.footnotes.add(identifier)
-  const stop = parseBlocks(context, content, n, false, InterruptState.None, input[j] ?? boundary)
+  // Containers opened on the label line can interrupt only what the label line could.
+  const stop = parseBlocks(context, content, n, false, residual, input[j] ?? boundary)
   if (stop < content.length) {
     j = i + stop
     tree.end[n] = input[j - 1].end
@@ -1049,7 +1082,9 @@ export function parseBlocks(
   let i = document ? frontmatter(context, input, parent) : 0
   // Residual state controls list interruption and indented-code eligibility.
   // Definitions survive adjacent lines; only indented code retains its state across blanks.
-  let residual = inheritedInterrupt
+  // A new container's first line may be interrupted, but no definition precedes it there.
+  let residual: InterruptState =
+    inheritedInterrupt === InterruptState.Definition ? InterruptState.Paragraph : inheritedInterrupt
   let pendingLazy = false
   // Lines an MDX flow tag or expression attempt still spans cannot start containers.
   let spanEnd = 0
@@ -1168,10 +1203,10 @@ export function parseBlocks(
           ((!interrupts(context, current) && !marker(source, current)) ||
             lazyFlowSpan(context, current))
         ) {
-          const html = !context.config.mdx && htmlBlock(source, current, false)
-          if (html && current.next === current.end) break
+          const take = lazyLine(context, current)
+          if (take === LazyLine.Stop) break
           content.push({ ...current, lazy: true })
-          if (html) {
+          if (take === LazyLine.TakeLast) {
             j++
             break
           }
@@ -1193,6 +1228,24 @@ export function parseBlocks(
       pendingLazy = j < input.length && !blank(source, input[j])
       residual = InterruptState.None
       i = j
+      continue
+    }
+    // ── Footnotes are containers, so they precede tables and definition continuation ──
+    const footnote = context.config.gfm && !spanned && footnoteLabel(source, line)
+    if (footnote) {
+      i += parseFootnoteDefinition(
+        context,
+        input,
+        i,
+        parent,
+        footnote,
+        scan.start,
+        residual,
+        boundary,
+      )
+      if (input[i]?.lazy) return i
+      // The next line is not continued, so nothing it starts interrupts.
+      residual = InterruptState.None
       continue
     }
     // ── GFM tables precede list and paragraph recognition ──
@@ -1284,11 +1337,11 @@ export function parseBlocks(
             lazy &&
             (current.lazy || !interrupts(context, current) || lazyFlowSpan(context, current))
           ) {
-            const html = !context.config.mdx && htmlBlock(source, current, false)
-            if (html && current.next === current.end) break
+            const take = lazyLine(context, current)
+            if (take === LazyLine.Stop) break
             content.push({ ...current, lazy: true })
             lastContent = j
-            if (html) {
+            if (take === LazyLine.TakeLast) {
               j++
               break
             }
@@ -1462,17 +1515,14 @@ export function parseBlocks(
       continue
     }
     // ── HTML blocks end at their terminator, blank line or lazy boundary ──
-    const html = !context.config.mdx && htmlBlock(source, line, false)
+    // Definitions are paragraph content, so HTML that cannot interrupt one stays text,
+    // except on a lazy line, which ends the definitions' container.
+    const html =
+      !context.config.mdx &&
+      htmlBlock(source, line, residual === InterruptState.Definition && !line.lazy)
     if (html) {
       i += parseHtmlBlock(context, input, i, parent, html, boundary)
       residual = InterruptState.None
-      continue
-    }
-    // ── Footnotes collect indented blocks and lazy paragraph continuation ──
-    const footnote = context.config.gfm && !spanned && footnoteLabel(source, line)
-    if (footnote) {
-      i += parseFootnoteDefinition(context, input, i, parent, footnote, scan.start, boundary)
-      if (input[i]?.lazy) return i
       continue
     }
     // ── Ordinary reference definitions precede paragraph fallback ──
