@@ -103,5 +103,18 @@
   { "name": "MDX unclosed tags in reference images name the image token", "input": "![a <b>][c]\n\n[c]: d", "syntax": ["mdx"] },
   { "name": "MDX unclosed tags name the tableHeader token", "input": "|<b>|\n|-|", "syntax": ["mdx", "gfm"] },
   { "name": "MDX unclosed tags name the tableData token", "input": "|a|b|\n|-|-|\n|c|<d>|", "syntax": ["mdx", "gfm"] },
-  { "name": "MDX crossing tags name the tableHeader token", "input": "<a>\n|b </a>|\n|-|", "syntax": ["mdx", "gfm"] }
+  { "name": "MDX crossing tags name the tableHeader token", "input": "<a>\n|b </a>|\n|-|", "syntax": ["mdx", "gfm"] },
+  { "name": "MDX expressions in containers stop retrying closing braces after an acorn error", "input": "> ```\n> {\n> }\n> ```\n\n> {\n> }\n\n> a {\n> b\n> }\n\n> a\n> {\n> b}\n\n> <A b={\n> 1} {...\n> c} />\n\n- ```\n  {a b\n  }\n  ```\n\n- > {(\n  > 1)}\n\n> > ```\n> > {`\n> > }\n> > ```\n\n> ```\n> {a //b\n> }\n> ```\n\n> ```js\n> {\n>   \"a\": { \"b\": 1 }\n> }\n> ```\n\n> ```\n> <A {...\n> } b={\n> } />\n> ```\n\n> ```\n> {\n> ```\n\n> {1} {2}\n> {3} x\n", "syntax": ["mdx"] },
+  { "name": "MDX, frontmatter and GFM expressions in containers stop retrying closing braces after an acorn error", "input": "> ```\n> {\n> }\n> ```\n\n> {\n> }\n\n> a {\n> b\n> }\n\n> a\n> {\n> b}\n\n> <A b={\n> 1} {...\n> c} />\n\n- ```\n  {a b\n  }\n  ```\n\n- > {(\n  > 1)}\n\n> > ```\n> > {`\n> > }\n> > ```\n\n> ```\n> {a //b\n> }\n> ```\n\n> ```js\n> {\n>   \"a\": { \"b\": 1 }\n> }\n> ```\n\n> ```\n> <A {...\n> } b={\n> } />\n> ```\n\n> ```\n> {\n> ```\n\n> {1} {2}\n> {3} x\n", "syntax": ["mdx", "frontmatter", "gfm"] },
+  { "name": "MDX flow expression acorn error keeps its place before later closing braces", "input": "{a b\n}\n\n}\n\n> }\n", "syntax": ["mdx"] },
+  { "name": "MDX attribute expression acorn error keeps its place before later closing braces", "input": "<A b={a b\n} />\n\n}\n", "syntax": ["mdx"] },
+  { "name": "MDX spread attribute acorn error keeps its place before later closing braces", "input": "<A {...a b\n} />\n\n}\n", "syntax": ["mdx"] },
+  { "name": "MDX incomplete expression fails at the first closing brace acorn rejects", "input": "{a +\n}\n\n1}\n", "syntax": ["mdx"] },
+  { "name": "MDX expression ending in a line comment still closes at a later brace", "input": "{a //b\n}\n", "syntax": ["mdx"] },
+  { "name": "MDX unterminated template literal still closes at a later brace", "input": "> {`\n> }\n> `}\n", "syntax": ["mdx"] },
+  { "name": "MDX unclosed flow expression ends with its block quote, not at a later fenced brace", "input": "> {\n> a\n\n> ```\n> }\n> ```\n", "syntax": ["mdx"] },
+  { "name": "MDX unclosed text expression ends with its block quote, not at a later list brace", "input": "> a {\n> b\n\n- ```\n  }\n  ```\n", "syntax": ["mdx"] },
+  { "name": "MDX text expression reports a lazy line even when its indentation is stripped", "input": ">a\n{\n }\n", "syntax": ["mdx"] },
+  { "name": "MDX attribute expression reports a lazy line even when its indentation is stripped", "input": ">a\n<A b={\n 1} />\n", "syntax": ["mdx"] },
+  { "name": "MDX lazy indented line is reported before later closing braces", "input": ">}\n{-\n }{}\n}", "syntax": ["mdx"] }
 ]

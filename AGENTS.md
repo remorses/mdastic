@@ -136,7 +136,9 @@ Do not recursively call `parseDocument` from a hook: the arena is reused. Use th
 - `mdx-parser.ts` owns JSX tags/attributes, ESM, cached container views and deferred JSX nesting.
   `parseEsmFlow` handles ESM continuation separately; image alt flattens after JSX resolution.
 - `mdx-scan.ts` uses the injected Acorn tokenizer to find expression boundaries, then validates
-  once and remaps ESTree positions. Failed predictions retain micromark's brace-by-brace fallback.
+  once and remaps ESTree positions. Failed predictions retain micromark's brace-by-brace fallback,
+  which stops once acorn fails before the end of the input: no later brace can close it then.
+  Paragraph probes read raw source across `> ` prefixes, so retrying every brace was cubic.
 - Inline JSX tags nest after markdown attention/link resolution, so crossing tags produce the
   same errors as remark. Flow JSX parents redirect block nodes through `flowParent`.
 - `positions: false` only removes mdast positions. MDX still indexes lines for ESTree and errors.
