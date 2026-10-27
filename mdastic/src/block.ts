@@ -1488,7 +1488,11 @@ export function parseBlocks(
       continue
     }
     // ── HTML blocks end at their terminator, blank line or lazy boundary ──
-    const html = !context.config.mdx && htmlBlock(source, line, false)
+    // Definitions are paragraph content, so HTML that cannot interrupt one stays text,
+    // except on a lazy line, which ends the definitions' container.
+    const html =
+      !context.config.mdx &&
+      htmlBlock(source, line, residual === InterruptState.Definition && !line.lazy)
     if (html) {
       i += parseHtmlBlock(context, input, i, parent, html, boundary)
       residual = InterruptState.None
