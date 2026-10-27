@@ -472,6 +472,18 @@ export function startsContainer(context: BlockContext, line: Line): boolean {
   )
 }
 
+const enum LazyLine {
+  Stop,
+  Take,
+  TakeLast,
+}
+
+// Quirk: lazy HTML ends the container as its last line, but stays outside when it ends the file.
+function lazyLine(context: BlockContext, line: Line): LazyLine {
+  if (context.config.mdx || !htmlBlock(context.source, line, false)) return LazyLine.Take
+  return line.next === line.end ? LazyLine.Stop : LazyLine.TakeLast
+}
+
 function lazyParagraph(context: BlockContext, line: Line, interrupted = false): boolean {
   const source = context.source
   let current = line
@@ -1013,11 +1025,11 @@ function parseFootnoteDefinition(
         lazyFlowSpan(context, input[j]))
     ) {
       // A lazy line is not continued, so any list marker may open a list there.
-      const html = !context.config.mdx && htmlBlock(source, input[j], false)
-      if (html && input[j].next === input[j].end) break
+      const take = lazyLine(context, input[j])
+      if (take === LazyLine.Stop) break
       content.push({ ...input[j], lazy: true })
       last = j
-      if (html) {
+      if (take === LazyLine.TakeLast) {
         j++
         break
       }
@@ -1191,10 +1203,10 @@ export function parseBlocks(
           ((!interrupts(context, current) && !marker(source, current)) ||
             lazyFlowSpan(context, current))
         ) {
-          const html = !context.config.mdx && htmlBlock(source, current, false)
-          if (html && current.next === current.end) break
+          const take = lazyLine(context, current)
+          if (take === LazyLine.Stop) break
           content.push({ ...current, lazy: true })
-          if (html) {
+          if (take === LazyLine.TakeLast) {
             j++
             break
           }
@@ -1325,11 +1337,11 @@ export function parseBlocks(
             lazy &&
             (current.lazy || !interrupts(context, current) || lazyFlowSpan(context, current))
           ) {
-            const html = !context.config.mdx && htmlBlock(source, current, false)
-            if (html && current.next === current.end) break
+            const take = lazyLine(context, current)
+            if (take === LazyLine.Stop) break
             content.push({ ...current, lazy: true })
             lastContent = j
-            if (html) {
+            if (take === LazyLine.TakeLast) {
               j++
               break
             }
