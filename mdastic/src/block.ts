@@ -981,7 +981,7 @@ function parseFootnoteDefinition(
     if (blank(source, input[j])) {
       content.push(input[j])
       lazy = false
-    } else if (indentation(source, input[j]).indent >= FOOTNOTE_INDENT) {
+    } else if (!input[j].lazy && indentation(source, input[j]).indent >= FOOTNOTE_INDENT) {
       const stripped = stripIndent(source, input[j], FOOTNOTE_INDENT)
       content.push(stripped)
       last = j
@@ -1254,7 +1254,8 @@ export function parseBlocks(
           }
           const scan = indentation(source, current)
           if (scan.indent < mark.indent && marker(source, current) && !current.lazy) break
-          if (scan.indent >= mark.indent) {
+          // A lazy line skipped this item's continuation, so its indent stays content.
+          if (!current.lazy && scan.indent >= mark.indent) {
             const stripped = stripIndent(source, current, mark.indent)
             if (blank(source, stripped) || interrupts(context, stripped)) table = false
             if (
