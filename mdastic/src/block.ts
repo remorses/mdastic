@@ -986,9 +986,20 @@ function parseFootnoteDefinition(
       content.push(stripped)
       last = j
       lazy = lazyParagraph(context, stripped)
-    } else if (lazy && !interrupts(context, input[j])) {
+    } else if (
+      lazy &&
+      ((!interrupts(context, input[j]) && !marker(source, input[j])) ||
+        lazyFlowSpan(context, input[j]))
+    ) {
+      // A lazy line is not continued, so any list marker may open a list there.
+      const html = !context.config.mdx && htmlBlock(source, input[j], false)
+      if (html && input[j].next === input[j].end) break
       content.push({ ...input[j], lazy: true })
       last = j
+      if (html) {
+        j++
+        break
+      }
     } else break
   }
   let end = input[last].end
