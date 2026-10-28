@@ -931,6 +931,9 @@ function row(context: BlockContext, line: Line, parent: number): void {
   }
 }
 
+// HTML flow is tried before tables at `<`, so a table cannot start on an HTML block start.
+// Interrupting paragraph content, the head row attempt still succeeds: it ends the paragraph,
+// and then an HTML block of any kind, even one that cannot interrupt, starts there.
 function tableStart(
   context: BlockContext,
   input: Line[],
@@ -944,7 +947,8 @@ function tableStart(
     (!mdxMode && indentation(source, headerLine).indent >= CODE_INDENT) ||
     (marker(source, headerLine) && (!paragraph || interrupts(context, headerLine))) ||
     quote(source, headerLine) >= 0 ||
-    footnoteLabel(source, headerLine)
+    footnoteLabel(source, headerLine) ||
+    (!paragraph && !mdxMode && htmlBlock(source, headerLine, false))
   )
     return
   const align = tableAlign(context.source, input[i + 1])
@@ -980,6 +984,8 @@ function parseTable(
   paragraph: boolean,
 ): number {
   if (input[i] === afterTable) return 0
+  // The paragraph this line may interrupt has ended, so HTML blocks win here.
+  if (!mdxMode && htmlBlock(context.source, input[i], false)) return 0
   const align = tableStart(context, input, i, paragraph)
   if (!align) return 0
   const source = context.source
@@ -1791,10 +1797,14 @@ export function parseBlocks(
     }
     // ── HTML blocks end at their terminator, blank line or lazy boundary ──
     // Definitions are paragraph content, so HTML that cannot interrupt one stays text,
-    // except on a lazy line, which ends the definitions' container.
+    // except on a lazy line, which ends the definitions' container, or a table head row.
     const html =
       !context.config.mdx &&
-      htmlBlock(source, line, residual === InterruptState.Definition && !line.lazy)
+      htmlBlock(
+        source,
+        line,
+        residual === InterruptState.Definition && !line.lazy && !tableStart(context, input, i, true),
+      )
     if (html) {
       i += parseHtmlBlock(context, input, i, parent, html, boundary)
       residual = InterruptState.None
