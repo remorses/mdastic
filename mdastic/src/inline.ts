@@ -90,6 +90,11 @@ const enum DelimiterFlag {
   CanOpen = 1,
   CanClose = 2,
 }
+const enum Family {
+  Attention = 1,
+  Tilde = 2,
+  Both = 3,
+}
 const INITIAL_DELIMITER_CAPACITY = 1024
 const MAX_DESTINATION_PAREN_DEPTH = 32
 const MIN_AUTOLINK_SCHEME_LENGTH = 2
@@ -106,6 +111,8 @@ let delimiterStart = new Int32Array(delimiterCapacity)
 let delimiterLength = new Int32Array(delimiterCapacity)
 let delimiterChar = new Uint8Array(delimiterCapacity)
 let delimiterFlags = new Uint8Array(delimiterCapacity)
+// First attention or tilde run of the current top-level content, labels included.
+let firstRun = 0
 // Shortest `$` run that opens inline math; 0 when math is off.
 let mathRun = 0
 const mathClosers = new Map<string, Map<number, number[]>>()
@@ -175,10 +182,14 @@ function resolveDelimiters(
   begin: number,
   end: number,
   strikeFirst: boolean,
+  live: number = Family.Both,
 ): void {
-  // Micromark uses tokenization order at the top level, tilde-first inside spans.
-  resolveFamily(view, parent, begin, end, strikeFirst)
-  resolveFamily(view, parent, begin, end, !strikeFirst)
+  // Micromark uses tokenization order at the top level, tilde-first inside spans. Each
+  // resolver turns its leftover runs into text, so spans the second family wraps only
+  // resolve that family inside.
+  const first = strikeFirst ? Family.Tilde : Family.Attention
+  if (live & first) resolveFamily(view, parent, begin, end, strikeFirst, live)
+  if (live & ~first) resolveFamily(view, parent, begin, end, !strikeFirst, live & ~first)
 }
 
 function resolveFamily(
@@ -187,6 +198,7 @@ function resolveFamily(
   begin: number,
   end: number,
   tilde: boolean,
+  live: number,
 ): void {
   for (let close = begin; close < end; close++) {
     if (
@@ -260,7 +272,7 @@ function resolveFamily(
       )
       for (let d = open + 1; d < close; d++)
         if (delimiterParent[d] === parent) delimiterParent[d] = wrapper
-      resolveDelimiters(view, wrapper, open + 1, close, true)
+      resolveDelimiters(view, wrapper, open + 1, close, true, live)
       if (!delimiterLength[open]) unlink(parent, left)
       if (!delimiterLength[close]) unlink(parent, right)
     }
@@ -705,6 +717,7 @@ export function parseInline(
   // ── Reserve this inline scope and select its candidate scanner ──
   const source = view.source
   const delimiterBegin = delimiterCount
+  if (trim) firstRun = 0
   let textStart = start
   const emailAt = context.config.gfm && literals ? source.indexOf('@', start) : -1
   const email = emailAt >= 0 && emailAt < end
@@ -867,9 +880,10 @@ export function parseInline(
       }
       if (textStart < i) plainText(view, textStart, i, parent)
       const n = plainText(view, i, stop, parent)
-      // Micromark classifies UTF-16 units, not decoded surrogate pairs.
-      const before = i > start ? source.charCodeAt(i - 1) : Char.Space
-      const after = stop < end ? source.charCodeAt(stop) : Char.Space
+      // Micromark classifies UTF-16 units, not decoded surrogate pairs. Label edges see
+      // their own brackets, not whitespace.
+      const before = i > start || !trim ? source.charCodeAt(i - 1) : Char.Space
+      const after = stop < end || !trim ? source.charCodeAt(stop) : Char.Space
       const beforeSpace = isWhitespace(before)
       const afterSpace = isWhitespace(after)
       const beforePunct = isPunctuation(before)
@@ -882,6 +896,7 @@ export function parseInline(
         (c !== Char.Tilde && context.config.gfm !== undefined && before === Char.Tilde)
       const canOpen = c === Char.Underscore ? left && (!right || beforePunct) : left
       const canClose = c === Char.Underscore ? right && (!left || afterPunct) : right
+      if (!firstRun) firstRun = c
       delimiter(
         n,
         parent,
@@ -1009,7 +1024,7 @@ export function parseInline(
     parent,
     delimiterBegin,
     delimiterCount,
-    !trim || delimiterChar[delimiterBegin] === Char.Tilde,
+    !trim || firstRun === Char.Tilde,
   )
   delimiterCount = delimiterBegin
   mergeText(parent)
