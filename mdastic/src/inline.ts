@@ -131,7 +131,11 @@ let labelView: View | undefined
 let labelContext: InlineContext | undefined
 let labelEnd = -1
 
-export function resetInline(config: Config): void {
+// Container views write a tab's unconsumed columns as spaces mapped to the tab.
+let documentSource = ''
+
+export function resetInline(config: Config, source: string): void {
+  documentSource = source
   delimiterCount = 0
   labelView = labelContext = undefined
   mathClosers.clear()
@@ -541,24 +545,35 @@ function spanEnd(source: string, start: number, end: number, length: number, cha
   return close < end ? close : -1
 }
 
-function codeValue(source: string, start: number, end: number): string {
+function codeValue(view: View, start: number, end: number): string {
+  const source = view.source
   // CommonMark trims one edge space only when the code span is not entirely spaces.
+  // micromark reads the virtual spaces of a split tab as data, never as padding.
   let allSpaces = true
   for (let i = start; i < end; i++) {
     const c = source.charCodeAt(i)
-    if (c !== 32 && c !== 10 && c !== 13) allSpaces = false
+    if ((c !== 32 && c !== 10 && c !== 13) || virtualSpace(view, i)) allSpaces = false
   }
   const first = source.charCodeAt(start)
   const last = source.charCodeAt(end - 1)
   if (
     !allSpaces &&
     (first === 32 || first === 10 || first === 13) &&
-    (last === 32 || last === 10 || last === 13)
+    (last === 32 || last === 10 || last === 13) &&
+    !virtualSpace(view, end - 1)
   ) {
     start += first === 13 && source.charCodeAt(start + 1) === 10 ? 2 : 1
     end -= last === 10 && source.charCodeAt(end - 2) === 13 ? 2 : 1
   }
   return source.slice(start, end)
+}
+
+function virtualSpace(view: View, i: number): boolean {
+  return (
+    !!view.map &&
+    view.source.charCodeAt(i) === Char.Space &&
+    documentSource.charCodeAt(view.map[i]) === Char.Tab
+  )
 }
 
 function attributeValueEnd(source: string, at: number, end: number, loose: boolean): number {
@@ -888,7 +903,7 @@ export function parseInline(
         if (textStart < i) plainText(view, textStart, i, parent)
         const stop = close + run - i
         const n = node(Kind.InlineCode, offset(view, i), offset(view, stop), parent)
-        tree.value[n] = codeValue(source, run, close)
+        tree.value[n] = codeValue(view, run, close)
         if (view.table) tree.value[n] = unescapePipes(tree.value[n]!)
         i = textStart = stop
         continue
@@ -905,7 +920,7 @@ export function parseInline(
         if (textStart < i) plainText(view, textStart, i, parent)
         const stop = close + run - i
         const n = node(Kind.InlineMath, offset(view, i), offset(view, stop), parent)
-        tree.value[n] = codeValue(source, run, close)
+        tree.value[n] = codeValue(view, run, close)
         i = textStart = stop
         continue
       }

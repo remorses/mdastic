@@ -2028,5 +2028,53 @@
       "frontmatter",
       "gfm"
     ]
+  },
+  {
+    "name": "code span keeps a split tab's columns as data, not edge padding",
+    "input": "- ` a\n\t`\n- `\nb\n\t`\n\n> ` c\n>\t`\n\n1. *````` d\n\t````` e\n\t=\n\n> - ` f\n>\t`\n\n- ` \n\t  `\n\n1. x `\n\t  `\n",
+    "syntax": []
+  },
+  {
+    "name": "GFM code span keeps a split tab's columns as data, not edge padding",
+    "input": "- ` a\n\t`\n- `\nb\n\t`\n\n> ` c\n>\t`\n\n1. *````` d\n\t````` e\n\t=\n\n> - ` f\n>\t`\n\n- ` \n\t  `\n\n1. x `\n\t  `\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX code span keeps a split tab's columns as data, not edge padding",
+    "input": "- ` a\n\t`\n- `\nb\n\t`\n\n> ` c\n>\t`\n\n1. *````` d\n\t````` e\n\t=\n\n> - ` f\n>\t`\n\n- ` \n\t  `\n\n1. x `\n\t  `\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "math span keeps a split tab's columns as data, not edge padding",
+    "input": "- $ a\n\t$\n\n> $$b$ c\n>\t$\n\n1. $$ d\n\t$$ e\n\n- $ \n\t  $\n",
+    "syntax": [
+      "math"
+    ]
+  },
+  {
+    "name": "MDX math span keeps a split tab's columns as data, not edge padding",
+    "input": "- $ a\n\t$\n\n> $$b$ c\n>\t$\n\n1. $$ d\n\t$$ e\n\n- <A>$ f\n\t$</A>\n\n- $ \n\t  $\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm",
+      "math"
+    ]
+  },
+  {
+    "name": "control: code and math spans in containers still trim real edge spaces",
+    "input": "- ` a\n\t `\n- ` b\n  `\n- `\t\n\t`\n\n> ` c\n> `\n\n- $ d\n  $ e\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm",
+      "math"
+    ]
   }
 ]
