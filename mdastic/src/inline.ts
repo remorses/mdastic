@@ -389,8 +389,8 @@ function bracketEnd(
   let depth = 0
   for (let i = start; i < end; i++) {
     const c = source.charCodeAt(i)
-    // JavaScript brackets inside expressions do not participate in Markdown labels.
-    if (c === Char.LeftBrace && view && context?.inline) {
+    // Brackets inside expressions and JSX tags do not participate in Markdown labels.
+    if ((c === Char.LeftBrace || c === Char.LessThan) && view && context?.inline) {
       const match = context.inline(view, i, end, context)
       if (match) {
         i = match.end - 1
@@ -1039,8 +1039,8 @@ function containsLink(view: View, start: number, end: number, context: InlineCon
   const source = view.source
   for (let i = start; i < end; i++) {
     const c = source.charCodeAt(i)
-    // Like bracketEnd, ignore reference-looking brackets inside embedded expressions.
-    if (c === Char.LeftBrace && context.inline) {
+    // Like bracketEnd, ignore reference-looking brackets inside expressions and JSX tags.
+    if ((c === Char.LeftBrace || c === Char.LessThan) && context.inline) {
       const match = context.inline(view, i, end, context)
       if (match) {
         i = match.end - 1
