@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.3.1
+
+1. **Fixed link and image label parsing** to match remark:
+   - JSX tags with spread attributes inside a label no longer fail with an acorn error (`![<a {...b}/>](x)`)
+   - references inside a label resolve before the outer label is rejected, and each inner label takes its own resource or reference (`![[a][]([)](/z)` with `[a]` defined)
+   - defined footnote calls inside a label take no resource (`[x [^a](])](/z)`)
+   - emphasis and strikethrough inside labels resolve in micromark's order
+2. **Fixed tables and lazy lines in containers** (block quotes, list items, footnote definitions):
+   - tables are tracked through nested containers, so a lazy line after a table never joins it or opens a new table
+   - a lazy line declined by a nested quote closes all containers
+   - blank lines and footnote labels are never table head rows
+   - a table head row ends the link definitions before it (`[a]: u\nb|c\n-|-`), so references to them resolve
+   - HTML block starts win over GFM table head rows (`<!-- c -->\n:-`)
+3. **Fixed paragraph interruption in containers**: after a paragraph or indented code in a quote, list item or footnote, a marker that cannot interrupt (`*` alone, `2.`) stays paragraph text and keeps taking lazy lines. HTML blocks in containers no longer take lazy lines.
+4. **Fixed list and task list details**:
+   - list `spread` when quoted lists close and around footnote definitions, and quoted list item positions
+   - `[x]` is a task checkbox only in an item's first content, not after `* \n  [x] a` or a blank line after definitions
+   - unclosed fenced code or HTML in a list item keeps remark's trailing blank lines when a footnote definition or `- --` follows
+5. **Fixed split tabs** in containers: leftover tab columns stay data in code spans, inline math and MDX expression continuation lines, like remark.
+6. **Fixed MDX differences from remark**:
+   - quoted JSX attribute values decode character references like `parse-entities` (`&#128;` is `€`, `&copye;` is `©e;`)
+   - flow tags or expressions on a container's paragraph continuation line that reach a lazy line now return remark's `unexpected-lazy` error (`> a\n{\n}b`)
+   - JSX errors are reported in micromark's token exit order, and an unclosed expression at the end of a block quote reports the same place as remark
+   - footnotes inside footnotes inside JSX flow tags take the outer indent
+7. **Fixed quadratic parse time** for unclosed `{` lines in block quotes, long runs of link definitions, and `[` / `![[]()` bracket floods. These inputs now parse in linear time.
+
+Thanks @rgodha24 for #19 to #40 and #43!
+
 ## 0.3.0
 
 1. **New `createStreamParser()` for streaming markdown and MDX**, like an LLM response. Pass the whole text so far on every chunk; each result equals `parse(text)`:
