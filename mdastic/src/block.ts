@@ -615,17 +615,18 @@ function parseDefinition(
       break
     }
   }
+  if (tableStart(context, input, at)) return 0
   // ── Collect continuation lines without crossing another block construct ──
+  // A table head row interrupts paragraph content, so the definition ends before it.
   let limit = at + 1
   while (
     limit < input.length &&
     !blank(original, input[limit]) &&
     !interrupts(context, input[limit]) &&
-    !setext(original, input[limit])
-  ) {
-    if (tableStart(context, input, limit - 1)) return 0
+    !setext(original, input[limit]) &&
+    !tableStart(context, input, limit, true)
+  )
     limit++
-  }
   const view = viewFor(original, input.slice(at, limit), false)
   const source = view.source
   // The view starts with the line's virtual tab columns.
@@ -1251,7 +1252,14 @@ export function parseBlocks(
       continue
     }
     // ── GFM tables precede list and paragraph recognition ──
-    const tableCount = parseTable(context, input, i, parent, residual === InterruptState.Paragraph)
+    // Definitions are paragraph content, so a head row after one interrupts it the same way.
+    const tableCount = parseTable(
+      context,
+      input,
+      i,
+      parent,
+      residual === InterruptState.Paragraph || residual === InterruptState.Definition,
+    )
     if (tableCount) {
       i += tableCount
       residual = InterruptState.None
