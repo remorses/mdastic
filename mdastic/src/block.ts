@@ -464,6 +464,11 @@ function footnoteLabel(source: string, line: Line): { end: number; raw: string }
   return { end: i + 2, raw: source.slice(scan.start + 2, i) }
 }
 
+// micromark's block quote continuation fails at EOF, so a final empty line is lazy in one.
+export function inQuote(): boolean {
+  return quoteDepth > 0
+}
+
 // The line opens a block quote, list item or footnote definition.
 export function startsContainer(context: BlockContext, line: Line): boolean {
   const source = context.source
