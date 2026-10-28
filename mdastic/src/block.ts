@@ -1076,19 +1076,38 @@ function parseFootnoteDefinition(
   return j - i
 }
 
-function hasBlankLineInFlowJsx(source: string, content: Line[], parent: number): boolean {
+// prepareList only skips blank line endings inside nested lists and quotes, so blank lines
+// inside flow JSX or footnote definitions also make the enclosing item spread.
+function hasNestedBlankLine(source: string, content: Line[], parent: number): boolean {
   for (let n = tree.child[parent]; n; n = tree.next[n]) {
-    if (tree.kind[n] !== Kind.Mdx || tree.extra[n]?.type !== 'mdxJsxFlowElement') continue
-    let previousEnd = tree.a[n]
+    let previousEnd: number
+    let end: number
+    if (tree.kind[n] === Kind.Mdx && tree.extra[n]?.type === 'mdxJsxFlowElement') {
+      previousEnd = tree.a[n]
+      end = tree.b[n]
+    } else if (tree.kind[n] === Kind.FootnoteDefinition) {
+      // An empty label line ends in a blank line ending when the definition continues.
+      const first = tree.child[n] ? tree.start[tree.child[n]] : tree.end[n]
+      for (let k = tree.start[n]; k < first; k++)
+        if (source.charCodeAt(k) === 10 || source.charCodeAt(k) === 13) return true
+      previousEnd = tree.start[n]
+      end = tree.end[n]
+    } else continue
     for (let c = tree.child[n]; c; c = tree.next[c]) {
       for (const line of content)
         if (line.start >= previousEnd && line.end <= tree.start[c] && blank(source, line))
           return true
       previousEnd = tree.end[c]
     }
+    // A trailing blank line counts only if the container ends after its line ending.
     for (const line of content)
-      if (line.start >= previousEnd && line.end <= tree.b[n] && blank(source, line)) return true
-    if (hasBlankLineInFlowJsx(source, content, n)) return true
+      if (
+        line.start >= previousEnd &&
+        (tree.kind[n] === Kind.FootnoteDefinition ? line.next : line.end) <= end &&
+        blank(source, line)
+      )
+        return true
+    if (hasNestedBlankLine(source, content, n)) return true
   }
   return false
 }
@@ -1451,7 +1470,10 @@ export function parseBlocks(
             )
               itemSpread = true
         }
-        if (context.config.mdx && hasBlankLineInFlowJsx(source, content, item))
+        if (
+          (context.config.mdx || context.config.gfm) &&
+          hasNestedBlankLine(source, content, item)
+        )
           itemSpread = true
         tree.a[item] = itemSpread ? 1 : 0
         if (tree.last[item])
