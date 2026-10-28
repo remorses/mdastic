@@ -1867,5 +1867,95 @@
       "frontmatter",
       "gfm"
     ]
+  },
+  {
+    "name": "MDX expression on a lazy quote line that cannot interrupt reads the next lazy line",
+    "input": "> a\n{\n}b\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX expression on a quote continuation line reads the next lazy line",
+    "input": "> a\n> {\n}b\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX expression on a lazy list line that cannot interrupt reads the next lazy line",
+    "input": "- a\n{\n}b\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX expression on a lazy footnote line that cannot interrupt reads the next lazy line",
+    "input": "[^a]: b\n{\n}c\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX tag on a lazy quote line that cannot interrupt reads the next lazy line",
+    "input": "> a\n<A\n/>b\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX attribute expression on a lazy quote line reads the next lazy line",
+    "input": "> a\n<A b={\n1}/>c\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX tag lazy in a nested quote reads the next line under the outer prefix",
+    "input": ">> a\n<A\n>/>\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX attribute expression lazy in a nested quote reads the next line under the outer prefix",
+    "input": ">> a\n> <A b={\n> 1}/>\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX expression on a lazy quote line that reaches a prefixed line continues the paragraph",
+    "input": "> a\n{\n> }b\n\n> c\n<A b={\n> 1}/>d\n\n>> e\n> <A b={\n>> 1}/>f\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX tags and expressions on lazy container lines that stay on one line or reach a prefixed line",
+    "input": "- e\n  {\n  }f\n\n> g\n{ h }i\n\n> j\n<A\n> />k\n\n> l\n<A/>m\n\n- n\n<A b={1}/>o\n\n> p\n{q}\n{\n}\n\nr\n{\n}s\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
   }
 ]

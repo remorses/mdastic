@@ -49,6 +49,12 @@ export interface BlockContext extends InlineContext {
   interrupt?: (line: Line) => boolean
   esm?: (line: Line) => boolean
   continuationEnd?: (line: Line) => number
+  continuation?: (
+    context: BlockContext,
+    input: Line[],
+    at: number,
+    boundary?: Line,
+  ) => boolean | undefined
 }
 interface Marker {
   start: number
@@ -1752,12 +1758,15 @@ export function parseBlocks(
     for (; j < input.length; j++) {
       depth = input[j].lazy ? 0 : setext(source, input[j])
       if (depth) break
+      // A flow tag or expression decided in the container view overrides raw source probes.
+      const flow = context.continuation?.(context, input, j, boundary)
+      if (flow) break
       if (input[j].start < spanEnd) {
-        if (flowInterrupts(context, input[j])) break
+        if (flow === undefined && flowInterrupts(context, input[j])) break
       } else {
-        if (!input[j].lazy && interrupts(context, input[j])) break
+        if (flow === undefined && !input[j].lazy && interrupts(context, input[j])) break
         if (input[j].lazy && !context.config.mdx && htmlBlock(source, input[j], false)) break
-        if (input[j].lazy && lazyFlowSpan(context, input[j])) break
+        if (flow === undefined && input[j].lazy && lazyFlowSpan(context, input[j])) break
         if (context.continuationEnd) spanEnd = context.continuationEnd(input[j])
       }
       if (tableStart(context, input, j, true)) break
