@@ -509,6 +509,36 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
       point(line.start).column === 1
     )
   }
+  type FlowItem =
+    | Tag
+    | { type: 'expression'; start: number; end: number; result: ReturnType<typeof expression> }
+  // Scans tags and expressions from `i` to the end of their last line, as a flow attempt.
+  function flowLine(view: View, i: number): { found: FlowItem[]; end: number } | undefined {
+    const text = view.source
+    const found: FlowItem[] = []
+    for (;;) {
+      const c = text.charCodeAt(i)
+      if (c === Char.LessThan) {
+        const t = tag(view, i, text.length, syntax)
+        if (!t) return
+        found.push(t)
+        i = t.end
+      } else if (c === Char.LeftBrace) {
+        const result = expression(view, i, text.length, syntax)
+        found.push({ type: 'expression', start: i, end: result.end, result })
+        i = result.end
+      } else return
+      while (space(text.charCodeAt(i))) i++
+      if (
+        i >= text.length ||
+        text.charCodeAt(i) === Char.LineFeed ||
+        text.charCodeAt(i) === Char.CarriageReturn
+      )
+        return { found, end: i }
+      if (text.charCodeAt(i) === Char.LeftBrace && found.at(-1)!.type === 'expression') return
+      if (text.charCodeAt(i) !== Char.LessThan && text.charCodeAt(i) !== Char.LeftBrace) return
+    }
+  }
   function flow(
     context: BlockContext,
     input: Line[],
@@ -533,40 +563,9 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
     // ── Probe a line containing only qualifying tags/expressions ──
     const mapped = flowView(context, input, boundary)
     const view = mapped.view
-    const text = view.source
-    const found: (
-      | Tag
-      | {
-          type: 'expression'
-          start: number
-          end: number
-          result: ReturnType<typeof expression>
-        }
-    )[] = []
-    let i = mapped.starts[at] + begin - line.start
-    for (;;) {
-      const c = text.charCodeAt(i)
-      if (c === Char.LessThan) {
-        const t = tag(view, i, text.length, syntax)
-        if (!t) return 0
-        found.push(t)
-        i = t.end
-      } else if (c === Char.LeftBrace) {
-        const result = expression(view, i, text.length, syntax)
-        found.push({ type: 'expression', start: i, end: result.end, result })
-        i = result.end
-      } else return 0
-      while (space(text.charCodeAt(i))) i++
-      if (
-        i >= text.length ||
-        text.charCodeAt(i) === Char.LineFeed ||
-        text.charCodeAt(i) === Char.CarriageReturn
-      )
-        break
-      if (text.charCodeAt(i) === Char.LeftBrace && found.at(-1)!.type === 'expression') return 0
-      if (text.charCodeAt(i) !== Char.LessThan && text.charCodeAt(i) !== Char.LeftBrace)
-        return 0
-    }
+    const scanned = flowLine(view, mapped.starts[at] + begin - line.start)
+    if (!scanned) return 0
+    const { found, end: i } = scanned
     // ── Apply the committed tokens to this Markdown container's JSX stack ──
     for (const item of found) {
       if (item.type === 'expression') {
@@ -640,6 +639,23 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
     esm,
     // Imports are document scoped: later ESM blocks are validated against them.
     hasImports: () => imports.length > 0,
+    // micromark tries a flow tag or expression on every paragraph continuation line, so its
+    // scan fails on the first lazy line it reads. Raw source probes cannot see laziness, and
+    // read across container prefixes, so containers with lazy lines decide here instead.
+    continuation(
+      context: BlockContext,
+      input: Line[],
+      at: number,
+      boundary?: Line,
+    ): boolean | undefined {
+      const line = input[at]
+      let begin = line.start
+      while (space(source.charCodeAt(begin))) begin++
+      if (source.charCodeAt(begin) !== Char.LessThan && source.charCodeAt(begin) !== Char.LeftBrace)
+        return
+      const { view, starts } = flowView(context, input, boundary)
+      if (view.lazy?.size) return !!flowLine(view, starts[at] + begin - line.start)
+    },
     interrupt(line: Line) {
       let i = line.start
       while (space(source.charCodeAt(i))) i++
@@ -685,11 +701,12 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
           ? (tag(view, i, source.length, syntax)?.end ?? line.end)
           : expression(view, i, source.length, syntax).end
       } catch (error) {
-        // Failed expressions and unclosed tags read every following line before failing.
+        // Failed expressions and unclosed tags read every following line before failing;
+        // other failed tags read up to their error.
         return source.charCodeAt(i) === Char.LeftBrace ||
           (error as MdxParseError).ruleId === 'unexpected-eof'
           ? source.length
-          : line.end
+          : Math.max(line.end, (error as MdxParseError).place?.offset ?? line.end)
       }
     },
     finish() {
