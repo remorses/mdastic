@@ -89,6 +89,9 @@ let quoteDepth = 0
 // A line that continues an open list as its next item. micromark closes the containers inside
 // that list before the preceding blank lines, so they never close at its prefix.
 let siblingLine: Line | undefined
+// Content lines of the outermost open footnote definition. Every non-blank one after the label
+// line starts with the definition's indent token, which prepareList does not look back past.
+let footnoteLines: Line[] | undefined
 
 let taskCount = 0
 let taskParents = new Int32Array(INITIAL_TASK_CAPACITY)
@@ -99,6 +102,7 @@ export function resetBlocks(): void {
   noContainers = false
   quoteDepth = 0
   siblingLine = undefined
+  footnoteLines = undefined
   taskCount = 0
   taskViews.length = 0
 }
@@ -478,8 +482,9 @@ export function startsContainer(context: BlockContext, line: Line): boolean {
   )
 }
 
-// micromark exits a quoted list or footnote definition after the prefix of the line opening a
-// new container, or of a final prefix-only line at EOF, not before the blank lines preceding it.
+// micromark exits a quoted list or footnote definition after the prefix (quote markers or a
+// footnote definition's indent) of the line opening a new container, or of a final prefix-only
+// line at EOF, not before the blank lines preceding it.
 function closesQuotedContainer(
   context: BlockContext,
   input: Line[],
@@ -491,10 +496,27 @@ function closesQuotedContainer(
   // A parent that ended on a lazy line does not hand its boundary down as a container start.
   if (!line || line === siblingLine || line.lazy || (j >= input.length && input[j - 1]?.lazy))
     return false
-  if (!quotePrefix(source, line)) return false
+  if (!quotePrefix(source, line) && !footnoteIndented(source, line)) return false
   if (blank(source, line))
     return line.start === line.end && !line.padding && line.end === source.length
   return startsContainer(context, line)
+}
+
+// The line continues an open footnote definition through its indent, in any nested view of it.
+function footnoteIndented(source: string, line: Line | undefined): boolean {
+  const lines = footnoteLines
+  if (!lines || !line || line.lazy) return false
+  // Views of one source line share its `next`; the label line has no indent.
+  let low = 1
+  let high = lines.length - 1
+  while (low <= high) {
+    const middle = (low + high) >> 1
+    const found = lines[middle]
+    if (found.next < line.next) low = middle + 1
+    else if (found.next > line.next) high = middle - 1
+    else return !found.lazy && !blank(source, found)
+  }
+  return false
 }
 
 const enum LazyLine {
@@ -1066,8 +1088,11 @@ function parseFootnoteDefinition(
   const n = node(Kind.FootnoteDefinition, start, end, parent)
   tree.extra[n] = { identifier, label: decode(raw) }
   context.footnotes.add(identifier)
+  const outerLines = footnoteLines
+  footnoteLines ??= content
   // Containers opened on the label line can interrupt only what the label line could.
   const stop = parseBlocks(context, content, n, false, residual, input[j] ?? boundary)
+  footnoteLines = outerLines
   if (stop < content.length) {
     j = i + stop
     tree.end[n] = input[j - 1].end
@@ -1154,11 +1179,22 @@ export function parseBlocks(
           tree.kind[previous] === Kind.List ||
           tree.kind[previous] === Kind.FootnoteDefinition)
       ) {
-        if (
-          tree.kind[previous] === Kind.List &&
+        const item = tree.kind[previous] === Kind.List ? tree.last[previous] : 0
+        if (item && footnoteIndented(source, line)) {
+          // As in the list loop, the footnote indent keeps the blank line endings in the item.
+          const child = tree.last[item]
+          if (
+            i > 0 &&
+            blank(source, input[i - 1]) &&
+            (child ? tree.end[child] : tree.start[item]) < input[i - 1].end
+          )
+            tree.a[item] = 1
+          tree.end[item] = line.end
+        } else if (
+          item &&
           i > 0 &&
           blank(source, input[i - 1]) &&
-          tree.end[tree.last[previous]] < input[i - 1].end
+          tree.end[item] < input[i - 1].end
         )
           tree.extra[previous] = true
         tree.end[previous] = line.end
@@ -1355,7 +1391,7 @@ export function parseBlocks(
               while (next < input.length && blank(source, input[next])) next++
               const nextMark = next < input.length ? marker(source, input[next]) : undefined
               if (nextMark && nextMark.char === m.char && nextMark.ordered === m.ordered) {
-                spread = true
+                if (!footnoteIndented(source, input[next])) spread = true
                 j = next
               } else if (closesQuotedContainer(context, input, next, boundary)) j = next
               break
@@ -1485,21 +1521,31 @@ export function parseBlocks(
           sibling &&
           tree.last[item] &&
           (tree.end[tree.last[item]] === input[j].start ||
-            tree.end[tree.last[item]] === input[j - 1].next ||
-            tree.kind[parent] === Kind.FootnoteDefinition)
+            tree.end[tree.last[item]] === input[j - 1].next)
         )
           tree.end[item] = nextMark.content
-        if (!sibling && nextMark && tree.kind[parent] === Kind.FootnoteDefinition)
-          tree.end[item] = nextMark.start
-        if (sibling && sawBlank && tree.kind[parent] === Kind.FootnoteDefinition)
-          tree.a[item] = 1
-        if (
-          j < input.length &&
-          tree.kind[parent] === Kind.FootnoteDefinition &&
-          footnoteLabel(source, input[j])
-        ) {
-          tree.end[item] = input[j].start
-          if (sawBlank) tree.a[item] = 1
+        const closes = !sibling && closesQuotedContainer(context, input, j, boundary)
+        // Where micromark exits the item when that follows a footnote definition's indent: the
+        // next item's prefix, a new container, or a final quoted blank line.
+        const exit = sibling
+          ? footnoteIndented(source, input[j]) && nextMark.content
+          : closes
+            ? footnoteIndented(source, input[j] ?? boundary) && (input[j] ?? boundary!).start
+            : j > lastContent + 1 &&
+              quotePrefix(source, input[j - 1]) &&
+              footnoteIndented(source, input[j - 1]) &&
+              input[j - 1].end
+        if (exit !== false) {
+          // Quirk: prepareList stops looking back for the item's trailing line endings at the
+          // indent, so they never spread the list, and blank ones before the exit spread the item
+          // unless its last child (a nested list, unclosed code) took them.
+          if (tree.end[item] <= input[lastContent].end)
+            for (let k = lastContent + 1; k < j; k++)
+              if (input[k].end < exit && blank(source, input[k])) tree.a[item] = 1
+          tree.end[item] = exit
+          tree.end[list] = exit
+          if (!sibling) break
+          continue
         }
         if (sibling && sawBlank && tree.end[item] <= input[lastContent].end) spread = true
         tree.end[list] = tree.end[item]
@@ -1515,7 +1561,7 @@ export function parseBlocks(
           spread = true
         // A quoted container start closes the list after that line's prefix, so every trailing
         // blank line ending stays inside the list (only the innermost list counts them).
-        if (!sibling && closesQuotedContainer(context, input, j, boundary)) {
+        if (closes) {
           tree.end[list] = (input[j] ?? boundary!).start
           if (j > lastContent + 1 && tree.end[item] <= input[lastContent].end) spread = true
           // A last child that kept its line ending (unclosed code) leaves no trailing ending
