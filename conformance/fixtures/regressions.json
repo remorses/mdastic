@@ -1957,5 +1957,28 @@
       "frontmatter",
       "gfm"
     ]
+  },
+  {
+    "name": "MDX text tag attribute values decode references like parse-entities",
+    "input": "x <a b=\"&#87654321; &#2; &#0; &#128; &#129; &#x110000; &#xD800; &#00000000065;\" c='&copye; &notit; &frac12x; &AMPx;'/> y\n\n- a <b c=\"&#X9F;&ccedil1;\"/>\n",
+    "syntax": [
+      "mdx"
+    ]
+  },
+  {
+    "name": "MDX flow tag attribute values decode references like parse-entities",
+    "input": "<A b=\"&#87654321; &#2; &#x80; &#1114112;\" c=\"&copye; &notit; &notin; &not;\">\n<B c='&copyb;'/>\n</A>\n\n> <C b=\"&copye;\n> &#11;\"/>\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "control: MDX attribute references that need a semicolon stay text",
+    "input": "<A b=\"&amp; &copy; &#65; &#x41; &#x1F600; &copy &amp &#65 &#; &#x; &; &unknown; & a\" c=\"a\n  &lt;b\"/>\n\nx <a b='&copy &frac12 &#x41'/>\n",
+    "syntax": [
+      "mdx"
+    ]
   }
 ]

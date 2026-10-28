@@ -2,7 +2,7 @@
 // Inline tags remain tokens until Markdown links and attention have resolved.
 import type { MdxSyntax } from './syntax.ts'
 import { MdxParseError } from './syntax.ts'
-import { alpha, Char, digit, entity, isWhitespace, point, position, space } from './scan.ts'
+import { alpha, attributeEntity, Char, digit, isWhitespace, point, position, space } from './scan.ts'
 import { append, Kind, node, tree } from './tree.ts'
 import { offset, type View } from './inline.ts'
 import { blank, type BlockContext, inQuote, type Line, startsContainer } from './block.ts'
@@ -262,12 +262,12 @@ function tag(view: View, start: number, end: number, syntax: MdxSyntax): Tag | u
       if (quote === Char.DoubleQuote || quote === Char.SingleQuote) {
         i++
         value = ''
-        // Quoted JSX values decode entities and remove continuation indentation.
+        // Quoted JSX values decode references and remove continuation indentation.
         while (i < end && source.charCodeAt(i) !== quote) {
           checkLazy()
           const c = source.charCodeAt(i)
           if (c === Char.Ampersand) {
-            const ref = entity(source, i, end)
+            const ref = attributeEntity(source, i, end)
             if (ref) {
               value += ref.value
               i = ref.end

@@ -1,6 +1,6 @@
 // Shared character classification, decoding, and UTF-16 source positions.
 // The line index is reused by one synchronous parse at a time.
-import { entities } from './entities.ts'
+import { entities, legacyEntities } from './entities.ts'
 import { punctuation } from './punctuation.ts'
 import type { Point, Position } from './types.ts'
 
@@ -89,6 +89,13 @@ const NONCHARACTER_END = 0xfdef
 const UNICODE_PLANE_MASK = 0xffff
 const PLANE_NONCHARACTER_START = 0xfffe
 const REPLACEMENT_CHARACTER = 0xfffd
+const MAX_LEGACY_REFERENCE_LENGTH = 6
+const C1_START = 0x80
+const C1_END = 0x9f
+// HTML maps C1 references to windows-1252; unmapped ones stay as they are.
+const WINDOWS_1252 =
+  '€\x81‚ƒ„…†‡ˆ‰Š‹Œ\x8dŽ\x8f\x90‘’“”•–—˜™š›œ\x9džŸ'
+const legacy = new Set(legacyEntities)
 const INITIAL_LINE_CAPACITY = 1024
 const POSITION_CURSOR_SCAN_LIMIT = 4
 
@@ -201,6 +208,52 @@ export function entity(
   const name = source.slice(begin, i)
   const value = Object.hasOwn(entities, name) ? entities[name] : undefined
   if (value !== undefined) return { value, end: i + 1 }
+}
+
+// JSX attribute values decode with parse-entities (`nonTerminated: false`), not
+// CommonMark: numeric references take any number of digits and keep controls,
+// and a terminated unknown name still decodes its longest legacy prefix
+// (`&copye;` is `©e;`).
+export function attributeEntity(
+  source: string,
+  start: number,
+  end: number,
+): { value: string; end: number } | undefined {
+  let i = start + 1
+  if (source.charCodeAt(i) === Char.Hash) {
+    i++
+    const hex = source.charCodeAt(i) === Char.LowerX || source.charCodeAt(i) === Char.UpperX
+    if (hex) i++
+    const begin = i
+    while (i < end) {
+      const c = source.charCodeAt(i)
+      if (
+        !digit(c) &&
+        !(hex && ((c >= Char.UpperA && c <= Char.UpperF) || (c >= Char.LowerA && c <= Char.LowerF)))
+      )
+        break
+      i++
+    }
+    if (i === begin || source.charCodeAt(i) !== Char.Semicolon) return
+    const n = Number.parseInt(source.slice(begin, i), hex ? 16 : 10)
+    const value =
+      n > MAX_UNICODE_CODE_POINT || (n >= SURROGATE_START && n <= SURROGATE_END) || n === 0
+        ? String.fromCharCode(REPLACEMENT_CHARACTER)
+        : n >= C1_START && n <= C1_END
+          ? WINDOWS_1252[n - C1_START]
+          : String.fromCodePoint(n)
+    return { value, end: i + 1 }
+  }
+  const begin = i
+  let prefix = 0
+  while (i < end && (alpha(source.charCodeAt(i)) || digit(source.charCodeAt(i)))) {
+    i++
+    if (i - begin <= MAX_LEGACY_REFERENCE_LENGTH && legacy.has(source.slice(begin, i))) prefix = i
+  }
+  if (source.charCodeAt(i) !== Char.Semicolon) return
+  const name = source.slice(begin, i)
+  if (Object.hasOwn(entities, name)) return { value: entities[name], end: i + 1 }
+  if (prefix) return { value: entities[source.slice(begin, prefix)], end: prefix }
 }
 
 const needsDecode = /[\\&\0]/
