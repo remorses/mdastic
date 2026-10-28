@@ -674,23 +674,53 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
         return true
       }
     },
-    continuationEnd(line: Line) {
-      let i = line.start
-      while (space(source.charCodeAt(i))) i++
-      if (source.charCodeAt(i) !== Char.LessThan && source.charCodeAt(i) !== Char.LeftBrace)
-        return line.end
-      const view = rawView
-      try {
-        return source.charCodeAt(i) === Char.LessThan
-          ? (tag(view, i, source.length, syntax)?.end ?? line.end)
-          : expression(view, i, source.length, syntax).end
-      } catch (error) {
-        // Failed expressions and unclosed tags read every following line before failing.
-        return source.charCodeAt(i) === Char.LeftBrace ||
-          (error as MdxParseError).ruleId === 'unexpected-eof'
-          ? source.length
-          : line.end
+    continuationEnd(
+      line: Line,
+      context?: BlockContext,
+      input?: Line[],
+      at = 0,
+      boundary?: Line,
+    ) {
+      let begin = line.start
+      while (space(source.charCodeAt(begin))) begin++
+      const first = source.charCodeAt(begin)
+      if (first !== Char.LessThan && first !== Char.LeftBrace) return line.end
+      // Inside a container, read the lines without their prefixes, as flow() does.
+      let view = rawView
+      let i = begin
+      if (context && input) {
+        const mapped = flowView(context, input, boundary)
+        view = mapped.view
+        i = mapped.starts[at] + begin - line.start
       }
+      const text = view.source
+      // micromark's flow attempt reads tags and expressions in a row, so a later tag on
+      // the line can carry it, and the lines it spans, past the first tag's end.
+      let previousExpression = false
+      for (;;) {
+        const c = text.charCodeAt(i)
+        if (c !== Char.LessThan && c !== Char.LeftBrace) break
+        if (c === Char.LeftBrace && previousExpression) break
+        let end: number | undefined
+        try {
+          end =
+            c === Char.LessThan
+              ? tag(view, i, text.length, syntax)?.end
+              : expression(view, i, text.length, syntax).end
+        } catch (error) {
+          // Failed expressions and unclosed tags read every following line before failing.
+          const eof = (error as MdxParseError).ruleId === 'unexpected-eof'
+          // micromark's flow attempt on a paragraph line crashes before text is parsed.
+          if (input && !eof) throw error
+          if (c === Char.LeftBrace || eof) return source.length
+          return Math.max(offset(view, i), line.end)
+        }
+        if (end === undefined) break
+        previousExpression = c === Char.LeftBrace
+        i = end
+        while (space(text.charCodeAt(i))) i++
+      }
+      return Math.max(offset(view, i), line.end)
     },
     finish() {
       mismatched?.()
