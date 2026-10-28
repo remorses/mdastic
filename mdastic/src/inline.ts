@@ -272,18 +272,25 @@ export function destination(
   start: number,
   end: number,
 ): { end: number; value: string } | undefined {
+  const stop = destinationEnd(source, start, end)
+  if (stop < 0) return
   // mdast stores decoded destinations; URI encoding belongs to HTML serialization.
+  const angle = source.charCodeAt(start) === Char.LessThan
+  const value = angle ? source.slice(start + 1, stop - 1) : source.slice(start, stop)
+  return { end: stop, value: decode(value) }
+}
+
+/** End of the link destination at `start`, or -1. */
+function destinationEnd(source: string, start: number, end: number): number {
   let i = start
   if (source.charCodeAt(i) === Char.LessThan) {
-    i++
-    const begin = i
-    for (; i < end; i++) {
+    for (i++; i < end; i++) {
       const c = source.charCodeAt(i)
-      if (c === Char.GreaterThan) return { end: i + 1, value: decode(source.slice(begin, i)) }
-      if (c === Char.LessThan || c === Char.LineFeed || c === Char.CarriageReturn) return
+      if (c === Char.GreaterThan) return i + 1
+      if (c === Char.LessThan || c === Char.LineFeed || c === Char.CarriageReturn) return -1
       if (c === Char.Backslash && isPunctuation(source.charCodeAt(i + 1))) i++
     }
-    return
+    return -1
   }
   let depth = 0
   for (; i < end; i++) {
@@ -294,14 +301,13 @@ export function destination(
       continue
     }
     if (c === Char.LeftParen) {
-      if (++depth > MAX_DESTINATION_PAREN_DEPTH) return
+      if (++depth > MAX_DESTINATION_PAREN_DEPTH) return -1
     } else if (c === Char.RightParen) {
       if (!depth) break
       depth--
     }
   }
-  if (depth) return
-  return { end: i, value: decode(source.slice(start, i)) }
+  return depth ? -1 : i
 }
 
 export function title(
@@ -309,13 +315,19 @@ export function title(
   start: number,
   end: number,
 ): { end: number; value: string } | undefined {
+  const stop = titleEnd(source, start, end)
+  if (stop >= 0)
+    return { end: stop, value: decode(trimContinuation(source.slice(start + 1, stop - 1))) }
+}
+
+/** End of the link title at `start`, or -1. */
+function titleEnd(source: string, start: number, end: number): number {
   const open = source.charCodeAt(start)
-  if (open !== Char.DoubleQuote && open !== Char.SingleQuote && open !== Char.LeftParen) return
+  if (open !== Char.DoubleQuote && open !== Char.SingleQuote && open !== Char.LeftParen) return -1
   const close = open === Char.LeftParen ? Char.RightParen : open
   for (let i = start + 1; i < end; i++) {
     const c = source.charCodeAt(i)
-    if (c === close)
-      return { end: i + 1, value: decode(trimContinuation(source.slice(start + 1, i))) }
+    if (c === close) return i + 1
     if (c === 92 && isPunctuation(source.charCodeAt(i + 1))) i++
     if (c === 13 && source.charCodeAt(i + 1) === 10) {
       i++
@@ -325,8 +337,9 @@ export function title(
       (c === 10 || c === 13) &&
       (source.charCodeAt(i + 1) === 10 || source.charCodeAt(i + 1) === 13)
     )
-      return
+      return -1
   }
+  return -1
 }
 
 function skipWhitespace(source: string, i: number, end: number): number {
@@ -379,18 +392,39 @@ function resource(
   if (source.charCodeAt(i) === 41) return { end: i + 1, url: dest.value, title: label }
 }
 
+/** End of the resource at `start`, or -1; like resource without decoding its values. */
+function resourceEnd(source: string, start: number, end: number): number {
+  let i = skipWhitespace(source, start + 1, end)
+  const dest = destinationEnd(source, i, end)
+  if (dest < 0) return -1
+  i = skipWhitespace(source, dest, end)
+  if (i > dest && source.charCodeAt(i) !== 41) {
+    const t = titleEnd(source, i, end)
+    if (t < 0) return -1
+    i = skipWhitespace(source, t, end)
+  }
+  return source.charCodeAt(i) === 41 ? i + 1 : -1
+}
+
 function bracketEnd(
   source: string,
   start: number,
   end: number,
-  view?: View,
-  context?: InlineContext,
+  view: View,
+  context: InlineContext,
 ): number {
+  // Depths of open inner image labels, innermost last. Link openers at depths below `active`
+  // were marked inactive by an inner link: micromark ends them without a resource or reference.
+  let images: number[] | undefined
   let depth = 0
+  let active = 0
+  // Definition labels hold no unescaped brackets, so only a label whose `[` is the last
+  // bracket seen (`opener`, -1 after any other) can match one.
+  let opener = -1
   for (let i = start; i < end; i++) {
     const c = source.charCodeAt(i)
     // JavaScript brackets inside expressions do not participate in Markdown labels.
-    if (c === Char.LeftBrace && view && context?.inline) {
+    if (c === Char.LeftBrace && context.inline) {
       const match = context.inline(view, i, end, context)
       if (match) {
         i = match.end - 1
@@ -401,36 +435,69 @@ function bracketEnd(
       i++
       continue
     }
-    if (c === 60) {
-      const stop = autolink(source, i, end)?.end ?? htmlEnd(source, i, end)
-      if (stop > i) {
-        i = stop - 1
-        continue
-      }
-    }
-    if (c === 96 || (c === Char.Dollar && mathRun)) {
-      let run = i + 1
-      while (source.charCodeAt(run) === c) run++
-      const close = spanEnd(source, run, end, run - i, c)
-      if (close >= 0) {
-        i = close + run - i - 1
-        continue
-      }
-      // An unmatched run stays whole; its suffix cannot open a shorter span.
-      i = run - 1
-    }
-    if (c === 91) depth++
-    else if (c === 93) {
+    // Out-of-line skips keep this loop small enough for V8 to inline into parseInline.
+    if (c === 60 || c === 96 || (c === Char.Dollar && mathRun)) i = skipSpan(source, i, end, c)
+    else if (c === 91) {
+      depth++
+      opener = i
+    } else if (c === 93) {
       if (!depth) return i
       depth--
-      // Resource destinations and titles are not part of the enclosing label.
-      if (source.charCodeAt(i + 1) === Char.LeftParen) {
-        const match = resource(source, i + 1, end)
-        if (match) i = match.end - 1
+      const image = images !== undefined && images[images.length - 1] === depth
+      if (image) images!.pop()
+      const labelStart = opener + 1
+      opener = -1
+      if (depth < active) {
+        active = depth
+        if (!image) continue
       }
+      // Resources and references belong to the inner label, not the enclosing one.
+      const stop = innerTail(source, labelStart, i, end, context, image)
+      if (stop < 0) continue
+      if (!image) active = depth
+      i = stop - 1
+    } else if (c === Char.Exclamation && source.charCodeAt(i + 1) === 91) {
+      if (!images) images = []
+      images.push(depth++)
+      opener = ++i
     }
   }
   return -1
+}
+
+/** Last index of the HTML, autolink, code or math span at `i`, else of its unmatched run. */
+function skipSpan(source: string, i: number, end: number, c: number): number {
+  if (c === 60) return Math.max(i, (autolink(source, i, end)?.end ?? htmlEnd(source, i, end)) - 1)
+  let run = i + 1
+  while (source.charCodeAt(run) === c) run++
+  const close = spanEnd(source, run, end, run - i, c)
+  // An unmatched run stays whole; its suffix cannot open a shorter span.
+  return close >= 0 ? close + run - i - 1 : run - 1
+}
+
+/**
+ * End of the inner link or image closed at `close`, or -1. `labelStart` is 0 when the label
+ * holds brackets. Kept out of bracketEnd so its scan loop stays small enough to inline.
+ */
+function innerTail(
+  source: string,
+  labelStart: number,
+  close: number,
+  end: number,
+  context: InlineContext,
+  image: boolean,
+): number {
+  const next = source.charCodeAt(close + 1)
+  const plain = labelStart > 0
+  // Only a resource, a reference, or a defined shortcut label forms an inner link.
+  if (next !== 40 && next !== 91 && !(plain && context.definitions.size)) return -1
+  // A defined GFM footnote call is no label: it takes no trailing resource or reference.
+  if (plain && !image && source.charCodeAt(labelStart) === 94 && context.config.gfm) {
+    const label = source.slice(labelStart + 1, close)
+    if (label && !hasWhitespace(label) && context.footnotes.has(normalizeIdentifier(label)))
+      return -1
+  }
+  return labelTail(source, labelStart, close, end, context, plain)
 }
 
 function codeEnd(source: string, start: number, end: number, length: number, char = 96): number {
@@ -1102,6 +1169,7 @@ function containsLink(view: View, start: number, end: number, context: InlineCon
  * End of the link or image whose label spans `start..close`, or -1 when it does not form.
  * Mirrors micromark's label end: a failed resource falls back to a shortcut, but a following
  * `[` must complete a full or collapsed reference, so `[a][missing]` is no link even with `[a]`.
+ * `plain` is false when the label holds brackets, so no definition can match it.
  */
 function labelTail(
   source: string,
@@ -1109,9 +1177,11 @@ function labelTail(
   close: number,
   end: number,
   context: InlineContext,
+  plain = true,
 ): number {
   const stop = close + 1
   const c = source.charCodeAt(stop)
+  const lookup = plain && context.definitions.size > 0
   if (c === 91) {
     let r = stop + 1
     while (r < end && source.charCodeAt(r) !== 93 && source.charCodeAt(r) !== 91) {
@@ -1121,11 +1191,15 @@ function labelTail(
     if (source.charCodeAt(r) !== 93) return -1
     if (r > stop + 1)
       return context.definitions.has(normalizeIdentifier(source.slice(stop + 1, r))) ? r + 1 : -1
-    return context.definitions.has(normalizeIdentifier(source.slice(start, close))) ? r + 1 : -1
+    return lookup && context.definitions.has(normalizeIdentifier(source.slice(start, close)))
+      ? r + 1
+      : -1
   }
   if (c === 40) {
-    const match = resource(source, stop, end)
-    if (match) return match.end
+    const match = resourceEnd(source, stop, end)
+    if (match >= 0) return match
   }
-  return context.definitions.has(normalizeIdentifier(source.slice(start, close))) ? stop : -1
+  return lookup && context.definitions.has(normalizeIdentifier(source.slice(start, close)))
+    ? stop
+    : -1
 }
