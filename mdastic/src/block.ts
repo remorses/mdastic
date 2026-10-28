@@ -86,6 +86,8 @@ let mathMode = false
 let noContainers = false
 // Open blockquotes; nothing inside one keeps the final EOF line ending.
 let quoteDepth = 0
+// Set by lazyState when the line has a list marker, even one it reads as paragraph text.
+let lazyListed = false
 
 let taskCount = 0
 let taskParents = new Int32Array(INITIAL_TASK_CAPACITY)
@@ -486,26 +488,46 @@ function lazyLine(context: BlockContext, line: Line): LazyLine {
   return line.next === line.end ? LazyLine.Stop : LazyLine.TakeLast
 }
 
-function lazyParagraph(context: BlockContext, line: Line, interrupted = false): boolean {
+// What a container line leaves open for the next line, seen through the containers it starts.
+// A paragraph takes lazy lines. Indented code takes none, but micromark keeps `interrupt` set
+// after it, across blank lines too, so a marker on the next line that cannot interrupt is text.
+// `open` is what the container had open before the line: `interrupted` rejects those markers at
+// any depth, open code only directly in the container. `listed` says an earlier line may have
+// left a list item open, which would take an indented line as its own content.
+function lazyState(
+  context: BlockContext,
+  line: Line,
+  interrupted = false,
+  open = InterruptState.None,
+  listed = false,
+): InterruptState {
   const source = context.source
   let current = line
+  lazyListed = false
   // This probe cap bounds implementation work; it is not a CommonMark grammar limit.
   for (let depth = 0; depth < MAX_LAZY_CONTAINER_PROBES; depth++) {
+    const code = depth === 0 && open === InterruptState.IndentedCode
+    if (blank(source, current)) return code ? InterruptState.IndentedCode : InterruptState.None
+    // Only code directly in this container counts. A container this line starts, an earlier
+    // list item, or an open paragraph may take the line instead.
+    if (!context.config.mdx && indentation(source, current).indent >= CODE_INDENT)
+      return depth === 0 && !listed && open !== InterruptState.Paragraph
+        ? InterruptState.IndentedCode
+        : InterruptState.None
     if (
-      blank(source, current) ||
-      (!context.config.mdx && indentation(source, current).indent >= CODE_INDENT) ||
       thematic(source, current) ||
       atx(source, current) ||
       fence(source, current) ||
       context.interrupt?.(current)
     )
-      return false
-    if (!context.config.mdx && htmlBlock(source, current, false)) return false
+      return InterruptState.None
+    if (!context.config.mdx && htmlBlock(source, current, false)) return InterruptState.None
     const q = quote(source, current)
     const m = q < 0 ? marker(source, current) : undefined
+    if (m) lazyListed = true
     if (
       m &&
-      interrupted &&
+      (interrupted || code) &&
       (blank(source, { start: m.content, end: line.end, next: line.next }) ||
         (m.ordered &&
           !(
@@ -513,12 +535,12 @@ function lazyParagraph(context: BlockContext, line: Line, interrupted = false): 
             (source.charCodeAt(m.start + 1) === 46 || source.charCodeAt(m.start + 1) === 41)
           )))
     )
-      return true
+      return InterruptState.Paragraph
     const start = q >= 0 ? q : m?.content
-    if (start === undefined) return true
+    if (start === undefined) return InterruptState.Paragraph
     current = { start, end: line.end, next: line.next }
   }
-  return false
+  return InterruptState.None
 }
 
 function quotePrefix(source: string, line: Line): boolean {
@@ -959,7 +981,8 @@ function parseHtmlBlock(
   let j = i
   let closed = false
   for (; j < input.length; j++) {
-    if (line.lazy && j > i) break
+    // HTML takes no lazy lines; parseBlocks hands them back to the container.
+    if (j > i && (line.lazy || input[j].lazy)) break
     if (!html.until && blank(source, input[j])) break
     if (html.until) {
       const value = source.slice(input[j].start, input[j].end)
@@ -1004,25 +1027,28 @@ function parseFootnoteDefinition(
   const content: Line[] = [{ start: first, end: line.end, next: line.next }]
   let j = i + 1
   let last = i
-  let lazy = lazyParagraph(context, content[0], residual > 0)
+  let open = lazyState(context, content[0], residual > 0)
+  let listed = lazyListed
   const nested = tree.kind[parent] === Kind.FootnoteDefinition
   for (; j < input.length; j++) {
     if (blank(source, input[j])) {
       content.push(input[j])
-      lazy = false
+      if (open !== InterruptState.IndentedCode) open = InterruptState.None
     } else if (!input[j].lazy && indentation(source, input[j]).indent >= FOOTNOTE_INDENT) {
       const stripped = stripIndent(source, input[j], FOOTNOTE_INDENT)
       content.push(stripped)
       last = j
-      lazy = lazyParagraph(context, stripped, lazy)
+      open = lazyState(context, stripped, open === InterruptState.Paragraph, open, listed)
+      listed ||= lazyListed
     } else if (nested && !input[j].lazy && indentation(source, input[j]).indent === 0) {
       // Quirk: micromark checks the indent token before the line, so a footnote directly
       // in a footnote takes the outer indent as its own when it has none left.
       content.push(input[j])
       last = j
-      lazy = lazyParagraph(context, input[j])
+      open = lazyState(context, input[j], open === InterruptState.Paragraph, open, listed)
+      listed ||= lazyListed
     } else if (
-      lazy &&
+      open === InterruptState.Paragraph &&
       ((!interrupts(context, input[j]) && !marker(source, input[j])) ||
         lazyFlowSpan(context, input[j]))
     ) {
@@ -1175,7 +1201,8 @@ export function parseBlocks(
       }
       const content: Line[] = []
       let j = i
-      let lazy = false
+      let open = InterruptState.None
+      let listed = false
       let table = false
       for (; j < input.length; j++) {
         const current = input[j]
@@ -1199,11 +1226,13 @@ export function parseBlocks(
             table = true
           content.push(item)
           // Tables cannot receive ordinary lazy paragraph continuation.
-          // Open paragraphs and the first line's inherited state reject markers that
-          // cannot interrupt, so the marker line stays paragraph text.
-          lazy = !table && lazyParagraph(context, item, lazy || (j === i && residual > 0))
+          // Open paragraphs, indented code and the first line's inherited state reject
+          // markers that cannot interrupt, so the marker line stays paragraph text.
+          const interrupted = open === InterruptState.Paragraph || (j === i && residual > 0)
+          open = table ? InterruptState.None : lazyState(context, item, interrupted, open, listed)
+          listed ||= lazyListed
         } else if (
-          lazy &&
+          open === InterruptState.Paragraph &&
           ((!interrupts(context, current) && !marker(source, current)) ||
             lazyFlowSpan(context, current))
         ) {
@@ -1298,7 +1327,8 @@ export function parseBlocks(
           },
         ]
         j++
-        let lazy = lazyParagraph(context, content[0], residual > 0)
+        let open = lazyState(context, content[0], residual > 0)
+        let listed = lazyListed
         let sawBlank = false
         let lastContent = itemStart
         let itemSpread = false
@@ -1318,7 +1348,7 @@ export function parseBlocks(
             }
             content.push(stripIndent(source, current, mark.indent))
             sawBlank = true
-            lazy = false
+            if (open !== InterruptState.IndentedCode) open = InterruptState.None
             continue
           }
           const scan = indentation(source, current)
@@ -1335,10 +1365,14 @@ export function parseBlocks(
               table = true
             content.push(stripped)
             lastContent = j
-            lazy = !table && lazyParagraph(context, stripped, lazy || residual > 0)
+            const interrupted = open === InterruptState.Paragraph || residual > 0
+            open = table
+              ? InterruptState.None
+              : lazyState(context, stripped, interrupted, open, listed)
+            listed ||= lazyListed
             sawBlank = false
           } else if (
-            lazy &&
+            open === InterruptState.Paragraph &&
             (current.lazy || !interrupts(context, current) || lazyFlowSpan(context, current))
           ) {
             const take = lazyLine(context, current)
@@ -1526,6 +1560,7 @@ export function parseBlocks(
       htmlBlock(source, line, residual === InterruptState.Definition && !line.lazy)
     if (html) {
       i += parseHtmlBlock(context, input, i, parent, html, boundary)
+      if (input[i]?.lazy) return i
       residual = InterruptState.None
       continue
     }
