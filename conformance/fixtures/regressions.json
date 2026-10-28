@@ -1777,5 +1777,26 @@
       "frontmatter",
       "gfm"
     ]
+  },
+  {
+    "name": "Image labels nested in unclosed labels keep their closes",
+    "input": "![[]()![[]()![[]() [a](b) ![x[y](z)]](w) [`]` [a]] [<http://a.b/]>] ![[a]![b](c)](d) ![[a] ![[`]`](e) ![![[]()](f)\n\n[a]: /a\n",
+    "syntax": []
+  },
+  {
+    "name": "GFM image labels nested in unclosed labels keep their closes",
+    "input": "![[]()![[]()![[]() [a](b) ![x[y](z)]](w) [`]` [a]] [<http://a.b/]>] ![[a]![b](c)](d) ![[a] ![[`]`](e) ![![[]()](f)\n\n[a]: /a\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX image labels nested in unclosed labels keep their closes",
+    "input": "![{\"]\"}[]()![[{\"[\"}]]() [a{\"]\"}](b) ![[<b>]</b>]() ![[a]{\"[\"}](c) ![[]()![[]()\n\n[a]: /a\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
   }
 ]
