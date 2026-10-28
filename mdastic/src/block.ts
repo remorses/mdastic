@@ -1288,8 +1288,9 @@ export function parseBlocks(
       if (stop < content.length) {
         j = i + stop
         tree.end[n] = input[j - 1].end
-        if (input[j].lazy) return j
       }
+      // A lazy line closes every container up to the one that accepted it.
+      if (input[j]?.lazy) return j
       // Quirk: a new container after a stripped quote prefix closes at that prefix.
       if (j < input.length && quotePrefix(source, input[j]) && marker(source, input[j]))
         tree.end[n] = input[j].start
