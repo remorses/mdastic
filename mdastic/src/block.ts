@@ -94,12 +94,10 @@ let taskCount = 0
 let taskParents = new Int32Array(INITIAL_TASK_CAPACITY)
 let taskStarts = new Int32Array(INITIAL_TASK_CAPACITY)
 const taskViews: (View | undefined)[] = []
-// The last definition continuation scan: lines runStart..runLimit-1 of runInput continue a
-// paragraph, so each line of a definition run shares one scan. runTable: a table starts there.
+// Lines runStart..runLimit-1 of runInput continue a paragraph and share one definition scan.
 let runInput: Line[] | undefined
 let runStart = 0
 let runLimit = 0
-let runTable = false
 
 export function resetBlocks(): void {
   noContainers = false
@@ -703,28 +701,23 @@ function parseDefinition(
       break
     }
   }
+  if (tableStart(context, input, at)) return 0
   // ── Collect continuation lines without crossing another block construct ──
+  // A table head row interrupts paragraph content, so the definition ends before it.
   let limit = at + 1
   if (input === runInput && at >= runStart && at < runLimit) {
-    if (runTable) return 0
     limit = runLimit
   } else {
     runInput = input
     runStart = at
-    runTable = false
     while (
       limit < input.length &&
       !blank(original, input[limit]) &&
       !interrupts(context, input[limit]) &&
-      !setext(original, input[limit])
-    ) {
-      if (tableStart(context, input, limit - 1)) {
-        runLimit = limit
-        runTable = true
-        return 0
-      }
+      !setext(original, input[limit]) &&
+      !tableStart(context, input, limit, true)
+    )
       limit++
-    }
     runLimit = limit
   }
   // A definition usually spans a line or two of its run. Read a doubling window of lines and
@@ -1436,7 +1429,14 @@ export function parseBlocks(
       continue
     }
     // ── GFM tables precede list and paragraph recognition ──
-    const tableCount = parseTable(context, input, i, parent, residual === InterruptState.Paragraph)
+    // Definitions are paragraph content, so a head row after one interrupts it the same way.
+    const tableCount = parseTable(
+      context,
+      input,
+      i,
+      parent,
+      residual === InterruptState.Paragraph || residual === InterruptState.Definition,
+    )
     if (tableCount) {
       i += tableCount
       residual = InterruptState.None
