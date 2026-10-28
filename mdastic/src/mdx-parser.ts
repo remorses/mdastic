@@ -736,6 +736,8 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
               const open = pending.at(-1)
               if (!open) {
                 if (active) {
+                  // mdast-util-mdx-jsx checks the closing name before the boundary.
+                  if (active.name !== t.name) mismatch(t, active, { source, base: 0 })
                   // Active JSX cannot close across a Markdown container boundary.
                   const type = tokenType(parent, header)
                   mdxError(
@@ -771,7 +773,8 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
                 ? {
                     type: 'tag',
                     start: tree.start[n],
-                    end: tree.end[n],
+                    // The opening tag's end, as reported by a closing-name mismatch.
+                    end: tree.a[n],
                     name: e.name,
                     attributes: e.attributes,
                     close: false,

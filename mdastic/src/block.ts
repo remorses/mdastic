@@ -993,6 +993,7 @@ function parseFootnoteDefinition(
   footnote: NonNullable<ReturnType<typeof footnoteLabel>>,
   start: number,
   residual: InterruptState,
+  nested: boolean,
   boundary?: Line,
 ): number {
   const source = context.source
@@ -1005,7 +1006,6 @@ function parseFootnoteDefinition(
   let j = i + 1
   let last = i
   let lazy = lazyParagraph(context, content[0], residual > 0)
-  const nested = tree.kind[parent] === Kind.FootnoteDefinition
   for (; j < input.length; j++) {
     if (blank(source, input[j])) {
       content.push(input[j])
@@ -1243,6 +1243,8 @@ export function parseBlocks(
         footnote,
         scan.start,
         residual,
+        // The container, not an open MDX flow tag routed through `flowParent`.
+        tree.kind[owner] === Kind.FootnoteDefinition,
         boundary,
       )
       if (input[i]?.lazy) return i
