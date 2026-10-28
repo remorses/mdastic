@@ -964,6 +964,8 @@ function tableStart(
 ): AlignType[] | undefined {
   if (!context.config.gfm || !input[i + 1] || input[i + 1].lazy) return
   const source = context.source
+  const align = tableAlign(source, input[i + 1])
+  if (!align) return
   const headerLine = input[i]
   if (
     (!mdxMode && indentation(source, headerLine).indent >= CODE_INDENT) ||
@@ -973,9 +975,8 @@ function tableStart(
     (!paragraph && !mdxMode && htmlBlock(source, headerLine, false))
   )
     return
-  const align = tableAlign(context.source, input[i + 1])
   // A setext underline or list marker wins over a possible table delimiter row.
-  if (!align || setext(context.source, input[i + 1]) || marker(context.source, input[i + 1]))
+  if (setext(context.source, input[i + 1]) || marker(context.source, input[i + 1]))
     return
   const header = tableCells(context.source, input[i])
   if (header.length !== align.length) return
@@ -1006,10 +1007,9 @@ function parseTable(
   paragraph: boolean,
 ): number {
   if (input[i] === afterTable) return 0
-  // The paragraph this line may interrupt has ended, so HTML blocks win here.
-  if (!mdxMode && htmlBlock(context.source, input[i], false)) return 0
   const align = tableStart(context, input, i, paragraph)
-  if (!align) return 0
+  // The paragraph this line may interrupt has ended, so HTML blocks win here.
+  if (!align || (!mdxMode && htmlBlock(context.source, input[i], false))) return 0
   const source = context.source
   const n = node(Kind.Table, indentation(source, input[i]).start, input[i + 1].end, parent)
   tree.extra[n] = align
