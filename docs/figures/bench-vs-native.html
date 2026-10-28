@@ -10,20 +10,32 @@
       import { barChart } from '/skill/charts.ts'
       const ms = (v) => `${v} ms`
       barChart('#diagram', {
-        series: ['Markdown + GFM, 2.6 MB', 'MDX, 1 MB'],
-        colors: ['blue', 'purple'],
-        axisTitle: 'Median parse time for the whole corpus, Node 24, Apple M5 Pro',
+        series: ['markdown-it', 'mdastic', 'Sätteri'],
+        colors: ['bar', 'accent', 'purple'],
+        ratioHeader: 'vs Rust',
+        axisTitle: 'Median parse time, 2.6 MB markdown and 1 MB MDX, Apple M5 Pro. Sätteri is Rust (napi)',
         charts: [
           {
-            title: 'Parse',
+            title: 'Markdown',
             legend: true,
-            max: 40,
-            ticks: [0, 10, 20, 30, 40],
+            max: 50,
+            ticks: [0, 10, 20, 30, 40, 50],
             unit: ms,
             rows: [
-              { label: 'markdown-it (tokens only)', values: [36.72, 0], text: ['36.7 ms', 'no MDX'] },
-              { label: 'mdastic (TypeScript)', values: [24.65, 16.83], text: ['24.7 ms', '16.8 ms'] },
-              { label: 'Sätteri (Rust, napi)', values: [20.45, 10.62], text: ['20.5 ms', '10.6 ms, no estree'] },
+              { label: 'Node 24', values: [37.41, 26.53, 19.81], text: ['37.4 ms', '26.5 ms', '19.8 ms'], ratio: '1.34x' },
+              { label: 'Bun (JIT)', values: [31.02, 23.92, 20.23], text: ['31.0 ms', '23.9 ms', '20.2 ms'], ratio: '1.18x' },
+              { label: 'Bun AOT', values: [42.29, 20.96, 18.78], text: ['42.3 ms', '21.0 ms', '18.8 ms'], ratio: '1.12x' },
+            ],
+          },
+          {
+            title: 'MDX (Sätteri gives no estree)',
+            max: 50,
+            ticks: [0, 10, 20, 30, 40, 50],
+            unit: ms,
+            rows: [
+              { label: 'Node 24', values: [0, 17.82, 10.97], text: ['no MDX', '17.8 ms', '11.0 ms'], ratio: '1.62x' },
+              { label: 'Bun (JIT)', values: [0, 13.48, 10.25], text: ['no MDX', '13.5 ms', '10.3 ms'], ratio: '1.32x' },
+              { label: 'Bun AOT', values: [0, 11.1, 10.02], text: ['no MDX', '11.1 ms', '10.0 ms'], ratio: '1.11x' },
             ],
           },
         ],

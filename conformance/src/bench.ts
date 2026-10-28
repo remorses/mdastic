@@ -72,7 +72,9 @@ const markdownIt = new MarkdownIt()
 const mdToMarkdownExt = { extensions: [frontmatterToMarkdown(['yaml', 'toml']), gfmToMarkdown()] }
 const mdxToMarkdownExt = { extensions: [mdxToMarkdown(), frontmatterToMarkdown(['yaml', 'toml']), gfmToMarkdown()] }
 
-console.log(`Node ${process.version}, ${process.arch}`)
+const bun = (globalThis as { Bun?: { version: string; revision: string } }).Bun
+const runtime = bun ? `Bun ${bun.version}+${bun.revision.slice(0, 9)}` : `Node ${process.version}`
+console.log(`${runtime}, ${process.arch}`)
 
 table('Parse markdown + GFM', markdownDocs, [
   ['remark (remark-gfm, remark-frontmatter)', (d) => remarkMd.parse(d)],

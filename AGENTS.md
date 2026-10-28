@@ -17,8 +17,9 @@ only after parity. Read this file top to bottom before changing `mdastic/src/`.
 - **Exact parity** with `mdast-util-from-markdown` + `micromark-extension-{gfm,mdxjs,frontmatter}`
   for parsing, and with `mdast-util-to-markdown` + `{gfm,mdx,frontmatter}ToMarkdown` for stringify.
   Not "close enough": deep equal JSON, including every `position` and acorn `data.estree`.
-- **Speed.** Real-document benchmark: 28x faster than remark on markdown, 17x on MDX, 6x on
-  stringify. Faster than markdown-it (which builds no tree), about 1.2x behind native Sätteri.
+- **Speed.** Real-document benchmark: 29x faster than remark on markdown, 18x on MDX, 6x on
+  stringify. Faster than markdown-it (which builds no tree). Behind native Sätteri by 1.3x to
+  1.6x on Node, 1.1x when compiled with Bun `--aot`.
 - **Replace remark** in three of Tommy's projects:
 
 ```text
@@ -296,14 +297,24 @@ pnpm exec tsx scripts/bench-stream.ts      # 32-char chunks: parse every chunk v
 ```
 
 `src/bench.ts` parses each real document separately (342 markdown docs, 2.6 MB; 523 MDX docs that
-remark accepts, 1 MB), median of 15 runs after warmup. Last numbers on an M5 Pro, Node 24:
+remark accepts, 1 MB), median of 15 runs after warmup. Last numbers on an M5 Pro, Node 24.22
+and Bun 1.4.4 canary `--aot` (whole benchmark compiled to one executable, remark too):
 
-| Task | remark | mdastic |
-| --- | ---: | ---: |
-| Parse markdown + GFM | 703 ms | 24.7 ms |
-| Parse MDX with estree | 289 ms | 16.8 ms |
-| Stringify markdown + GFM | 253 ms | 42.7 ms |
-| Round trip MDX | 402 ms | 33.9 ms |
+| Task | remark, Node | mdastic, Node | remark, Bun AOT | mdastic, Bun AOT |
+| --- | ---: | ---: | ---: | ---: |
+| Parse markdown + GFM | 774 ms | 26.5 ms | 584 ms | 21.0 ms |
+| Parse MDX with estree | 317 ms | 17.8 ms | 245 ms | 11.1 ms |
+| Stringify markdown + GFM | 253 ms | 42.1 ms | 237 ms | 38.9 ms |
+| Round trip MDX | 426 ms | 35.6 ms | 345 ms | 27.2 ms |
+
+Sätteri parses the same corpora in 19.8 / 11.0 ms on Node and 18.8 / 10.0 ms under AOT, so
+mdastic is 1.34x / 1.62x behind on Node and 1.12x / 1.11x behind under AOT. Build the AOT
+benchmark from `conformance/` (it needs `--compile-in-place` so fixtures load from disk):
+
+```bash
+bun build --compile --aot --compile-in-place --production \
+  --define 'process.env.NODE_ENV="production"' src/bench.ts --outfile ../tmp/bench-aot
+```
 
 Profile with `node --cpu-prof --cpu-prof-dir=tmp/profiles --import tsx <script>`, then
 `profano tmp/profiles/*.cpuprofile`. Host load moves numbers a few percent; rerun before
