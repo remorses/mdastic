@@ -486,6 +486,59 @@ function lazyLine(context: BlockContext, line: Line): LazyLine {
   return line.next === line.end ? LazyLine.Stop : LazyLine.TakeLast
 }
 
+// What is left of `line` inside the block quotes and list items `opener` opened, and
+// whether `line` is lazy there. micromark rejects a lazy table delimiter row, so
+// `- > a\n  b|c\n  -|-` is one quoted paragraph, while `- > a|b\n  > -|-` is a table.
+function within(source: string, opener: Line, line: Line): { line: Line; lazy: boolean } {
+  for (let depth = 0; depth < MAX_LAZY_CONTAINER_PROBES; depth++) {
+    const q = quote(source, opener)
+    const m = q < 0 ? marker(source, opener) : undefined
+    if (q < 0 && !m) break
+    const next: Line = m
+      ? { start: m.content, end: opener.end, next: opener.next, padding: m.padding }
+      : { start: q, end: opener.end, next: opener.next, padding: quotePadding(source, q) }
+    if (line.start === opener.start) line = { ...next, end: line.end, next: line.next }
+    else if (m) {
+      if (indentation(source, line).indent < m.indent) return { line, lazy: true }
+      line = stripIndent(source, line, m.indent)
+    } else {
+      const r = quote(source, line)
+      if (r < 0) return { line, lazy: true }
+      line = { start: r, end: line.end, next: line.next, padding: quotePadding(source, r) }
+    }
+    opener = next
+  }
+  return { line, lazy: false }
+}
+
+function quotePadding(source: string, content: number): number {
+  return source.charCodeAt(content - 1) === 9 ? tabWidth(source, content - 1) - 1 : 0
+}
+
+// A table row pair inside the paragraph `opener` opened: the delimiter row must not be lazy.
+function nestedTable(context: BlockContext, opener: Line, header: Line, delimiter: Line): boolean {
+  const source = context.source
+  // Every delimiter row has a dash.
+  let dash = delimiter.start
+  while (dash < delimiter.end && source.charCodeAt(dash) !== 45) dash++
+  if (dash === delimiter.end) return false
+  const row = within(source, opener, delimiter)
+  return (
+    !row.lazy && !!tableStart(context, [within(source, opener, header).line, row.line], 0)
+  )
+}
+
+// Whether `line` continues the table in the containers `opener` opened.
+function tableRow(context: BlockContext, opener: Line, line: Line): boolean {
+  const row = within(context.source, opener, line)
+  return !row.lazy && !blank(context.source, row.line) && !interrupts(context, row.line)
+}
+
+// The line that opens the paragraph `line` leaves open, given the current one's opener.
+function paragraphOpener(context: BlockContext, opener: Line, line: Line, open: boolean): Line {
+  return !open || interrupts(context, within(context.source, opener, line).line) ? line : opener
+}
+
 function lazyParagraph(context: BlockContext, line: Line, interrupted = false): boolean {
   const source = context.source
   let current = line
@@ -1006,21 +1059,35 @@ function parseFootnoteDefinition(
   let j = i + 1
   let last = i
   let lazy = lazyParagraph(context, content[0], residual > 0)
+  let opener = content[0]
+  let table = false
   for (; j < input.length; j++) {
-    if (blank(source, input[j])) {
+    const scan = indentation(source, input[j])
+    const indent = scan.indent
+    if (scan.start === input[j].end) {
       content.push(input[j])
       lazy = false
-    } else if (!input[j].lazy && indentation(source, input[j]).indent >= FOOTNOTE_INDENT) {
-      const stripped = stripIndent(source, input[j], FOOTNOTE_INDENT)
+      table = false
+    } else if (
+      !input[j].lazy &&
+      (indent >= FOOTNOTE_INDENT ||
+        // Quirk: micromark checks the indent token before the line, so a footnote directly
+        // in a footnote takes the outer indent as its own when it has none left.
+        (nested && indent === 0))
+    ) {
+      const stripped =
+        indent >= FOOTNOTE_INDENT ? stripIndent(source, input[j], FOOTNOTE_INDENT) : input[j]
+      if (table) table = tableRow(context, opener, stripped)
+      else if (
+        context.config.gfm &&
+        nestedTable(context, opener, content[content.length - 1], stripped)
+      )
+        table = true
+      if (!table) opener = paragraphOpener(context, opener, stripped, lazy)
       content.push(stripped)
       last = j
-      lazy = lazyParagraph(context, stripped)
-    } else if (nested && !input[j].lazy && indentation(source, input[j]).indent === 0) {
-      // Quirk: micromark checks the indent token before the line, so a footnote directly
-      // in a footnote takes the outer indent as its own when it has none left.
-      content.push(input[j])
-      last = j
-      lazy = lazyParagraph(context, input[j])
+      // Tables cannot receive ordinary lazy paragraph continuation.
+      lazy = !table && lazyParagraph(context, stripped)
     } else if (
       lazy &&
       ((!interrupts(context, input[j]) && !marker(source, input[j])) ||
@@ -1177,26 +1244,26 @@ export function parseBlocks(
       let j = i
       let lazy = false
       let table = false
+      let opener: Line | undefined
       for (; j < input.length; j++) {
         const current = input[j]
         const stripped = quote(source, current)
         if (stripped >= 0) {
-          const padding =
-            source.charCodeAt(stripped - 1) === 9 ? tabWidth(source, stripped - 1) - 1 : 0
           const item = {
             start: stripped,
             end: current.end,
             next: current.next,
-            padding,
+            padding: quotePadding(source, stripped),
             lazy: current.lazy,
           }
-          if (blank(source, item) || interrupts(context, item)) table = false
-          const align =
-            context.config.gfm && content.length && !setext(source, item)
-              ? tableAlign(source, item)
-              : undefined
-          if (align && tableCells(source, content[content.length - 1]).length === align.length)
+          if (table && opener) table = tableRow(context, opener, item)
+          else if (
+            context.config.gfm &&
+            opener &&
+            nestedTable(context, opener, content[content.length - 1], item)
+          )
             table = true
+          if (!table) opener = paragraphOpener(context, opener ?? item, item, lazy)
           content.push(item)
           // Tables cannot receive ordinary lazy paragraph continuation.
           lazy = !table && lazyParagraph(context, item)
@@ -1299,6 +1366,7 @@ export function parseBlocks(
         ]
         j++
         let lazy = lazyParagraph(context, content[0], residual > 0)
+        let opener = content[0]
         let sawBlank = false
         let lastContent = itemStart
         let itemSpread = false
@@ -1319,6 +1387,7 @@ export function parseBlocks(
             content.push(stripIndent(source, current, mark.indent))
             sawBlank = true
             lazy = false
+            table = false
             continue
           }
           const scan = indentation(source, current)
@@ -1326,13 +1395,13 @@ export function parseBlocks(
           // A lazy line skipped this item's continuation, so its indent stays content.
           if (!current.lazy && scan.indent >= mark.indent) {
             const stripped = stripIndent(source, current, mark.indent)
-            if (blank(source, stripped) || interrupts(context, stripped)) table = false
-            if (
+            if (table) table = tableRow(context, opener, stripped)
+            else if (
               context.config.gfm &&
-              content.length &&
-              tableStart(context, [content[content.length - 1], stripped], 0)
+              nestedTable(context, opener, content[content.length - 1], stripped)
             )
               table = true
+            if (!table) opener = paragraphOpener(context, opener, stripped, lazy)
             content.push(stripped)
             lastContent = j
             lazy = !table && lazyParagraph(context, stripped, lazy || residual > 0)

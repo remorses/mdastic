@@ -1335,5 +1335,46 @@
       "frontmatter",
       "gfm"
     ]
+  },
+  {
+    "name": "a lazy table delimiter row continues a nested paragraph",
+    "input": "- > a\n  b|c\n  -|-\nd\n\n***\n\n- > a\nb|c\n  -|-\nd\n\n***\n\n> - a\nb|c\n> -|-\nd\n\n***\n\n- - a\n    b|c\n  -|-\nd\n\n***\n\n> > a\n> b|c\n> -|-\nd\n\n***\n\n1. > a\n   b|c\n\t-|-\nd\n\n***\n\n- a\n  > b\n  c|d\n  -|-\ne\n\n***\n\n- a\nb|c\n  -|-\nd\n\n***\n\n- - a\n  b|c\n    -|-\nd\n\n***\n\n> - a\n>   b|c\n>   -|-\nd\n\n***\n\n- > a\n\n  b|c\n  -|-\nd\n\n***\n\n> a\n> 2. b\n> c|d\n> -|-\ne\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX lazy table delimiter row continues a nested paragraph",
+    "input": "- > a\n  b|c\n  -|-\nd\n\n***\n\n- > a\nb|c\n  -|-\nd\n\n***\n\n> - a\nb|c\n> -|-\nd\n\n***\n\n- - a\n    b|c\n  -|-\nd\n\n***\n\n> > a\n> b|c\n> -|-\nd\n\n***\n\n1. > a\n   b|c\n\t-|-\nd\n\n***\n\n- a\n  > b\n  c|d\n  -|-\ne\n\n***\n\n- a\nb|c\n  -|-\nd\n\n***\n\n- - a\n  b|c\n    -|-\nd\n\n***\n\n> - a\n>   b|c\n>   -|-\nd\n\n***\n\n- > a\n\n  b|c\n  -|-\nd\n\n***\n\n> a\n> 2. b\n> c|d\n> -|-\ne\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "a table in a nested container takes no lazy line",
+    "input": "- > a|b\n  > -|-\nc\n\n***\n\n> > a|b\n> > -|-\nc\n\n***\n\n[^x]: a|b\n    -|-\nc\n\n***\n\n[^y]: > a|b\n    > -|-\nc\n\n***\n\n- a|b\n  -|-\n\n  c\nd\n\n***\n\n[^z]: a|b\n    -|-\n\n    c\nd\n\n***\n\n- > a|b\n  > -|-\n  > c\nd\n\n***\n\n[^w]: a\n    b|c\nd\n\n[^x] [^y] [^z] [^w]\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX table in a nested container takes no lazy line",
+    "input": "- > a|b\n  > -|-\nc\n\n***\n\n> > a|b\n> > -|-\nc\n\n***\n\n[^x]: a|b\n    -|-\nc\n\n***\n\n[^y]: > a|b\n    > -|-\nc\n\n***\n\n- a|b\n  -|-\n\n  c\nd\n\n***\n\n[^z]: a|b\n    -|-\n\n    c\nd\n\n***\n\n- > a|b\n  > -|-\n  > c\nd\n\n***\n\n[^w]: a\n    b|c\nd\n\n[^x] [^y] [^z] [^w]\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "ESM after a lazy table delimiter row in a nested paragraph is text",
+    "input": "3. > a\nb|c\n\t-|-|-\nexport \n\n***\n\n- > a\n  b|c\n  -|-\nexport const a = 1\n\n***\n\n> - a\nb|c\n> -|-\nimport a from 'b'\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
   }
 ]
