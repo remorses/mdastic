@@ -2225,5 +2225,38 @@
       "frontmatter",
       "gfm"
     ]
+  },
+  {
+    "name": "markers that cannot interrupt after indented code in a container keep the next lazy line, and HTML in a container takes none",
+    "input": ">     a\n>*\nb\n\n>     c\n>-\nd\n\n>     e\n>2.\nf\n\n>     g\n>1.\nh\n\n>     i\n>\n>*\nj\n\n>     k\n>*\n    l\n\n-     m\n  *\nn\n\n-     o\n\n  2)\np\n\n1.     q\n   +\nr\n\n[^1]: s\n\n        t\n    *\nu\n\n> <div>\n> v\nw\n\n> <div>\n>     x\n>2. y\nz\n\n- <!--\n  a\nb\n\n[^1]\n",
+    "syntax": []
+  },
+  {
+    "name": "GFM markers that cannot interrupt after indented code in a container keep the next lazy line, and HTML in a container takes none",
+    "input": ">     a\n>*\nb\n\n>     c\n>-\nd\n\n>     e\n>2.\nf\n\n>     g\n>1.\nh\n\n>     i\n>\n>*\nj\n\n>     k\n>*\n    l\n\n-     m\n  *\nn\n\n-     o\n\n  2)\np\n\n1.     q\n   +\nr\n\n[^1]: s\n\n        t\n    *\nu\n\n> <div>\n> v\nw\n\n> <div>\n>     x\n>2. y\nz\n\n- <!--\n  a\nb\n\n[^1]\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "markers after fenced code, nested or unmatched containers, or open list items after indented code are unchanged",
+    "input": "    w\n*\nx\n\n> ~~~\n>     a\n>*\nb\n\n> ~~~\n>     c\n>2. d\ne\n\n>     f\n>* g\nh\n\n>     i\n>1. j\nk\n\n>     l\n*\nm\n\n> >     n\n>*\no\n\n> -     p\n>-\nq\n\n>- r\n>     s\n>-\nt\n\n>- r\n>\n>     s\n>-\nt\n\n> <!--\n>     u\n>*\nv\n\n> y\n>\n>     z\n>* a\nb\n\n> <div>\n>\nc\n\n- <div>\n\n  d\ne\n",
+    "syntax": []
+  },
+  {
+    "name": "GFM markers after fenced code, nested or unmatched containers, or open list items after indented code are unchanged",
+    "input": "    w\n*\nx\n\n> ~~~\n>     a\n>*\nb\n\n> ~~~\n>     c\n>2. d\ne\n\n>     f\n>* g\nh\n\n>     i\n>1. j\nk\n\n>     l\n*\nm\n\n> >     n\n>*\no\n\n> -     p\n>-\nq\n\n>- r\n>     s\n>-\nt\n\n>- r\n>\n>     s\n>-\nt\n\n> <!--\n>     u\n>*\nv\n\n> y\n>\n>     z\n>* a\nb\n\n> <div>\n>\nc\n\n- <div>\n\n  d\ne\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX markers after fenced code, nested or unmatched containers, or open list items after indented code are unchanged",
+    "input": "    w\n*\nx\n\n> ~~~\n>     a\n>*\nb\n\n> ~~~\n>     c\n>2. d\ne\n\n>     f\n>* g\nh\n\n>     i\n>1. j\nk\n\n>     l\n*\nm\n\n> >     n\n>*\no\n\n> -     p\n>-\nq\n\n>- r\n>     s\n>-\nt\n\n>- r\n>\n>     s\n>-\nt\n\n> <!--\n>     u\n>*\nv\n\n> y\n>\n>     z\n>* a\nb\n\n> <div>\n>\nc\n\n- <div>\n\n  d\ne\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
   }
 ]
