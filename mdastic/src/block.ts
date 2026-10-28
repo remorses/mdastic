@@ -1099,11 +1099,14 @@ function hasNestedBlankLine(source: string, content: Line[], parent: number): bo
           return true
       previousEnd = tree.end[c]
     }
-    // A trailing blank line counts only if the container ends after its line ending.
+    // A trailing blank line counts only if the container ends after its line ending (a final
+    // line at EOF has none).
     for (const line of content)
       if (
         line.start >= previousEnd &&
-        (tree.kind[n] === Kind.FootnoteDefinition ? line.next : line.end) <= end &&
+        (tree.kind[n] === Kind.FootnoteDefinition
+          ? line.end < line.next && line.next <= end
+          : line.end <= end) &&
         blank(source, line)
       )
         return true
