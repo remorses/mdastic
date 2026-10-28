@@ -1277,5 +1277,63 @@
       "frontmatter",
       "gfm"
     ]
+  },
+  {
+    "name": "Link labels only reject inner references that resolve",
+    "input": "[x[a][r]](/z)\n\n[x[r][a]](/z)\n\n[x[a][r]][b]\n\n[x[y[a][r]]](/z)\n\n[x[y[a][r]][b]](/z)\n\n[x[a][r](/z)\n\n[x[a][]](/z)\n\n[x[a][b]](/z)\n\n[x[a]](/z)\n\n[x[a](/u)](/z)\n\n[x[y[a]](/u)](/z)\n\n[a]: /a\n[b]: /b\n",
+    "syntax": []
+  },
+  {
+    "name": "GFM link labels only reject inner references that resolve",
+    "input": "[x[a][r]](/z)\n\n[x[r][a]](/z)\n\n[x[a][r]][b]\n\n[x[y[a][r]]](/z)\n\n[x[y[a][r]][b]](/z)\n\n[x[a][r](/z)\n\n[x[a][]](/z)\n\n[x[a][b]](/z)\n\n[x[a]](/z)\n\n[x[a](/u)](/z)\n\n[x[y[a]](/u)](/z)\n\n[a]: /a\n[b]: /b\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX link labels only reject inner references that resolve",
+    "input": "[x[a][r]](/z)\n\n[x[r][a]](/z)\n\n[x[a][r]][b]\n\n[x[y[a][r]]](/z)\n\n[x[y[a][r]][b]](/z)\n\n[x[a][r](/z)\n\n[x[a][]](/z)\n\n[x[a][b]](/z)\n\n[x[a]](/z)\n\n[x[a](/u)](/z)\n\n[x[y[a]](/u)](/z)\n\n[a]: /a\n[b]: /b\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "Link labels scan past image references that do not resolve",
+    "input": "[x![a][r]()](/z)\n\n[x![][]()](/z)\n\n[x![a][r](/u)](/z)\n\n[x![a][b]](/z)\n\n[x![a](/u)](/z)\n\n[x![a[b](/u)](/v)](/z)\n\n[a]: /a\n[b]: /b\n",
+    "syntax": []
+  },
+  {
+    "name": "GFM link labels scan past image references that do not resolve",
+    "input": "[x![a][r]()](/z)\n\n[x![][]()](/z)\n\n[x![a][r](/u)](/z)\n\n[x![a][b]](/z)\n\n[x![a](/u)](/z)\n\n[x![a[b](/u)](/v)](/z)\n\n[a]: /a\n[b]: /b\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX link labels scan past image references that do not resolve",
+    "input": "[x![a][r]()](/z)\n\n[x![][]()](/z)\n\n[x![a][r](/u)](/z)\n\n[x![a][b]](/z)\n\n[x![a](/u)](/z)\n\n[x![a[b](/u)](/v)](/z)\n\n[a]: /a\n[b]: /b\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "GFM footnote calls in link labels ignore a trailing resource",
+    "input": "[x[^a](/u)](/z)\n\n[x[^a][r]](/z)\n\n[[^a]()]()\n\n[x[^q](/u)](/z)\n\n[x[^a][b]](/z)\n\n[^a]: f\n[b]: /b\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX footnote calls in link labels ignore a trailing resource",
+    "input": "[x[^a](/u)](/z)\n\n[x[^a][r]](/z)\n\n[[^a]()]()\n\n[x[^q](/u)](/z)\n\n[x[^a][b]](/z)\n\n[^a]: f\n[b]: /b\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
   }
 ]
