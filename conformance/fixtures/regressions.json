@@ -1057,5 +1057,63 @@
       "frontmatter",
       "gfm"
     ]
+  },
+  {
+    "name": "MDX unclosed braces in quotes never read to a distant closing brace",
+    "input": "> ```\n> {\n> ```\n\n> ```\n> {x\n> y\n> z\n> ```\n\n- > ```\n  > {\n  > ```\n\n> > ```\n> > {\n> > ```\n\n> ```\n> {a +\n> ```\n\n{\n  a,\n  b,\n  c,\n  d\n}\n\n> {`\n> a\n> b\n> c\n> `}\n\n> {/*\n> a\n> b\n> c\n> */}\n\n> a {[\n> 1,\n> 2,\n> 3\n> ]} b\n\n{a}\n",
+    "syntax": [
+      "mdx"
+    ]
+  },
+  {
+    "name": "MDX, frontmatter and GFM unclosed braces in quotes never read to a distant closing brace",
+    "input": "> ```\n> {\n> ```\n\n> ```\n> {x\n> y\n> z\n> ```\n\n- > ```\n  > {\n  > ```\n\n> > ```\n> > {\n> > ```\n\n> ```\n> {a +\n> ```\n\n{\n  a,\n  b,\n  c,\n  d\n}\n\n> {`\n> a\n> b\n> c\n> `}\n\n> {/*\n> a\n> b\n> c\n> */}\n\n> a {[\n> 1,\n> 2,\n> 3\n> ]} b\n\n{a}\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX flow expression acorn error on its second line keeps its place before a distant brace",
+    "input": "{\na b\nc\nd\ne\n}\n",
+    "syntax": [
+      "mdx"
+    ]
+  },
+  {
+    "name": "MDX text expression acorn error on its second line keeps its place before a distant brace",
+    "input": "x {\na b\nc\nd\ne\n}\n",
+    "syntax": [
+      "mdx"
+    ]
+  },
+  {
+    "name": "MDX attribute expression acorn error on its second line keeps its place before a distant brace",
+    "input": "<A b={\na b\nc\nd\n} />\n",
+    "syntax": [
+      "mdx"
+    ]
+  },
+  {
+    "name": "MDX acorn error after blank lines keeps its place before a distant brace",
+    "input": "{\n\n\n\na b\n}\n",
+    "syntax": [
+      "mdx"
+    ]
+  },
+  {
+    "name": "MDX unclosed expression in a quote with no closing brace reaches the end of the file",
+    "input": "> {\n> a\n> b",
+    "syntax": [
+      "mdx"
+    ]
+  },
+  {
+    "name": "MDX lazy line is reported before an acorn error ahead of a distant brace",
+    "input": ">{\na b\nc\nd\n}\n",
+    "syntax": [
+      "mdx"
+    ]
   }
 ]

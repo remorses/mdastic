@@ -170,6 +170,8 @@ Do not recursively call `parseDocument` from a hook: the arena is reused. Use th
   once and remaps ESTree positions. Failed predictions retain micromark's brace-by-brace fallback,
   which stops once acorn fails before the end of the input: no later brace can close it then.
   Paragraph probes read raw source across `> ` prefixes, so retrying every brace was cubic.
+  An acorn error in a line-bounded prefix decides the expression before tokenizing to a distant
+  `}`, and each view caches its next `}`, so unclosed `{` lines in block quotes stay linear.
 - Inline JSX tags nest after markdown attention/link resolution, so crossing tags produce the
   same errors as remark. Flow JSX parents redirect block nodes through `flowParent`.
 - `positions: false` only removes mdast positions. MDX still indexes lines for ESTree and errors.

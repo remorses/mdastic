@@ -96,6 +96,11 @@ const cases: { name: string; n: number; syntax: SyntaxName[]; input: (n: number)
   { name: 'mdx flow expressions in quotes', n: 5000, syntax: mdx, input: (n) => '> {\n> }\n'.repeat(n) },
   { name: 'mdx text expressions in quotes', n: 5000, syntax: mdx, input: (n) => '> a\n> {\n> b}\n'.repeat(n) },
   { name: 'mdx attribute expressions in quotes', n: 5000, syntax: mdx, input: (n) => '> <A b={\n> 1} />\n'.repeat(n) },
+  // MDX: unclosed `{` lines in quotes must not read to the end of the document or a distant `}`
+  { name: 'mdx unclosed flow expressions in quotes', n: 5000, syntax: mdx, input: (n) => '> {\n'.repeat(n) + '\na\n' },
+  { name: 'mdx unclosed braces in fenced code in quotes', n: 5000, syntax: mdx, input: (n) => '> ```\n> {\n> ```\n'.repeat(n) },
+  { name: 'mdx unclosed flow expressions in quotes before a brace', n: 5000, syntax: mdx, input: (n) => '> {\n'.repeat(n) + '}\n' },
+  { name: 'mdx unclosed braces in fenced code in quotes before an expression', n: 5000, syntax: mdx, input: (n) => '> ```\n> {\n> ```\n'.repeat(n) + '{a}\n' },
   // Math: dollar runs mirror cmark backticks
   { name: 'math dollars', n: 2500, syntax: math, input: (n) => range(n).map((i) => 'e' + '$'.repeat(i + 1)).join('') },
   { name: 'math unmatched dollars', n: 100000, syntax: math, input: (n) => 'a $b '.repeat(n) },
