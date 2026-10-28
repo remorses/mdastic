@@ -1014,7 +1014,7 @@ function parseFootnoteDefinition(
       const stripped = stripIndent(source, input[j], FOOTNOTE_INDENT)
       content.push(stripped)
       last = j
-      lazy = lazyParagraph(context, stripped)
+      lazy = lazyParagraph(context, stripped, lazy)
     } else if (nested && !input[j].lazy && indentation(source, input[j]).indent === 0) {
       // Quirk: micromark checks the indent token before the line, so a footnote directly
       // in a footnote takes the outer indent as its own when it has none left.
@@ -1199,7 +1199,9 @@ export function parseBlocks(
             table = true
           content.push(item)
           // Tables cannot receive ordinary lazy paragraph continuation.
-          lazy = !table && lazyParagraph(context, item)
+          // Open paragraphs and the first line's inherited state reject markers that
+          // cannot interrupt, so the marker line stays paragraph text.
+          lazy = !table && lazyParagraph(context, item, lazy || (j === i && residual > 0))
         } else if (
           lazy &&
           ((!interrupts(context, current) && !marker(source, current)) ||
