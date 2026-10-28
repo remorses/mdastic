@@ -527,9 +527,10 @@ function nestedTable(context: BlockContext, opener: Line, header: Line, delimite
   while (dash < delimiter.end && source.charCodeAt(dash) !== 45) dash++
   if (dash === delimiter.end) return false
   const row = within(source, opener, delimiter)
-  return (
-    !row.lazy && !!tableStart(context, [within(source, opener, header).line, row.line], 0)
-  )
+  if (row.lazy) return false
+  const head = within(source, opener, header).line
+  // A blank line is no head row: `- a\n\n  -:\nb` is a paragraph that takes `b`.
+  return !blank(source, head) && !!tableStart(context, [head, row.line], 0)
 }
 
 // Whether `line` continues the table in the containers `opener` opened.
@@ -838,7 +839,8 @@ function tableStart(
   if (
     (!mdxMode && indentation(source, headerLine).indent >= CODE_INDENT) ||
     (marker(source, headerLine) && (!paragraph || interrupts(context, headerLine))) ||
-    quote(source, headerLine) >= 0
+    quote(source, headerLine) >= 0 ||
+    footnoteLabel(source, headerLine)
   )
     return
   const align = tableAlign(context.source, input[i + 1])
