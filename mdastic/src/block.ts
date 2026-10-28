@@ -1115,7 +1115,7 @@ function parseFootnoteDefinition(
       content.push(stripped)
       last = j
       // Tables cannot receive ordinary lazy paragraph continuation.
-      lazy = !table && lazyParagraph(context, stripped)
+      lazy = !table && lazyParagraph(context, stripped, indent >= FOOTNOTE_INDENT && lazy)
     } else if (
       lazy &&
       ((!interrupts(context, input[j]) && !marker(source, input[j])) ||
@@ -1317,7 +1317,9 @@ export function parseBlocks(
           if (!table) opener = paragraphOpener(context, opener ?? item, item, lazy)
           content.push(item)
           // Tables cannot receive ordinary lazy paragraph continuation.
-          lazy = !table && lazyParagraph(context, item)
+          // Open paragraphs and the first line's inherited state reject markers that
+          // cannot interrupt, so the marker line stays paragraph text.
+          lazy = !table && lazyParagraph(context, item, lazy || (j === i && residual > 0))
         } else if (
           lazy &&
           ((!interrupts(context, current) && !marker(source, current)) ||

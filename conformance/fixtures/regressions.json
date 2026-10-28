@@ -1691,5 +1691,47 @@
       "frontmatter",
       "gfm"
     ]
+  },
+  {
+    "name": "list markers that cannot interrupt a quoted paragraph keep it open for lazy lines",
+    "input": "a\n>*\nb\n\nc\n>-\nd\n>-\n\ne\n>+  \nf\n\ng\n>2.\nh\n\ni\n> 1)\nj\n\nk\n>>*\nl\n\nm\n- >*\nn\n\n> o\n>*\np\n\n> - q\n>   *\nr\n\n> [s]: /s\n>*\nt\n\n> u\n> >2.\nv\n\n[^1]: w\n    *\nx\n\n[s] [^1]\n",
+    "syntax": []
+  },
+  {
+    "name": "list markers in a quote that can open a list or follow no paragraph are unchanged",
+    "input": ">*\na\n\nb\n>* c\nd\n\ne\n> 1. f\ng\n\nh\n\n>*\ni\n\n> j\n>\n>*\nk\n\n> l\n> 2. m\nn\n",
+    "syntax": []
+  },
+  {
+    "name": "GFM list markers that cannot interrupt a quoted paragraph keep it open for lazy lines",
+    "input": "a\n>*\nb\n\nc\n>-\nd\n>-\n\ne\n>+  \nf\n\ng\n>2.\nh\n\ni\n> 1)\nj\n\nk\n>>*\nl\n\nm\n- >*\nn\n\n> o\n>*\np\n\n> - q\n>   *\nr\n\n> [s]: /s\n>*\nt\n\n> u\n> >2.\nv\n\n[^1]: w\n    *\nx\n\n[s] [^1]\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "GFM list markers in a quote that can open a list or follow no paragraph are unchanged",
+    "input": ">*\na\n\nb\n>* c\nd\n\ne\n> 1. f\ng\n\nh\n\n>*\ni\n\n> j\n>\n>*\nk\n\n> l\n> 2. m\nn\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX list markers that cannot interrupt a quoted paragraph keep it open for lazy lines",
+    "input": "a\n>*\nb\n\nc\n>-\nd\n>-\n\ne\n>+  \nf\n\ng\n>2.\nh\n\ni\n> 1)\nj\n\nk\n>>*\nl\n\nm\n- >*\nn\n\n> o\n>*\np\n\n> - q\n>   *\nr\n\n> [s]: /s\n>*\nt\n\n> u\n> >2.\nv\n\n[^1]: w\n    *\nx\n\n[s] [^1]\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX list markers in a quote that can open a list or follow no paragraph are unchanged",
+    "input": ">*\na\n\nb\n>* c\nd\n\ne\n> 1. f\ng\n\nh\n\n>*\ni\n\n> j\n>\n>*\nk\n\n> l\n> 2. m\nn\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
   }
 ]
