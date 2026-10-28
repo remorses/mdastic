@@ -2167,5 +2167,63 @@
     "syntax": [
       "gfm"
     ]
+  },
+  {
+    "name": "Labels inside image labels take their own references",
+    "input": "![[a][]([)](/z)\n\n![x [a][b]([)](/z)\n\n![![a][]([)](/z)\n\n![x ![a][b]([)](/z)\n\n[x [a][]([)](/z)\n\n![[q][]([)](/z)\n\n![[a][q]([)](/z)\n\n![x [a](/u)](/z)\n\n![x [a] ](/z)\n\n[a]: /a\n[b]: /b\n",
+    "syntax": []
+  },
+  {
+    "name": "GFM labels inside image labels take their own references",
+    "input": "![[a][]([)](/z)\n\n![x [a][b]([)](/z)\n\n![![a][]([)](/z)\n\n![x ![a][b]([)](/z)\n\n[x [a][]([)](/z)\n\n![[q][]([)](/z)\n\n![[a][q]([)](/z)\n\n![x [a](/u)](/z)\n\n![x [a] ](/z)\n\n[a]: /a\n[b]: /b\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX labels inside image labels take their own references",
+    "input": "![[a][]([)](/z)\n\n![x [a][b]([)](/z)\n\n![![a][]([)](/z)\n\n![x ![a][b]([)](/z)\n\n[x [a][]([)](/z)\n\n![[q][]([)](/z)\n\n![[a][q]([)](/z)\n\n![x [a](/u)](/z)\n\n![x [a] ](/z)\n\n[a]: /a\n[b]: /b\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "Inactive inner link labels take no resource",
+    "input": "![x [y [a](u) ](v])](w)\n\n![x [y ![a](u) ](v])](w)\n\n![x [y [a](u) ](v)] z](w)\n\n![x [y [a](u) ](v)](w)\n",
+    "syntax": []
+  },
+  {
+    "name": "GFM inactive inner link labels take no resource",
+    "input": "![x [y [a](u) ](v])](w)\n\n![x [y ![a](u) ](v])](w)\n\n![x [y [a](u) ](v)] z](w)\n\n![x [y [a](u) ](v)](w)\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX inactive inner link labels take no resource",
+    "input": "![x [y [a](u) ](v])](w)\n\n![x [y ![a](u) ](v])](w)\n\n![x [y [a](u) ](v)] z](w)\n\n![x [y [a](u) ](v)](w)\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "GFM footnote calls inside labels take no resource",
+    "input": "[x [^a](])](/z)\n\n![x [^a](])](/z)\n\n[x [^q](])](/z)\n\n![x [^q](])](/z)\n\n![x [^a](/u)](/z)\n\n[^a]: f\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX footnote calls inside labels take no resource",
+    "input": "[x [^a](])](/z)\n\n![x [^a](])](/z)\n\n[x [^q](])](/z)\n\n![x [^q](])](/z)\n\n![x [^a](/u)](/z)\n\n[^a]: f\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
   }
 ]
