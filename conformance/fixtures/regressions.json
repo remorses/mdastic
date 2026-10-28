@@ -2076,5 +2076,67 @@
       "gfm",
       "math"
     ]
+  },
+  {
+    "name": "A lazy line after a setext heading in a quote in a list item closes both",
+    "input": "- > a\n  > -\nb\n\n1. > c\n   > -\n   > d\n\n- > e\n  > f\ng\n\n- > h\n  > -\n  i\n",
+    "syntax": []
+  },
+  {
+    "name": "MDX lazy line after a setext heading in a quote in a list item closes both",
+    "input": "- > a\n  > -\nb\n\n1. > c\n   > -\n   > d\n\n- > e\n  > f\ng\n\n- > h\n  > -\n  i\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "A lazy line right after a table in a container cannot open a table",
+    "input": "> a|b\n> -|-\nc|d\n-|-\n\n- a|b\n  -|-\nc|d\n-|-\n\n[^x]: a|b\n    -|-\nc|d\n-|-\n\n> > a|b\n> > -|-\n> c|d\n> -|-\n\n- > a|b\n  > -|-\n  c|d\n  -|-\ne\n\n> a|b\n> -|-\n> c|d\ne|f\n-|-\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX lazy line right after a table in a container cannot open a table",
+    "input": "> a|b\n> -|-\nc|d\n-|-\n\n- a|b\n  -|-\nc|d\n-|-\n\n[^x]: a|b\n    -|-\nc|d\n-|-\n\n> > a|b\n> > -|-\n> c|d\n> -|-\n\n- > a|b\n  > -|-\n  c|d\n  -|-\ne\n\n> a|b\n> -|-\n> c|d\ne|f\n-|-\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "Lines after a blank, a fence or a continued row can still open a table",
+    "input": "> a|b\n> -|-\n\nc|d\n-|-\n\n- ```\n  a|b\n  -|-\nc|d\n-|-\n\n> a|b\n> -|-\n> c|d\n> -|-\n\n- a|b\n  -|-\n  c|d\n\nd|e\n-|-\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "A blank line or footnote label is no table head for a delimiter-like row in a container",
+    "input": "+\n  -:\nx\n\n- a\n\n  -|\nb\n\n1) [^1]:\n   |-\nc\n\n[^x]: a\n\n    :-\nd\n\n> - e\n>\n>   -|\n> f\n\n- a|b\n\n  -|-\nc\n\n- a|b\n  -|-\nc\n\n- [^1]: a|b\n  -|-\ne\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX blank line or footnote label is no table head for a delimiter-like row in a container",
+    "input": "+\n  -:\nx\n\n- a\n\n  -|\nb\n\n1) [^1]:\n   |-\nc\n\n[^x]: a\n\n    :-\nd\n\n> - e\n>\n>   -|\n> f\n\n- a|b\n\n  -|-\nc\n\n- a|b\n  -|-\nc\n\n- [^1]: a|b\n  -|-\ne\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX lazy expression after a delimiter-like paragraph in a list item is an error",
+    "input": "+\n  -:\n{\n}",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
   }
 ]

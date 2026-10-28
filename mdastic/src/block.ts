@@ -95,6 +95,9 @@ let quoteDepth = 0
 // A line that continues an open list as its next item. micromark closes the containers inside
 // that list before the preceding blank lines, so they never close at its prefix.
 let siblingLine: Line | undefined
+// The line right after a container whose last line is a table row. micromark tries it
+// as a lazy body row, which fails, and never as a new table head: `> a|b\n> -|-\nc|d\n-|-`.
+let afterTable: Line | undefined
 
 let taskCount = 0
 let taskParents = new Int32Array(INITIAL_TASK_CAPACITY)
@@ -110,6 +113,7 @@ export function resetBlocks(): void {
   runInput = undefined
   quoteDepth = 0
   siblingLine = undefined
+  afterTable = undefined
   taskCount = 0
   taskViews.length = 0
 }
@@ -576,9 +580,10 @@ function nestedTable(context: BlockContext, opener: Line, header: Line, delimite
   while (dash < delimiter.end && source.charCodeAt(dash) !== 45) dash++
   if (dash === delimiter.end) return false
   const row = within(source, opener, delimiter)
-  return (
-    !row.lazy && !!tableStart(context, [within(source, opener, header).line, row.line], 0)
-  )
+  if (row.lazy) return false
+  const head = within(source, opener, header).line
+  // A blank line is no head row: `- a\n\n  -:\nb` is a paragraph that takes `b`.
+  return !blank(source, head) && !!tableStart(context, [head, row.line], 0)
 }
 
 // Whether `line` continues the table in the containers `opener` opened.
@@ -938,7 +943,8 @@ function tableStart(
   if (
     (!mdxMode && indentation(source, headerLine).indent >= CODE_INDENT) ||
     (marker(source, headerLine) && (!paragraph || interrupts(context, headerLine))) ||
-    quote(source, headerLine) >= 0
+    quote(source, headerLine) >= 0 ||
+    footnoteLabel(source, headerLine)
   )
     return
   const align = tableAlign(context.source, input[i + 1])
@@ -951,6 +957,21 @@ function tableStart(
   return align
 }
 
+// Whether the innermost last block of container `n` is a table whose last row ends at `end`.
+// Callers check for a table start first: this walks the nesting depth.
+function endsWithTable(n: number, end: number): boolean {
+  let last = tree.last[n]
+  while (
+    last &&
+    (tree.kind[last] === Kind.Blockquote ||
+      tree.kind[last] === Kind.List ||
+      tree.kind[last] === Kind.ListItem ||
+      tree.kind[last] === Kind.FootnoteDefinition)
+  )
+    last = tree.last[last]
+  return !!last && tree.kind[last] === Kind.Table && tree.end[last] === end
+}
+
 function parseTable(
   context: BlockContext,
   input: Line[],
@@ -958,6 +979,7 @@ function parseTable(
   parent: number,
   paragraph: boolean,
 ): number {
+  if (input[i] === afterTable) return 0
   const align = tableStart(context, input, i, paragraph)
   if (!align) return 0
   const source = context.source
@@ -1165,6 +1187,7 @@ function parseFootnoteDefinition(
   let lazy = lazyParagraph(context, content[0], residual > 0)
   let opener = content[0]
   let table = false
+  let rejected: Line | undefined
   for (; j < input.length; j++) {
     const scan = indentation(source, input[j])
     const indent = scan.indent
@@ -1181,9 +1204,13 @@ function parseFootnoteDefinition(
     ) {
       const stripped =
         indent >= FOOTNOTE_INDENT ? stripIndent(source, input[j], FOOTNOTE_INDENT) : input[j]
-      if (table) table = tableRow(context, opener, stripped)
-      else if (
+      if (table) {
+        table = tableRow(context, opener, stripped)
+        // micromark tried the rejected row as a body row, so it cannot open a table.
+        if (!table) rejected = stripped
+      } else if (
         context.config.gfm &&
+        content[content.length - 1] !== rejected &&
         nestedTable(context, opener, content[content.length - 1], stripped)
       )
         table = true
@@ -1220,6 +1247,7 @@ function parseFootnoteDefinition(
     j = i + stop
     tree.end[n] = input[j - 1].end
   }
+  if (tableStart(context, input, j) && endsWithTable(n, input[j - 1].end)) afterTable = input[j]
   if (tree.last[n]) tree.end[n] = Math.max(tree.end[n], tree.end[tree.last[n]])
   return j - i
 }
@@ -1371,6 +1399,7 @@ export function parseBlocks(
       let j = i
       let lazy = false
       let table = false
+      let rejected: Line | undefined
       let opener: Line | undefined
       for (; j < input.length; j++) {
         const current = input[j]
@@ -1383,10 +1412,14 @@ export function parseBlocks(
             padding: quotePadding(source, stripped),
             lazy: current.lazy,
           }
-          if (table && opener) table = tableRow(context, opener, item)
-          else if (
+          if (table && opener) {
+            table = tableRow(context, opener, item)
+            // micromark tried the rejected row as a body row, so it cannot open a table.
+            if (!table) rejected = item
+          } else if (
             context.config.gfm &&
             opener &&
+            content[content.length - 1] !== rejected &&
             nestedTable(context, opener, content[content.length - 1], item)
           )
             table = true
@@ -1417,8 +1450,10 @@ export function parseBlocks(
       if (stop < content.length) {
         j = i + stop
         tree.end[n] = input[j - 1].end
-        if (input[j].lazy) return j
       }
+      if (tableStart(context, input, j) && endsWithTable(n, input[j - 1].end)) afterTable = input[j]
+      // A lazy line closes every container up to the one that accepted it.
+      if (input[j]?.lazy) return j
       // Quirk: a new container after a stripped quote prefix closes at that prefix.
       if (j < input.length && quotePrefix(source, input[j]) && marker(source, input[j]))
         tree.end[n] = input[j].start
@@ -1507,6 +1542,7 @@ export function parseBlocks(
         let lastContent = itemStart
         let itemSpread = false
         let table = false
+        let rejected: Line | undefined
         for (; j < input.length; j++) {
           const current = input[j]
           if (blank(source, current)) {
@@ -1531,9 +1567,13 @@ export function parseBlocks(
           // A lazy line skipped this item's continuation, so its indent stays content.
           if (!current.lazy && scan.indent >= mark.indent) {
             const stripped = stripIndent(source, current, mark.indent)
-            if (table) table = tableRow(context, opener, stripped)
-            else if (
+            if (table) {
+              table = tableRow(context, opener, stripped)
+              // micromark tried the rejected row as a body row, so it cannot open a table.
+              if (!table) rejected = stripped
+            } else if (
               context.config.gfm &&
+              content[content.length - 1] !== rejected &&
               nestedTable(context, opener, content[content.length - 1], stripped)
             )
               table = true
@@ -1575,6 +1615,8 @@ export function parseBlocks(
           lastContent = j - 1
           tree.end[item] = input[lastContent].end
         }
+        if (tableStart(context, input, j) && endsWithTable(item, input[j - 1].end))
+          afterTable = input[j]
         // Only the first item can interrupt a paragraph; later items never inherit it.
         residual = InterruptState.None
         const nextMark = j < input.length ? marker(source, input[j]) : undefined
