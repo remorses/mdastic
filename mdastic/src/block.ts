@@ -94,9 +94,16 @@ let taskCount = 0
 let taskParents = new Int32Array(INITIAL_TASK_CAPACITY)
 let taskStarts = new Int32Array(INITIAL_TASK_CAPACITY)
 const taskViews: (View | undefined)[] = []
+// The last definition continuation scan: lines runStart..runLimit-1 of runInput continue a
+// paragraph, so each line of a definition run shares one scan. runTable: a table starts there.
+let runInput: Line[] | undefined
+let runStart = 0
+let runLimit = 0
+let runTable = false
 
 export function resetBlocks(): void {
   noContainers = false
+  runInput = undefined
   quoteDepth = 0
   siblingLine = undefined
   taskCount = 0
@@ -698,17 +705,54 @@ function parseDefinition(
   }
   // ── Collect continuation lines without crossing another block construct ──
   let limit = at + 1
-  while (
-    limit < input.length &&
-    !blank(original, input[limit]) &&
-    !interrupts(context, input[limit]) &&
-    !setext(original, input[limit])
-  ) {
-    if (tableStart(context, input, limit - 1)) return 0
-    limit++
+  if (input === runInput && at >= runStart && at < runLimit) {
+    if (runTable) return 0
+    limit = runLimit
+  } else {
+    runInput = input
+    runStart = at
+    runTable = false
+    while (
+      limit < input.length &&
+      !blank(original, input[limit]) &&
+      !interrupts(context, input[limit]) &&
+      !setext(original, input[limit])
+    ) {
+      if (tableStart(context, input, limit - 1)) {
+        runLimit = limit
+        runTable = true
+        return 0
+      }
+      limit++
+    }
+    runLimit = limit
   }
-  const view = viewFor(original, input.slice(at, limit), false)
+  // A definition usually spans a line or two of its run. Read a doubling window of lines and
+  // widen it only when a read reaches the window end, where the full run could differ.
+  for (let size = 2; ; size *= 2) {
+    const stop = Math.min(limit, at + size)
+    const consumed = readDefinition(context, input, at, stop, limit, parent, scan)
+    if (consumed >= 0) return consumed
+  }
+}
+
+// Consumed lines of the definition in lines at..stop-1, 0 when there is none, or -1 when the
+// window ends before the definition does and more of the run (up to limit) must be read.
+function readDefinition(
+  context: BlockContext,
+  input: Line[],
+  at: number,
+  stop: number,
+  limit: number,
+  parent: number,
+  scan: { start: number },
+): number {
+  const original = context.source
+  const line = input[at]
+  const view = viewFor(original, input.slice(at, stop), false)
   const source = view.source
+  // The window's text is a prefix of the run's, so only reads at its end may differ.
+  const partial = stop < limit
   // The view starts with the line's virtual tab columns.
   let i = scan.start - line.start + (line.padding ?? 0) + 1
   // ── Read and normalize the reference label ──
@@ -722,6 +766,7 @@ function parseDefinition(
     if (source.charCodeAt(i) === 92) i++
     i++
   }
+  if (partial && i + 1 >= source.length) return -1
   if (
     i - labelStart > MAX_LABEL_LENGTH ||
     i === labelStart ||
@@ -739,6 +784,8 @@ function parseDefinition(
     while (space(source.charCodeAt(i))) i++
   }
   // ── Read destination and optional title, then commit the definition ──
+  // Destinations end at a line ending, so one inside the window bounds every read up to it.
+  if (partial && !lineEndAfter(source, i)) return -1
   const dest = destination(source, i, source.length)
   if (!dest || dest.end === i) return 0
   i = dest.end
@@ -750,12 +797,14 @@ function parseDefinition(
   if (newline) {
     if (source.charCodeAt(i++) === 13 && source.charCodeAt(i) === 10) i++
     while (space(source.charCodeAt(i))) i++
+    if (partial && i >= source.length) return -1
   }
   if (i > destEnd) {
     const t = title(source, i, source.length)
     if (t) {
       let stop = t.end
       while (space(source.charCodeAt(stop))) stop++
+      if (partial && stop >= source.length) return -1
       if (
         stop === source.length ||
         source.charCodeAt(stop) === 10 ||
@@ -764,7 +813,13 @@ function parseDefinition(
         label = t.value || null
         end = stop
       } else if (!newline) return 0
-    } else if (!newline && i < source.length) return 0
+    } else {
+      // An open title can only fail at a blank line or the end of the run.
+      const c = source.charCodeAt(i)
+      if (partial && (c === Char.DoubleQuote || c === Char.SingleQuote || c === Char.LeftParen))
+        return -1
+      if (!newline && i < source.length) return 0
+    }
   } else if (i < source.length) return 0
   const absoluteEnd = offset(view, end)
   let consumed = 1
@@ -776,6 +831,14 @@ function parseDefinition(
   // CommonMark resolves duplicate labels to the first definition.
   if (!context.definitions.has(identifier)) context.definitions.set(identifier, data)
   return consumed
+}
+
+function lineEndAfter(source: string, i: number): boolean {
+  for (; i < source.length; i++) {
+    const c = source.charCodeAt(i)
+    if (c === 10 || c === 13) return true
+  }
+  return false
 }
 
 function tableCells(source: string, line: Line): [number, number][] {

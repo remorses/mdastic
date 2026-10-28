@@ -1798,5 +1798,26 @@
       "frontmatter",
       "gfm"
     ]
+  },
+  {
+    "name": "Definition runs read titles and labels past the next line",
+    "input": "[a]: /a\n[b]: /b \"t\nu\nv\nw\"\n[c\nd]: /c\n[e]:\n/e\n'f\ng'\n[h]: /h\n[i]: /i (t\nu\nv\nw\nx\ny) z\n[j]: /j\n\n[m]: /m\n[n]: /n\n===\n\n> [o]: /o\n> [p]: /p (q\n> r\n> s)\n> [t]: /t\n\n[u]: /u\r\n[v]: /v \"w\r\nx\"\r\n[y]: /y\r\n\n[a] [b] [c d] [e] [h] [i] [j] [m] [n] [o] [p] [t] [u] [v] [y]\n",
+    "syntax": []
+  },
+  {
+    "name": "GFM definition runs read titles and labels past the next line",
+    "input": "[a]: /a\n[b]: /b \"t\nu\nv\nw\"\n[c\nd]: /c\n[e]:\n/e\n'f\ng'\n[h]: /h\n[i]: /i (t\nu\nv\nw\nx\ny) z\n[j]: /j\n\n[m]: /m\n[n]: /n\n===\n\n> [o]: /o\n> [p]: /p (q\n> r\n> s)\n> [t]: /t\n\n[u]: /u\r\n[v]: /v \"w\r\nx\"\r\n[y]: /y\r\n\n[a] [b] [c d] [e] [h] [i] [j] [m] [n] [o] [p] [t] [u] [v] [y]\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX definition runs read titles and labels past the next line",
+    "input": "[a]: /a\n[b]: /b \"t\nu\nv\nw\"\n[c\nd]: /c\n[e]:\n/e\n'f\ng'\n[h]: /h\n[i]: /i (t\nu\nv\nw\nx\ny) z\n[j]: /j\n\n[m]: /m\n[n]: /n\n===\n\n> [o]: /o\n> [p]: /p (q\n> r\n> s)\n> [t]: /t\n\n[u]: /u\r\n[v]: /v \"w\r\nx\"\r\n[y]: /y\r\n\n[a] [b] [c d] [e] [h] [i] [j] [m] [n] [o] [p] [t] [u] [v] [y]\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
   }
 ]
