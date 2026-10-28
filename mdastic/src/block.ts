@@ -1297,6 +1297,65 @@ function hasNestedBlankLine(source: string, content: Line[], parent: number): bo
   return false
 }
 
+// Keep collection locals off the recursive parseBlocks frame to preserve deep quote capacity.
+function quoteLines(
+  context: BlockContext,
+  input: Line[],
+  i: number,
+  residual: InterruptState,
+  content: Line[],
+): number {
+  const source = context.source
+  let j = i
+  let lazy = false
+  let table = false
+  let rejected: Line | undefined
+  let opener: Line | undefined
+  for (; j < input.length; j++) {
+    const current = input[j]
+    const stripped = quote(source, current)
+    if (stripped >= 0) {
+      const item = {
+        start: stripped,
+        end: current.end,
+        next: current.next,
+        padding: quotePadding(source, stripped),
+        lazy: current.lazy,
+      }
+      if (table && opener) {
+        table = tableRow(context, opener, item)
+        // micromark tried the rejected row as a body row, so it cannot open a table.
+        if (!table) rejected = item
+      } else if (
+        context.config.gfm &&
+        opener &&
+        content[content.length - 1] !== rejected &&
+        nestedTable(context, opener, content[content.length - 1], item)
+      )
+        table = true
+      if (!table) opener = paragraphOpener(context, opener ?? item, item, lazy)
+      content.push(item)
+      // Tables cannot receive ordinary lazy paragraph continuation.
+      // Open paragraphs and the first line's inherited state reject markers that
+      // cannot interrupt, so the marker line stays paragraph text.
+      lazy = !table && lazyParagraph(context, item, lazy || (j === i && residual > 0))
+    } else if (
+      lazy &&
+      ((!interrupts(context, current) && !marker(source, current)) ||
+        lazyFlowSpan(context, current))
+    ) {
+      const take = lazyLine(context, current)
+      if (take === LazyLine.Stop) break
+      content.push({ ...current, lazy: true })
+      if (take === LazyLine.TakeLast) {
+        j++
+        break
+      }
+    } else break
+  }
+  return j
+}
+
 export function parseBlocks(
   context: BlockContext,
   input: Line[],
@@ -1402,53 +1461,7 @@ export function parseBlocks(
         tree.end[previous] = line.start
       }
       const content: Line[] = []
-      let j = i
-      let lazy = false
-      let table = false
-      let rejected: Line | undefined
-      let opener: Line | undefined
-      for (; j < input.length; j++) {
-        const current = input[j]
-        const stripped = quote(source, current)
-        if (stripped >= 0) {
-          const item = {
-            start: stripped,
-            end: current.end,
-            next: current.next,
-            padding: quotePadding(source, stripped),
-            lazy: current.lazy,
-          }
-          if (table && opener) {
-            table = tableRow(context, opener, item)
-            // micromark tried the rejected row as a body row, so it cannot open a table.
-            if (!table) rejected = item
-          } else if (
-            context.config.gfm &&
-            opener &&
-            content[content.length - 1] !== rejected &&
-            nestedTable(context, opener, content[content.length - 1], item)
-          )
-            table = true
-          if (!table) opener = paragraphOpener(context, opener ?? item, item, lazy)
-          content.push(item)
-          // Tables cannot receive ordinary lazy paragraph continuation.
-          // Open paragraphs and the first line's inherited state reject markers that
-          // cannot interrupt, so the marker line stays paragraph text.
-          lazy = !table && lazyParagraph(context, item, lazy || (j === i && residual > 0))
-        } else if (
-          lazy &&
-          ((!interrupts(context, current) && !marker(source, current)) ||
-            lazyFlowSpan(context, current))
-        ) {
-          const take = lazyLine(context, current)
-          if (take === LazyLine.Stop) break
-          content.push({ ...current, lazy: true })
-          if (take === LazyLine.TakeLast) {
-            j++
-            break
-          }
-        } else break
-      }
+      let j = quoteLines(context, input, i, residual, content)
       const n = node(Kind.Blockquote, scan.start, input[j - 1].end, parent)
       quoteDepth++
       const stop = parseBlocks(context, content, n, false, residual, input[j] ?? boundary)

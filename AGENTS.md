@@ -107,6 +107,7 @@ scan.ts ──► ASCII/Unicode classification, entities, UTF-16 line positions
   separate views), so references can precede definitions. Consumed views are released immediately.
   Fenced code, HTML and footnote recognizers return consumed line counts; `parseBlocks` owns
   interruption/lazy state and recognition order. JSX blank-line checks use a shared traversal.
+  `quoteLines` keeps collection locals outside recursive `parseBlocks` frames to preserve nesting.
 - `scan.ts` finds CR/LF with native string searches once. Block lines and positions share the typed
   line-start index. Position lookups use a nearby cursor and binary-search fallback.
 - `inline.ts` jumps between native-regex syntax candidates. Email-bearing views use an ASCII table;
