@@ -769,6 +769,9 @@ function row(context: BlockContext, line: Line, parent: number): void {
   }
 }
 
+// HTML flow is tried before tables at `<`, so a table cannot start on an HTML block start.
+// Interrupting paragraph content, the head row attempt still succeeds: it ends the paragraph,
+// and then an HTML block of any kind, even one that cannot interrupt, starts there.
 function tableStart(
   context: BlockContext,
   input: Line[],
@@ -781,7 +784,8 @@ function tableStart(
   if (
     (!mdxMode && indentation(source, headerLine).indent >= CODE_INDENT) ||
     (marker(source, headerLine) && (!paragraph || interrupts(context, headerLine))) ||
-    quote(source, headerLine) >= 0
+    quote(source, headerLine) >= 0 ||
+    (!paragraph && !mdxMode && htmlBlock(source, headerLine, false))
   )
     return
   const align = tableAlign(context.source, input[i + 1])
@@ -801,6 +805,8 @@ function parseTable(
   parent: number,
   paragraph: boolean,
 ): number {
+  // The paragraph this line may interrupt has ended, so HTML blocks win here.
+  if (!mdxMode && htmlBlock(context.source, input[i], false)) return 0
   const align = tableStart(context, input, i, paragraph)
   if (!align) return 0
   const source = context.source
@@ -1195,7 +1201,11 @@ export function parseBlocks(
             context.config.gfm && content.length && !setext(source, item)
               ? tableAlign(source, item)
               : undefined
-          if (align && tableCells(source, content[content.length - 1]).length === align.length)
+          if (
+            align &&
+            tableCells(source, content[content.length - 1]).length === align.length &&
+            (context.config.mdx || !htmlBlock(source, content[content.length - 1], false))
+          )
             table = true
           content.push(item)
           // Tables cannot receive ordinary lazy paragraph continuation.
@@ -1518,10 +1528,14 @@ export function parseBlocks(
     }
     // ── HTML blocks end at their terminator, blank line or lazy boundary ──
     // Definitions are paragraph content, so HTML that cannot interrupt one stays text,
-    // except on a lazy line, which ends the definitions' container.
+    // except on a lazy line, which ends the definitions' container, or a table head row.
     const html =
       !context.config.mdx &&
-      htmlBlock(source, line, residual === InterruptState.Definition && !line.lazy)
+      htmlBlock(
+        source,
+        line,
+        residual === InterruptState.Definition && !line.lazy && !tableStart(context, input, i, true),
+      )
     if (html) {
       i += parseHtmlBlock(context, input, i, parent, html, boundary)
       residual = InterruptState.None
