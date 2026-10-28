@@ -5,7 +5,7 @@ import { MdxParseError } from './syntax.ts'
 import { alpha, Char, digit, entity, isWhitespace, point, position, space } from './scan.ts'
 import { append, Kind, node, tree } from './tree.ts'
 import { offset, type View } from './inline.ts'
-import { blank, type BlockContext, type Line, startsContainer } from './block.ts'
+import { blank, type BlockContext, inQuote, type Line, startsContainer } from './block.ts'
 import type { MdxJsxAttribute, MdxJsxExpressionAttribute } from './types.ts'
 import { acornProgram, expression, lineOffset, mdxError, setExpressionSource } from './mdx-scan.ts'
 
@@ -359,6 +359,9 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
   const current = (parent: number) => stacks.get(parent)?.at(-1)?.node ?? parent
   // mdast-util-mdx-jsx reports tag mismatches after micromark tokenized the whole document.
   let mismatched: (() => never) | undefined
+  // A last EOF line of only container prefixes writes no flow chunk, so EOF stays at its start.
+  const prefixOnly = (line: Line) => line.start === line.next && !line.padding
+  const eofLineStart = () => Math.max(source.lastIndexOf('\n'), source.lastIndexOf('\r')) + 1
   function flowView(
     context: BlockContext,
     input: Line[],
@@ -402,11 +405,20 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
         chunks.push(source.slice(line.start, line.next))
         for (let i = line.start; i < line.next; i++) map[k++] = i
       }
-      map[k] = input.at(-1)!.next
+      map[k] = prefixOnly(input.at(-1)!) ? eofLineStart() : input.at(-1)!.next
       view = { source: chunks.join(''), base: 0, map, lazy }
     }
     // A line that starts a new container ends the flow; any other next line is lazy.
-    if (boundary && !startsContainer(context, boundary)) view.boundary = boundary.start
+    if (boundary && !startsContainer(context, boundary))
+      view.boundary = prefixOnly(boundary) ? eofLineStart() : boundary.start
+    // So is the empty line after a final line ending, inside a block quote.
+    else if (
+      !boundary &&
+      inQuote() &&
+      (source.charCodeAt(source.length - 1) === Char.LineFeed ||
+        source.charCodeAt(source.length - 1) === Char.CarriageReturn)
+    )
+      view.boundary = source.length
     const result = { view, starts }
     views.set(input, result)
     return result
