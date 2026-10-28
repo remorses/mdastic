@@ -163,7 +163,7 @@ function stripIndent(source: string, line: Line, amount: number): Line {
   }
 }
 
-function tabWidth(source: string, at: number): number {
+export function tabWidth(source: string, at: number): number {
   let start = at
   while (start && source.charCodeAt(start - 1) !== 10 && source.charCodeAt(start - 1) !== 13)
     start--

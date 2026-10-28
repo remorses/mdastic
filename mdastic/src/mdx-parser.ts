@@ -7,7 +7,7 @@ import { append, Kind, node, tree } from './tree.ts'
 import { offset, type View } from './inline.ts'
 import { blank, type BlockContext, type Line, startsContainer } from './block.ts'
 import type { MdxJsxAttribute, MdxJsxExpressionAttribute } from './types.ts'
-import { acornProgram, expression, mdxError } from './mdx-scan.ts'
+import { acornProgram, expression, lineOffset, mdxError, setExpressionSource } from './mdx-scan.ts'
 
 interface Tag {
   type: 'tag'
@@ -52,7 +52,7 @@ function tag(view: View, start: number, end: number, syntax: MdxSyntax): Tag | u
     if (view.lazy?.has(i))
       mdxError(
         'Unexpected lazy line in container, expected line to be prefixed with `>` when in a block quote, whitespace when in a list, etc',
-        offset(view, i),
+        lineOffset(view, i),
         'unexpected-lazy',
         'micromark-extension-mdx-jsx',
       )
@@ -352,6 +352,7 @@ function imageAlt(parent: number): string {
 export function mdxHooks(source: string, syntax: MdxSyntax) {
   // Per-document stacks/imports and cached container views never escape this closure.
   const rawView: View = { source, base: 0 }
+  setExpressionSource(source)
   const stacks = new Map<number, { tag: Tag; node: number }[]>()
   const imports: string[] = []
   const views = new WeakMap<Line[], { view: View; starts: Int32Array }>()
@@ -367,15 +368,18 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
     const cached = views.get(input)
     if (cached) return cached
     const starts = new Int32Array(input.length)
-    let length = 0
     let contiguous = true
+    for (let j = 1; j < input.length; j++)
+      if (input[j].start !== input[j - 1].next) contiguous = false
+    // Stripped lines keep a partly consumed tab's columns as spaces, like inline views.
+    let length = 0
+    const lazy = new Set<number>()
     for (let j = 0; j < input.length; j++) {
+      if (input[j].lazy) lazy.add(length)
+      if (!contiguous) length += input[j].padding ?? 0
       starts[j] = length
       length += input[j].next - input[j].start
-      if (j && input[j].start !== input[j - 1].next) contiguous = false
     }
-    const lazy = new Set<number>()
-    for (let j = 0; j < input.length; j++) if (input[j].lazy) lazy.add(starts[j])
     let view: View
     if (contiguous)
       view =
@@ -391,6 +395,10 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
       const chunks: string[] = []
       let k = 0
       for (const line of input) {
+        for (let p = 0; p < (line.padding ?? 0); p++) {
+          chunks.push(' ')
+          map[k++] = line.start - 1
+        }
         chunks.push(source.slice(line.start, line.next))
         for (let i = line.start; i < line.next; i++) map[k++] = i
       }
