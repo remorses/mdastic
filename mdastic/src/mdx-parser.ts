@@ -358,6 +358,8 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
   const current = (parent: number) => stacks.get(parent)?.at(-1)?.node ?? parent
   // mdast-util-mdx-jsx reports tag mismatches after micromark tokenized the whole document.
   let mismatched: (() => never) | undefined
+  // Where that closing tag ends: errors are reported in token exit order.
+  let mismatchedAt = 0
   function flowView(
     context: BlockContext,
     input: Line[],
@@ -601,8 +603,10 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
           }
           continue
         }
-        if (open.tag.name !== item.name)
-          mismatched ??= () => mismatch(item, open.tag, view)
+        if (open.tag.name !== item.name && !mismatched) {
+          mismatched = () => mismatch(item, open.tag, view)
+          mismatchedAt = offset(view, item.end)
+        }
         tree.end[open.node] = offset(view, item.end)
         tree.b[open.node] = offset(view, item.start)
         stack.pop()
@@ -693,7 +697,6 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
       }
     },
     finish() {
-      mismatched?.()
       const types: Partial<Record<Kind, string>> = {
         [Kind.Root]: 'root',
         [Kind.Paragraph]: 'paragraph',
@@ -719,6 +722,10 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
         if (tree.kind[n] === Kind.TableCell) return header ? 'tableHeader' : 'tableData'
         return types[tree.kind[n]] ?? 'paragraph'
       }
+      // A flow mismatch whose closing tag exits first wins over an error at `at`.
+      function earlier(at: number): void {
+        if (mismatched && mismatchedAt <= at) mismatched()
+      }
       function resolveInlineJsx(parent: number, active?: Tag, header = false): void {
         const pending: { tag: Tag; node: number }[] = []
         const children: number[] = []
@@ -735,6 +742,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
             if (t.close) {
               const open = pending.at(-1)
               if (!open) {
+                earlier(t.end)
                 if (active) {
                   // Active JSX cannot close across a Markdown container boundary.
                   const type = tokenType(parent, header)
@@ -757,7 +765,10 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
                 }
                 mismatch(t, undefined, { source, base: 0 })
               }
-              if (open.tag.name !== t.name) mismatch(t, open.tag, { source, base: 0 })
+              if (open.tag.name !== t.name) {
+                earlier(t.end)
+                mismatch(t, open.tag, { source, base: 0 })
+              }
               tree.end[open.node] = t.end
               pending.pop()
             } else {
@@ -791,7 +802,8 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
         }
         // ── Reject unfinished inline and flow stacks at their owning boundary ──
         const open = pending.at(-1)
-        if (open)
+        if (open) {
+          earlier(tree.end[parent])
           mdxError(
             'Expected a closing tag for `' +
               abbreviated(open.tag, false) +
@@ -804,8 +816,10 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
             'end-tag-mismatch',
             'mdast-util-mdx-jsx',
           )
+        }
         const flowOpen = stacks.get(parent)?.at(-1)
         if (flowOpen) {
+          earlier(tree.end[parent])
           const reason =
             'Expected a closing tag for `' +
             abbreviated(flowOpen.tag, false) +
@@ -831,6 +845,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
         }
       }
       resolveInlineJsx(1)
+      mismatched?.()
     },
   }
 }
