@@ -2,8 +2,9 @@
 // Failed predictions retain micromark-compatible closing-brace retries and errors.
 import type { MdxSyntax } from './syntax.ts'
 import { MdxParseError } from './syntax.ts'
-import { Char, isWhitespace, point, space, TAB_SIZE } from './scan.ts'
+import { Char, isWhitespace, point, space } from './scan.ts'
 import { offset, type View } from './inline.ts'
+import { tabWidth } from './block.ts'
 
 const ACORN_LANGUAGE_VERSION = 2024
 const EXPRESSION_KEY_STRIDE = 4
@@ -210,6 +211,18 @@ interface Expression {
   data?: { estree: any }
 }
 const expressions = new WeakMap<View, Map<number, Expression>>()
+// Container views drop prefixes, so tab columns and virtual spaces are read from the document.
+let documentSource = ''
+export function resetExpressions(source: string): void {
+  documentSource = source
+}
+function virtualSpace(view: View, i: number): boolean {
+  return view.source.charCodeAt(i) === Char.Space && documentSource.charCodeAt(offset(view, i)) === Char.Tab
+}
+// A line's virtual spaces map to its consumed tab; errors point after it.
+export function lineOffset(view: View, i: number): number {
+  return offset(view, i) + (virtualSpace(view, i) ? 1 : 0)
+}
 
 export function expression(
   view: View,
@@ -257,7 +270,7 @@ export function expression(
   if (lazy >= 0)
     mdxError(
       LAZY_EXPRESSION,
-      offset(view, lazy),
+      lineOffset(view, lazy),
       'unexpected-lazy',
     )
   if (view.boundary !== undefined)
@@ -290,7 +303,7 @@ export function collect(
     if (view.lazy?.has(i))
       mdxError(
         LAZY_EXPRESSION,
-        offset(view, i),
+        lineOffset(view, i),
         'unexpected-lazy',
       )
     if (i === end) break
@@ -303,38 +316,36 @@ export function collect(
       if (view.lazy?.has(i + 1))
         mdxError(
           LAZY_EXPRESSION,
-          offset(view, i + 1),
+          lineOffset(view, i + 1),
           'unexpected-lazy',
         )
+      // micromark eats two whitespace codes; a tab is one code per column it spans, from
+      // its real source column, and a container that consumed part of a tab leaves the
+      // remaining columns as virtual spaces that map back to the tab.
       let size = 0
-      while (
-        i + 1 < end &&
-        space(view.source.charCodeAt(i + 1)) &&
-        size < MDX_CONTINUATION_INDENT
-      ) {
+      let extra = 0
+      let after = 0
+      while (i + 1 < end && space(view.source.charCodeAt(i + 1))) {
+        const at = offset(view, i + 1)
         const tab = view.source.charCodeAt(i + 1) === Char.Tab
-        let width = 1
-        if (tab) {
-          let lineStart = i + 1
-          while (
-            lineStart > 0 &&
-            view.source.charCodeAt(lineStart - 1) !== 10 &&
-            view.source.charCodeAt(lineStart - 1) !== 13
-          )
-            lineStart--
-          width = TAB_SIZE - ((i + 1 - lineStart) % TAB_SIZE)
+        const padding = virtualSpace(view, i + 1)
+        if (size >= MDX_CONTINUATION_INDENT) {
+          if (!padding) break
+          extra++
+        } else {
+          size += tab ? tabWidth(documentSource, at) : 1
+          if (size > MDX_CONTINUATION_INDENT) extra = size - MDX_CONTINUATION_INDENT
         }
-        size += width
         i++
-        if (size > MDX_CONTINUATION_INDENT) {
-          virtual = true
-          ending = offset(view, i) + 1
-          // mdast retains virtual spaces; Acorn collection drops leading virtual spaces.
-          if (keepVirtual) {
-            value += ' '.repeat(size - MDX_CONTINUATION_INDENT)
-            for (let k = MDX_CONTINUATION_INDENT; k < size; k++)
-              indices.push(offset(view, i) + 1)
-          }
+        after = at + 1
+      }
+      if (extra) {
+        virtual = true
+        ending = after
+        // mdast retains virtual spaces; Acorn collection drops leading virtual spaces.
+        if (keepVirtual) {
+          value += ' '.repeat(extra)
+          for (let k = 0; k < extra; k++) indices.push(after)
         }
       }
     }
