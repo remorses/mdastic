@@ -1733,5 +1733,49 @@
       "frontmatter",
       "gfm"
     ]
+  },
+  {
+    "name": "attention at link and image label edges sees the brackets as punctuation",
+    "input": "[**:a*/**](u) [__:a_/__](u) [*)**](u) [****_**](u)\n\n![**_*](u) ![__*_](u) [b ![**_*](u) c](v)\n\n[**:a*/**][r] [**;*][r] ![**_*][r] [**:a*/**]\n\n[r]: /r\n[**:a*/**]: /s\n\ncontrols: [**a**](u) [*a*](u) *[a](u)* **[a*](u)** x*[a](u)*x [ **a*](u)\n",
+    "syntax": []
+  },
+  {
+    "name": "GFM attention at label edges sees the brackets next to tildes",
+    "input": "[**:a*/**](u) ![**_*](u) [**~a*](u) [~**a*](u)\n\ncontrols: [~:a~/~](u) [~~:a~~/~~](u) [~a~](u) [~~a~~](u) ~[a](u)~\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX attention at label edges next to JSX and expressions",
+    "input": "[**:a*<A/>**](u) [**<A/>*b**](u) ![**{1}*](u) <A>![**_*](u)</A>\n\n<A>\n[**:a*/**](u)\n</A>\n\ncontrols: [**<A/>**](u) [*{1}*](u)\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "a strikethrough or attention run inside an earlier label decides resolver order",
+    "input": "[~](u)_~**~**~\n\n[~](u)**h ~~*~~***\n\n[_](u)~**i ~~*~~***\n\n![~](u)_~**~**~\n\n[~~a~~](u)_~**~**~\n\n[*](u)~**~**~\n\n[~][r]_~**~**~\n\n[r]: /r\n\ncontrols: ~**~**~ and **~**~** and [a](u)_~**~**~\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "runs left over by the first resolver stay text inside spans of the second",
+    "input": "_~x**s****b*~\n\n_~~x**s****b*~~\n\n[~](u) ****>** ~~**~~**\n\ncontrols: ~x**s****b*~ and ~a **b** c~ and _a ~~b~~ c_\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX resolver order and leftover runs across labels and JSX",
+    "input": "[~](u)<A>_</A>~***~*<A></A>~\n\n<A>_</A>~<B></B>(**2****I*~\n\n<A>\n[~](u)**h ~~*~~***\n</A>\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
   }
 ]
