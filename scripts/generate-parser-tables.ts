@@ -1,9 +1,10 @@
 import fs from 'node:fs'
 import { characterEntities } from '../node_modules/.pnpm/character-entities@2.0.2/node_modules/character-entities/index.js'
+import { characterEntitiesLegacy } from '../node_modules/.pnpm/character-entities-legacy@3.0.0/node_modules/character-entities-legacy/index.js'
 
 console.log('Generate HTML named character reference table')
 const entitiesLicense = fs.readFileSync(new URL('../node_modules/.pnpm/character-entities@2.0.2/node_modules/character-entities/license', import.meta.url), 'utf8')
-fs.writeFileSync(new URL('../mdastic/src/entities.ts', import.meta.url), '// Generated HTML named character references (WHATWG, character-entities).\n/*\n' + entitiesLicense + '*/\nexport const entities: Record<string, string> = ' + JSON.stringify(characterEntities, null, 2) + '\n')
+fs.writeFileSync(new URL('../mdastic/src/entities.ts', import.meta.url), '// Generated HTML named character references (WHATWG, character-entities).\n/*\n' + entitiesLicense + '*/\nexport const entities: Record<string, string> = ' + JSON.stringify(characterEntities, null, 2) + '\n// Legacy names that also decode without a semicolon (character-entities-legacy, same license).\nexport const legacyEntities: string[] = ' + JSON.stringify(characterEntitiesLegacy) + '\n')
 console.log('Generate Unicode punctuation ranges from Sätteri')
 const source = fs.readFileSync('/Users/morse/.opensrc/repos/github.com/bruits/satteri/main/crates/satteri-pulldown-cmark/src/puncttable.rs', 'utf8')
 const tab = source.slice(source.indexOf('const PUNCT_TAB:'), source.indexOf('const PUNCT_MASKS:'))
