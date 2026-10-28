@@ -1305,8 +1305,13 @@ export function parseBlocks(
         tree.end[n] = input[j - 1].end
         if (input[j].lazy) return j
       }
-      // Quirk: a new container after a stripped quote prefix closes at that prefix.
-      if (j < input.length && quotePrefix(source, input[j]) && marker(source, input[j]))
+      // Quirk: a line opening a new container after a quote prefix or footnote indent closes
+      // the quote at that prefix.
+      if (
+        j < input.length &&
+        (quotePrefix(source, input[j]) || footnoteIndented(source, input[j])) &&
+        startsContainer(context, input[j])
+      )
         tree.end[n] = input[j].start
       if (tree.last[n]) tree.end[n] = Math.max(tree.end[n], tree.end[tree.last[n]])
       pendingLazy = j < input.length && !blank(source, input[j])
