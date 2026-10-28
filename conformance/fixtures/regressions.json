@@ -1615,5 +1615,81 @@
       "frontmatter",
       "gfm"
     ]
+  },
+  {
+    "name": "GFM quoted lists end at the prefix of a new container after blank lines",
+    "input": "> - a\n>\n> * b\n\nx\n\n> 1. a\n>\n> 1) b\n\nx\n\n> -\n>\n> > b\n\nx\n\n> - a\n>   - b\n>\n> * c\n\nx\n\n> - a\n> [^n]: b\n\nx\n\n> - - a\n>\n> - b\n\nx\n\n> - ```\n>\n> - a\n\nx\n\n> - ```\n> * a\n\nx\n\n> [^m]: a\n>\n> * b\n\nx\n\n> > - a\n> >\n> * b\n\n[^n] [^m]\n\n>> - a\n>>\n>",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX quoted lists end at the prefix of a new container after blank lines",
+    "input": "> - a\n>\n> * b\n\nx\n\n> 1. a\n>\n> 1) b\n\nx\n\n> -\n>\n> > b\n\nx\n\n> - a\n>   - b\n>\n> * c\n\nx\n\n> - a\n> [^n]: b\n\nx\n\n> - - a\n>\n> - b\n\nx\n\n> - ```\n>\n> - a\n\nx\n\n> - ```\n> * a\n\nx\n\n> [^m]: a\n>\n> * b\n\nx\n\n> > - a\n> >\n> * b\n\n[^n] [^m]\n\n>> - a\n>>\n>",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "Quoted lists before lazy, thematic, sibling and unquoted lines keep their ends",
+    "input": "> - a\n>\n> b\n\nx\n\n> - a\n>\n> ***\n\nx\n\n- a\n\n* b\n\nx\n\n> - a\n>\n* b\n\nx\n\n> - a\n>\n> - b\n\nx\n\n> - a\n>\n>\n> c\n\nx\n\n> * * a\n>   * b\n>\n> * c\n\nx\n\n> - - a\n> - b\n\nx\n\n>> - a\n>>\n>\n",
+    "syntax": []
+  },
+  {
+    "name": "GFM quoted lists before lazy, thematic, sibling and unquoted lines keep their ends",
+    "input": "> - a\n>\n> b\n\nx\n\n> - a\n>\n> ***\n\nx\n\n- a\n\n* b\n\nx\n\n> - a\n>\n* b\n\nx\n\n> - a\n>\n> - b\n\nx\n\n> - a\n>\n>\n> c\n\nx\n\n> * * a\n>   * b\n>\n> * c\n\nx\n\n> - - a\n> - b\n\nx\n\n>> - a\n>>\n>\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "GFM blank line endings in footnotes make list items spread",
+    "input": "- [^a]:\n      b\n\nx\n\n* [^c]: d\n\n      e\n\nx\n\n1. [^f]:\n       * g\n\nx\n\n- y\n  [^h]: i\n\n      j\n\nx\n\n* [^k]: [^l]:\n          m\n\nx\n\n> - [^n]:\n>\n> * o\n\nx\n\n> - [^p]:\n>\n\n[^a] [^c] [^f] [^h] [^k] [^n] [^p]\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX blank line endings in footnotes make list items spread",
+    "input": "- [^a]:\n      b\n\nx\n\n* [^c]: d\n\n      e\n\nx\n\n1. [^f]:\n       * g\n\nx\n\n- y\n  [^h]: i\n\n      j\n\nx\n\n* [^k]: [^l]:\n          m\n\nx\n\n> - [^n]:\n>\n> * o\n\nx\n\n> - [^p]:\n>\n\nx\n\n- [^q]: r\n      <A>\n\n      </A>\n\nx\n\n<B>\n- [^s]:\n      <C/>\n</B>\n\n[^q] [^s] [^a] [^c] [^f] [^h] [^k] [^n] [^p]\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "GFM blank lines in code, quotes or after footnotes keep list items tight",
+    "input": "- [^a]:\n- b\n\nx\n\n* [^c]: d\n\n* e\n\nx\n\n- [^f]: g\n      ~~~\n\n      ~~~\n\nx\n\n* [^h]: i\n      > j\n      >\n      > k\n\nx\n\n- [^l]: m\n\nn\n\n> - [^o]: p\n>\n> q\n\n[^a] [^c] [^f] [^h] [^l] [^o]\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX blank lines in code, quotes or after footnotes keep list items tight",
+    "input": "- [^a]:\n- b\n\nx\n\n* [^c]: d\n\n* e\n\nx\n\n- [^f]: g\n      ~~~\n\n      ~~~\n\nx\n\n* [^h]: i\n      > j\n      >\n      > k\n\nx\n\n- [^l]: m\n\nn\n\n> - [^o]: p\n>\n> q\n\n[^a] [^c] [^f] [^h] [^l] [^o]\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "GFM a final quote prefix at EOF is no blank line in a footnote",
+    "input": ">- [^a]: b\n>\n>\n\nx\n\n>- [^c]: d\n>",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX a final quote prefix at EOF is no blank line in a footnote",
+    "input": ">- [^a]: b\n>\n>\n\nx\n\n>- [^c]: d\n>",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
   }
 ]

@@ -86,6 +86,9 @@ let mathMode = false
 let noContainers = false
 // Open blockquotes; nothing inside one keeps the final EOF line ending.
 let quoteDepth = 0
+// A line that continues an open list as its next item. micromark closes the containers inside
+// that list before the preceding blank lines, so they never close at its prefix.
+let siblingLine: Line | undefined
 
 let taskCount = 0
 let taskParents = new Int32Array(INITIAL_TASK_CAPACITY)
@@ -95,6 +98,7 @@ const taskViews: (View | undefined)[] = []
 export function resetBlocks(): void {
   noContainers = false
   quoteDepth = 0
+  siblingLine = undefined
   taskCount = 0
   taskViews.length = 0
 }
@@ -477,6 +481,25 @@ export function startsContainer(context: BlockContext, line: Line): boolean {
     (!!marker(source, line) && !thematic(source, line)) ||
     (!!context.config.gfm && !!footnoteLabel(source, line))
   )
+}
+
+// micromark exits a quoted list or footnote definition after the prefix of the line opening a
+// new container, or of a final prefix-only line at EOF, not before the blank lines preceding it.
+function closesQuotedContainer(
+  context: BlockContext,
+  input: Line[],
+  j: number,
+  boundary: Line | undefined,
+): boolean {
+  const source = context.source
+  const line = j < input.length ? input[j] : boundary
+  // A parent that ended on a lazy line does not hand its boundary down as a container start.
+  if (!line || line === siblingLine || line.lazy || (j >= input.length && input[j - 1]?.lazy))
+    return false
+  if (!quotePrefix(source, line)) return false
+  if (blank(source, line))
+    return line.start === line.end && !line.padding && line.end === source.length
+  return startsContainer(context, line)
 }
 
 const enum LazyLine {
@@ -1111,6 +1134,7 @@ function parseFootnoteDefinition(
   }
   let end = input[last].end
   if (j > last + 1 && quotePrefix(source, input[j - 1])) end = input[j - 1].end
+  if (closesQuotedContainer(context, input, j, boundary)) end = (input[j] ?? boundary!).start
   const n = node(Kind.FootnoteDefinition, start, end, parent)
   tree.extra[n] = { identifier, label: decode(raw) }
   context.footnotes.add(identifier)
@@ -1124,19 +1148,41 @@ function parseFootnoteDefinition(
   return j - i
 }
 
-function hasBlankLineInFlowJsx(source: string, content: Line[], parent: number): boolean {
+// prepareList only skips blank line endings inside nested lists and quotes, so blank lines
+// inside flow JSX or footnote definitions also make the enclosing item spread.
+function hasNestedBlankLine(source: string, content: Line[], parent: number): boolean {
   for (let n = tree.child[parent]; n; n = tree.next[n]) {
-    if (tree.kind[n] !== Kind.Mdx || tree.extra[n]?.type !== 'mdxJsxFlowElement') continue
-    let previousEnd = tree.a[n]
+    let previousEnd: number
+    let end: number
+    if (tree.kind[n] === Kind.Mdx && tree.extra[n]?.type === 'mdxJsxFlowElement') {
+      previousEnd = tree.a[n]
+      end = tree.b[n]
+    } else if (tree.kind[n] === Kind.FootnoteDefinition) {
+      // An empty label line ends in a blank line ending when the definition continues.
+      const first = tree.child[n] ? tree.start[tree.child[n]] : tree.end[n]
+      for (let k = tree.start[n]; k < first; k++)
+        if (source.charCodeAt(k) === 10 || source.charCodeAt(k) === 13) return true
+      previousEnd = tree.start[n]
+      end = tree.end[n]
+    } else continue
     for (let c = tree.child[n]; c; c = tree.next[c]) {
       for (const line of content)
         if (line.start >= previousEnd && line.end <= tree.start[c] && blank(source, line))
           return true
       previousEnd = tree.end[c]
     }
+    // A trailing blank line counts only if the container ends after its line ending (a final
+    // line at EOF has none).
     for (const line of content)
-      if (line.start >= previousEnd && line.end <= tree.b[n] && blank(source, line)) return true
-    if (hasBlankLineInFlowJsx(source, content, n)) return true
+      if (
+        line.start >= previousEnd &&
+        (tree.kind[n] === Kind.FootnoteDefinition
+          ? line.end < line.next && line.next <= end
+          : line.end <= end) &&
+        blank(source, line)
+      )
+        return true
+    if (hasNestedBlankLine(source, content, n)) return true
   }
   return false
 }
@@ -1386,7 +1432,7 @@ export function parseBlocks(
               if (nextMark && nextMark.char === m.char && nextMark.ordered === m.ordered) {
                 spread = true
                 j = next
-              }
+              } else if (closesQuotedContainer(context, input, next, boundary)) j = next
               break
             }
             content.push(stripIndent(source, current, mark.indent))
@@ -1428,7 +1474,17 @@ export function parseBlocks(
         const item = node(Kind.ListItem, mark.start, input[lastContent].end, list)
         tree.a[item] = itemSpread ? 1 : 0
         const taskStart = taskCount
+        const after = j < input.length ? marker(source, input[j]) : undefined
+        const outerSibling = siblingLine
+        if (
+          after &&
+          after.ordered === m.ordered &&
+          after.char === m.char &&
+          !thematic(source, input[j])
+        )
+          siblingLine = input[j]
         const stop = parseBlocks(context, content, item, false, residual, input[j] ?? boundary)
+        siblingLine = outerSibling
         if (stop < content.length) {
           j = itemStart + stop
           lastContent = j - 1
@@ -1493,7 +1549,10 @@ export function parseBlocks(
             )
               itemSpread = true
         }
-        if (context.config.mdx && hasBlankLineInFlowJsx(source, content, item))
+        if (
+          (context.config.mdx || context.config.gfm) &&
+          hasNestedBlankLine(source, content, item)
+        )
           itemSpread = true
         tree.a[item] = itemSpread ? 1 : 0
         if (tree.last[item])
@@ -1502,6 +1561,7 @@ export function parseBlocks(
           sibling &&
           tree.last[item] &&
           (tree.end[tree.last[item]] === input[j].start ||
+            tree.end[tree.last[item]] === input[j - 1].next ||
             tree.kind[parent] === Kind.FootnoteDefinition)
         )
           tree.end[item] = nextMark.content
@@ -1529,6 +1589,15 @@ export function parseBlocks(
           tree.end[item] <= input[lastContent].end
         )
           spread = true
+        // A quoted container start closes the list after that line's prefix, so every trailing
+        // blank line ending stays inside the list (only the innermost list counts them).
+        if (!sibling && closesQuotedContainer(context, input, j, boundary)) {
+          tree.end[list] = (input[j] ?? boundary!).start
+          if (j > lastContent + 1 && tree.end[item] <= input[lastContent].end) spread = true
+          // A last child that kept its line ending (unclosed code) leaves no trailing ending
+          // to end the item at, so the item ends with the list.
+          else if (tree.end[item] > input[lastContent].end) tree.end[item] = tree.end[list]
+        }
         if (!sibling) break
       }
       tree.extra[list] = spread
