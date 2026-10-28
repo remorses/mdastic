@@ -1980,5 +1980,53 @@
     "syntax": [
       "mdx"
     ]
+  },
+  {
+    "name": "GFM task checkbox after a whitespace-only first item line is text",
+    "input": "- \n  [x] a\n-  \n  [ ] b\n-\t\n  [x] c\n- \n  [a]: /a\n  [x] d\n- \r\n  [x] e\n\n1. \n   [x] f\n\n> * \n>   [ ] g\n\n[a]\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "GFM task checkbox after a blank line following item definitions is text",
+    "input": "- [a]: /a\n\n  [x] b\n-\n  [b]: /b\n\n  [ ] c\n- [c]: /c\n  \n  [x] d\n\n> * [d]: /d\n>\n>   [x] e\n\n[a] [b] [c] [d]\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "control: GFM task checkbox in the first content of an item after an empty first line or definitions",
+    "input": "-\n  [x] a\n- [a]: /a\n  [b]: /b\n  [ ] b\n-\n  [c]: /c\n  [x] c\n-\r\n  [x] d\n\n1.\n   [x] e\n\n> *\n>   [ ] f\n\n- [x] g\n\n[a] [b] [c]\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX task checkbox after a whitespace-only first item line is text",
+    "input": "- \n  [x] a\n-  \n  [ ] b\n-\t\n  [x] c\n- \n  [a]: /a\n  [x] d\n- \r\n  [x] e\n\n1. \n   [x] f\n\n> * \n>   [ ] g\n\n[a]\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX task checkbox after a blank line following item definitions is text",
+    "input": "- [a]: /a\n\n  [x] b\n-\n  [b]: /b\n\n  [ ] c\n- [c]: /c\n  \n  [x] d\n\n> * [d]: /d\n>\n>   [x] e\n\n[a] [b] [c] [d]\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
+  },
+  {
+    "name": "control: MDX task checkbox in the first content of an item after an empty first line or definitions",
+    "input": "-\n  [x] a\n- [a]: /a\n  [b]: /b\n  [ ] b\n-\n  [c]: /c\n  [x] c\n-\r\n  [x] d\n\n1.\n   [x] e\n\n> *\n>   [ ] f\n\n- [x] g\n\n[a] [b] [c]\n",
+    "syntax": [
+      "mdx",
+      "frontmatter",
+      "gfm"
+    ]
   }
 ]

@@ -155,6 +155,20 @@ function indentation(source: string, line: Line): { start: number; indent: numbe
 export function blank(source: string, line: Line): boolean {
   return indentation(source, line).start === line.end
 }
+// micromark only looks for a task checkbox in an item's first content. A first
+// line with only whitespace after the marker, or a blank line after leading
+// definitions, starts a later content, so the paragraph is not a task.
+function inFirstContent(
+  source: string,
+  content: Line[],
+  markerContent: number,
+  paragraph: number,
+): boolean {
+  if (blank(source, content[0]) && space(source.charCodeAt(markerContent - 1))) return false
+  for (let k = 1; k < content.length && content[k].start < paragraph; k++)
+    if (blank(source, content[k])) return false
+  return true
+}
 function trimEnd(source: string, start: number, end: number): number {
   while (end > start && space(source.charCodeAt(end - 1))) end--
   return end
@@ -1592,7 +1606,8 @@ export function parseBlocks(
                 after < value.length &&
                 (space(value.charCodeAt(close + 1)) ||
                   value.charCodeAt(close + 1) === 10 ||
-                  value.charCodeAt(close + 1) === 13)
+                  value.charCodeAt(close + 1) === 13) &&
+                inFirstContent(source, content, mark.content, tree.start[first])
               ) {
                 tree.b[item] =
                   check === Char.LowerX || check === Char.UpperX
