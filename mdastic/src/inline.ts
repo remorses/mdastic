@@ -113,9 +113,20 @@ const mathClosers = new Map<string, Map<number, number[]>>()
 let markdownCandidates = markdownMarkers
 let gfmCandidates = gfmMarkers
 let emailCandidates = emailStops
+// Label closes of every `[` the last full bracketEnd scan passed, keyed by label start and
+// stamped by scan, so openers nested in an unclosed label do not rescan it (`![[]()` floods).
+let labelScan = 0
+let labelStamp = new Int32Array(0)
+let labelClose = new Int32Array(0)
+let labelOpeners = new Int32Array(64)
+let labelSource = ''
+let labelView: View | undefined
+let labelContext: InlineContext | undefined
+let labelEnd = -1
 
 export function resetInline(config: Config): void {
   delimiterCount = 0
+  labelView = labelContext = undefined
   mathClosers.clear()
   mathRun = config.math ? (config.math.singleDollarTextMath ? 1 : 2) : 0
   markdownCandidates = mathRun ? mathMarkers : markdownMarkers
@@ -386,6 +397,33 @@ function bracketEnd(
   view?: View,
   context?: InlineContext,
 ): number {
+  // A label start the cached scan passed has the same tokens up to its close. An unclosed
+  // label is only known unclosed up to the cached end: a shorter end may split a token.
+  if (
+    view &&
+    view === labelView &&
+    source === labelSource &&
+    context === labelContext &&
+    end <= labelEnd &&
+    labelStamp[start] === labelScan
+  ) {
+    const close = labelClose[start]
+    if (close >= 0 ? close < end : end === labelEnd) return close
+  }
+  // Record nested openers only for full scans; reference labels skip embedded syntax.
+  const memo = !!view && !!context
+  if (memo) {
+    if (labelStamp.length <= source.length) {
+      labelStamp = new Int32Array(source.length + 1)
+      labelClose = new Int32Array(source.length + 1)
+      labelScan = 0
+    }
+    labelScan++
+    labelSource = source
+    labelView = view
+    labelContext = context
+    labelEnd = end
+  }
   let depth = 0
   for (let i = start; i < end; i++) {
     const c = source.charCodeAt(i)
@@ -419,10 +457,22 @@ function bracketEnd(
       // An unmatched run stays whole; its suffix cannot open a shorter span.
       i = run - 1
     }
-    if (c === 91) depth++
-    else if (c === 93) {
+    if (c === 91) {
+      if (memo) {
+        if (depth === labelOpeners.length) {
+          const grown = new Int32Array(depth * 2)
+          grown.set(labelOpeners)
+          labelOpeners = grown
+        }
+        labelOpeners[depth] = i + 1
+        labelStamp[i + 1] = labelScan
+        labelClose[i + 1] = -1
+      }
+      depth++
+    } else if (c === 93) {
       if (!depth) return i
       depth--
+      if (memo) labelClose[labelOpeners[depth]] = i
       // Resource destinations and titles are not part of the enclosing label.
       if (source.charCodeAt(i + 1) === Char.LeftParen) {
         const match = resource(source, i + 1, end)
