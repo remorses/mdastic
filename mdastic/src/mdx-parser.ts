@@ -726,11 +726,12 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
       const scanned = flowLine(view, i)
       // Probes collect the span; flow() and continuation() commit errors in the stripped view.
       if (scanned.error) {
-        if (
-          view.source.charCodeAt(scanned.end) === Char.LeftBrace ||
-          scanned.error.ruleId === 'unexpected-eof'
-        )
+        if (scanned.error.ruleId === 'unexpected-eof') {
+          // A new container closes this flow after its line ending, before inline trimming.
+          if (context && boundary && startsContainer(context, boundary)) throw scanned.error
           return source.length
+        }
+        if (view.source.charCodeAt(scanned.end) === Char.LeftBrace) return source.length
         return Math.max(scanned.error.place?.offset ?? offset(view, scanned.end), line.end)
       }
       return Math.max(offset(view, scanned.end), line.end)

@@ -2349,5 +2349,20 @@
     "syntax": [
       "gfm"
     ]
+  },
+  {
+    "name": "MDX unclosed text tag keeps the line ending before a new container",
+    "input": "- a\n  <b\n>>",
+    "syntax": ["mdx", "gfm"]
+  },
+  {
+    "name": "MDX chained flow attempt keeps the footnote-ending line break in EOF errors",
+    "input": "[^a]:{}<b\n    >b\n    <b\n>>",
+    "syntax": ["mdx", "gfm"]
+  },
+  {
+    "name": "MDX chained flow attempt keeps the list-ending line break in EOF errors",
+    "input": "- {}<b\n  >*\n  <b\n>a",
+    "syntax": ["mdx", "gfm"]
   }
 ]
