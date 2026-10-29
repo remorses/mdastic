@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.2
+
+1. **Fixed multi-line MDX tags in containers.** A JSX tag that spans lines now follows every tag and expression on its line, inside the container's own view, like remark. These inputs parsed as errors before:
+   - `<p><strong \n>o</strong></p>` is `p > strong > "o"`
+   - `><_/\n>>>` is a block quote with `<_/>` and `>`
+   - `> <a b\n>>>` reports remark's "Expected a closing tag" error
+2. **Fixed lists inside footnote definitions.** The definition indent ends list items like a container prefix, so `spread` and item ends match remark when a blank line or a new container follows (`[^1]:-\n\n    -`).
+3. **Fixed nested block quotes closed by a new container.** They end at the enclosing prefix for footnote definitions too (`>>a\n>[^1]: b`), and not for thematic breaks that look like list markers (`>>a\n>* * *`).
+4. **Fixed MDX end-of-file errors at container boundaries.** When a new container closes an unfinished JSX tag or expression, mdastic reports the same error and place as remark.
+
+Thanks @rgodha24 for #41 and #42!
+
 ## 0.3.1
 
 1. **Fixed link and image label parsing** to match remark:
