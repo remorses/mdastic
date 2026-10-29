@@ -48,7 +48,14 @@ export interface BlockContext extends InlineContext {
   flowParent?: (parent: number) => number
   interrupt?: (line: Line) => boolean
   esm?: (line: Line) => boolean
-  continuationEnd?: (line: Line) => number
+  // With `input`, tags are read without the container's line prefixes.
+  continuationEnd?: (
+    line: Line,
+    context?: BlockContext,
+    input?: Line[],
+    at?: number,
+    boundary?: Line,
+  ) => number
   continuation?: (
     context: BlockContext,
     input: Line[],
@@ -1865,7 +1872,8 @@ export function parseBlocks(
     }
     // ── Gather paragraph lines, or promote them to a setext heading ──
     const content: Line[] = [line]
-    if (context.continuationEnd) spanEnd = Math.max(spanEnd, context.continuationEnd(line))
+    if (context.continuationEnd)
+      spanEnd = Math.max(spanEnd, context.continuationEnd(line, context, input, i, boundary))
     let j = i + 1
     let depth = 0
     for (; j < input.length; j++) {
@@ -1880,7 +1888,8 @@ export function parseBlocks(
         if (flow === undefined && !input[j].lazy && interrupts(context, input[j])) break
         if (input[j].lazy && !context.config.mdx && htmlBlock(source, input[j], false)) break
         if (flow === undefined && input[j].lazy && lazyFlowSpan(context, input[j])) break
-        if (context.continuationEnd) spanEnd = context.continuationEnd(input[j])
+        if (context.continuationEnd)
+          spanEnd = context.continuationEnd(input[j], context, input, j, boundary)
       }
       if (tableStart(context, input, j, true)) break
       content.push(input[j])

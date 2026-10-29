@@ -535,31 +535,41 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
     | Tag
     | { type: 'expression'; start: number; end: number; result: ReturnType<typeof expression> }
   // Scans tags and expressions from `i` to the end of their last line, as a flow attempt.
-  function flowLine(view: View, i: number): { found: FlowItem[]; end: number } | undefined {
+  function flowLine(view: View, i: number): {
+    found: FlowItem[]
+    end: number
+    complete: boolean
+    error?: MdxParseError
+  } {
     const text = view.source
     const found: FlowItem[] = []
     for (;;) {
       const c = text.charCodeAt(i)
-      if (c === Char.LessThan) {
-        const t = tag(view, i, text.length, syntax)
-        if (!t) return
-        found.push(t)
-        i = t.end
-      } else if (c === Char.LeftBrace) {
-        const result = expression(view, i, text.length, syntax)
-        found.push({ type: 'expression', start: i, end: result.end, result })
-        i = result.end
-      } else return
+      try {
+        if (c === Char.LessThan) {
+          const t = tag(view, i, text.length, syntax)
+          if (!t) break
+          found.push(t)
+          i = t.end
+        } else if (c === Char.LeftBrace) {
+          const result = expression(view, i, text.length, syntax)
+          found.push({ type: 'expression', start: i, end: result.end, result })
+          i = result.end
+        } else break
+      } catch (error) {
+        return { found, end: i, complete: false, error: error as MdxParseError }
+      }
       while (space(text.charCodeAt(i))) i++
       if (
         i >= text.length ||
         text.charCodeAt(i) === Char.LineFeed ||
         text.charCodeAt(i) === Char.CarriageReturn
       )
-        return { found, end: i }
-      if (text.charCodeAt(i) === Char.LeftBrace && found.at(-1)!.type === 'expression') return
-      if (text.charCodeAt(i) !== Char.LessThan && text.charCodeAt(i) !== Char.LeftBrace) return
+        return { found, end: i, complete: true }
+      if (text.charCodeAt(i) === Char.LeftBrace && found.at(-1)!.type === 'expression') break
+      if (text.charCodeAt(i) !== Char.LessThan && text.charCodeAt(i) !== Char.LeftBrace) break
     }
+    return { found, end: i, complete: false }
   }
   function flow(
     context: BlockContext,
@@ -586,7 +596,8 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
     const mapped = flowView(context, input, boundary)
     const view = mapped.view
     const scanned = flowLine(view, mapped.starts[at] + begin - line.start)
-    if (!scanned) return 0
+    if (scanned.error) throw scanned.error
+    if (!scanned.complete) return 0
     const { found, end: i } = scanned
     // ── Apply the committed tokens to this Markdown container's JSX stack ──
     for (const item of found) {
@@ -678,7 +689,11 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
       if (source.charCodeAt(begin) !== Char.LessThan && source.charCodeAt(begin) !== Char.LeftBrace)
         return
       const { view, starts } = flowView(context, input, boundary)
-      if (view.lazy?.size) return !!flowLine(view, starts[at] + begin - line.start)
+      if (view.lazy?.size) {
+        const scanned = flowLine(view, starts[at] + begin - line.start)
+        if (scanned.error) throw scanned.error
+        return scanned.complete
+      }
     },
     interrupt(line: Line) {
       let i = line.start
@@ -686,52 +701,39 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
       if (source.charCodeAt(i) !== Char.LessThan && source.charCodeAt(i) !== Char.LeftBrace)
         return false
       // Only complete tag/expression-only lines interrupt a paragraph.
-      try {
-        const view = rawView
-        let previousExpression = false
-        for (;;) {
-          const c = source.charCodeAt(i)
-          if (c === Char.LeftBrace && previousExpression) return false
-          const end =
-            c === Char.LessThan
-              ? tag(view, i, source.length, syntax)?.end
-              : c === Char.LeftBrace
-                ? expression(view, i, source.length, syntax).end
-                : undefined
-          if (end === undefined) return false
-          previousExpression = c === Char.LeftBrace
-          i = end
-          while (space(source.charCodeAt(i))) i++
-          if (
-            i >= source.length ||
-            source.charCodeAt(i) === Char.LineFeed ||
-            source.charCodeAt(i) === Char.CarriageReturn
-          )
-            return true
-        }
-      } catch {
-        // Commit the flow attempt so its real MDX error is reported, not swallowed.
-        return true
-      }
+      const scanned = flowLine(rawView, i)
+      return !!scanned.error || scanned.complete
     },
-    continuationEnd(line: Line) {
-      let i = line.start
-      while (space(source.charCodeAt(i))) i++
-      if (source.charCodeAt(i) !== Char.LessThan && source.charCodeAt(i) !== Char.LeftBrace)
-        return line.end
-      const view = rawView
-      try {
-        return source.charCodeAt(i) === Char.LessThan
-          ? (tag(view, i, source.length, syntax)?.end ?? line.end)
-          : expression(view, i, source.length, syntax).end
-      } catch (error) {
-        // Failed expressions and unclosed tags read every following line before failing;
-        // other failed tags read up to their error.
-        return source.charCodeAt(i) === Char.LeftBrace ||
-          (error as MdxParseError).ruleId === 'unexpected-eof'
-          ? source.length
-          : Math.max(line.end, (error as MdxParseError).place?.offset ?? line.end)
+    continuationEnd(
+      line: Line,
+      context?: BlockContext,
+      input?: Line[],
+      at = 0,
+      boundary?: Line,
+    ) {
+      let begin = line.start
+      while (space(source.charCodeAt(begin))) begin++
+      const first = source.charCodeAt(begin)
+      if (first !== Char.LessThan && first !== Char.LeftBrace) return line.end
+      // Inside a container, read the lines without their prefixes, as flow() does.
+      let view = rawView
+      let i = begin
+      if (context && input) {
+        const mapped = flowView(context, input, boundary)
+        view = mapped.view
+        i = mapped.starts[at] + begin - line.start
       }
+      const scanned = flowLine(view, i)
+      // Probes collect the span; flow() and continuation() commit errors in the stripped view.
+      if (scanned.error) {
+        if (
+          view.source.charCodeAt(scanned.end) === Char.LeftBrace ||
+          scanned.error.ruleId === 'unexpected-eof'
+        )
+          return source.length
+        return Math.max(scanned.error.place?.offset ?? offset(view, scanned.end), line.end)
+      }
+      return Math.max(offset(view, scanned.end), line.end)
     },
     finish() {
       const types: Partial<Record<Kind, string>> = {
