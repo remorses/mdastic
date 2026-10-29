@@ -12,7 +12,7 @@
       barChart('#diagram', {
         series: ['remark', 'mdastic'],
         ratioHeader: 'Faster',
-        axisTitle: 'Median time for the whole corpus, Apple M5 Pro. Bun AOT compiles both to machine code',
+        axisTitle: 'Median time for the whole corpus, Node 24, Apple M5 Pro',
         charts: [
           {
             title: 'Parse',
@@ -21,10 +21,8 @@
             ticks: [0, 200, 400, 600, 800],
             unit: ms,
             rows: [
-              { label: 'Markdown + GFM, Node 24', values: [773.84, 26.53], text: ['774 ms', '26.5 ms'], ratio: '×29.2' },
-              { label: 'Markdown + GFM, Bun AOT', values: [583.6, 20.96], text: ['584 ms', '21.0 ms'], ratio: '×27.8' },
-              { label: 'MDX with estree, Node 24', values: [316.85, 17.82], text: ['317 ms', '17.8 ms'], ratio: '×17.8' },
-              { label: 'MDX with estree, Bun AOT', values: [244.88, 11.1], text: ['245 ms', '11.1 ms'], ratio: '×22.1' },
+              { label: 'Markdown + GFM, 2.6 MB', values: [703.4, 24.65], text: ['703 ms', '24.7 ms'], ratio: '×28.5' },
+              { label: 'MDX with estree, 1 MB', values: [289.3, 16.83], text: ['289 ms', '16.8 ms'], ratio: '×17.2' },
             ],
           },
           {
@@ -33,10 +31,8 @@
             ticks: [0, 200, 400, 600, 800],
             unit: ms,
             rows: [
-              { label: 'Markdown + GFM, Node 24', values: [253.0, 42.07], text: ['253 ms', '42.1 ms'], ratio: '×6.0' },
-              { label: 'Markdown + GFM, Bun AOT', values: [237.37, 38.89], text: ['237 ms', '38.9 ms'], ratio: '×6.1' },
-              { label: 'MDX, Node 24', values: [99.3, 16.76], text: ['99.3 ms', '16.8 ms'], ratio: '×5.9' },
-              { label: 'MDX, Bun AOT', values: [91.55, 14.89], text: ['91.6 ms', '14.9 ms'], ratio: '×6.1' },
+              { label: 'Markdown + GFM, 2.6 MB', values: [253.1, 42.7], text: ['253 ms', '42.7 ms'], ratio: '×5.9' },
+              { label: 'MDX, 1 MB', values: [100.6, 16.68], text: ['101 ms', '16.7 ms'], ratio: '×6.0' },
             ],
           },
           {
@@ -45,8 +41,7 @@
             ticks: [0, 200, 400, 600, 800],
             unit: ms,
             rows: [
-              { label: 'MDX, Node 24', values: [425.89, 35.6], text: ['426 ms', '35.6 ms'], ratio: '×12.0' },
-              { label: 'MDX, Bun AOT', values: [345.08, 27.24], text: ['345 ms', '27.2 ms'], ratio: '×12.7' },
+              { label: 'MDX, 1 MB', values: [401.95, 33.89], text: ['402 ms', '33.9 ms'], ratio: '×11.9' },
             ],
           },
         ],

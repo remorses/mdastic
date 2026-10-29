@@ -2,7 +2,7 @@
     <br/>
     <br/>
     <h3>mdastic</h3>
-    <p>Markdown and MDX parser that outputs the exact remark mdast, 18 to 29x faster.</p>
+    <p>Markdown and MDX parser that outputs the exact remark mdast, 17 to 28x faster.</p>
     <br/>
     <br/>
 </div>
@@ -30,7 +30,7 @@ const markdown = stringify(tree, { syntax }) // same string as remark-stringify
 ## Features
 
 - **Exact remark output.** 9,854 of 9,854 conformance fixtures match the real remark stack, including positions and estree.
-- **Fast.** 29x faster than remark on markdown, 18x on MDX, 6x on stringify. Faster than markdown-it. Compiled with Bun AOT, within 1.1x of native Rust.
+- **Fast.** 28x faster than remark on markdown, 17x on MDX, 6x on stringify. Faster than markdown-it, close to native Rust.
 - **One syntax list.** The same `syntax` array drives `parse` and `stringify`. No separate micromark, from-markdown and to-markdown extension arrays.
 - **MDX built in.** JSX, ESM and `{expressions}` with `data.estree`. Only `mdastic/mdx` imports Acorn, so plain markdown bundles stay small.
 - **Streaming parsing.** `createStreamParser()` parses LLM output as it arrives. Closed blocks are not parsed again and keep object identity, and every result still equals `parse(text)`.
@@ -51,54 +51,35 @@ npm install mdastic
 
 Real documents, each parsed on its own, like a docs site build. 342 markdown docs (2.6 MB of READMEs and Mintlify docs) and 523 MDX docs (1 MB of Holocron docs). Median of 15 runs after warmup.
 
-![mdastic vs remark on Node 24 and Bun AOT: parse, stringify and round trip](docs/figures/bench-vs-remark.png)
+![mdastic vs remark: parse, stringify and round trip](docs/figures/bench-vs-remark.png)
 
-| Task | remark, Node 24 | mdastic, Node 24 | Faster | remark, Bun AOT | mdastic, Bun AOT | Faster |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Parse markdown + GFM | 774 ms | **26.5 ms** | 29.2x | 584 ms | **21.0 ms** | 27.8x |
-| Parse MDX with estree | 317 ms | **17.8 ms** | 17.8x | 245 ms | **11.1 ms** | 22.1x |
-| Stringify markdown + GFM | 253 ms | **42.1 ms** | 6.0x | 237 ms | **38.9 ms** | 6.1x |
-| Stringify MDX | 99.3 ms | **16.8 ms** | 5.9x | 91.6 ms | **14.9 ms** | 6.1x |
-| Round trip MDX | 426 ms | **35.6 ms** | 12.0x | 345 ms | **27.2 ms** | 12.7x |
+| Task | remark | mdastic | Faster |
+| --- | ---: | ---: | ---: |
+| Parse markdown + GFM | 703 ms | **24.7 ms** | 28.5x |
+| Parse MDX with estree | 289 ms | **16.8 ms** | 17.2x |
+| Stringify markdown + GFM | 253 ms | **42.7 ms** | 5.9x |
+| Stringify MDX | 101 ms | **16.7 ms** | 6.0x |
+| Round trip MDX | 402 ms | **33.9 ms** | 11.9x |
 
 ### Against other fast parsers
 
-mdastic is **faster than markdown-it** on every runtime. markdown-it only emits a token list and builds no tree. Sätteri is a native Rust addon (napi) and gives no `data.estree` for MDX.
+mdastic is **faster than markdown-it**, which only emits a token list and builds no tree. It is **1.2x behind Sätteri** on markdown. Sätteri is a native Rust addon and gives no `data.estree` for MDX.
 
-Compiled with **Bun AOT**, mdastic is **1.1x behind Sätteri**: 21.0 ms vs 18.8 ms on markdown, 11.1 ms vs 10.0 ms on MDX. On Node 24 the gap is 1.3x on markdown and 1.6x on MDX.
+![mdastic vs markdown-it and Sätteri parse time](docs/figures/bench-vs-native.png)
 
-![mdastic vs markdown-it and Sätteri parse time on Node 24, Bun and Bun AOT](docs/figures/bench-vs-native.png)
+| Parser | Markdown + GFM | MDX | Output |
+| --- | ---: | ---: | --- |
+| markdown-it 14 | 36.7 ms | not supported | tokens |
+| **mdastic** | **24.7 ms** | **16.8 ms** | mdast with estree |
+| Sätteri 0.10.5 (Rust, napi) | 20.5 ms | 10.6 ms | mdast, no estree |
 
-| Runtime | Corpus | markdown-it 14 | mdastic | Sätteri 0.10.5 | mdastic vs Sätteri |
-| --- | --- | ---: | ---: | ---: | ---: |
-| Node 24 | Markdown + GFM | 37.4 ms | **26.5 ms** | 19.8 ms | 1.34x slower |
-| Node 24 | MDX | no MDX | **17.8 ms** | 11.0 ms | 1.62x slower |
-| Bun (JIT) | Markdown + GFM | 31.0 ms | **23.9 ms** | 20.2 ms | 1.18x slower |
-| Bun (JIT) | MDX | no MDX | **13.5 ms** | 10.3 ms | 1.32x slower |
-| Bun AOT | Markdown + GFM | 42.3 ms | **21.0 ms** | 18.8 ms | 1.12x slower |
-| Bun AOT | MDX | no MDX | **11.1 ms** | 10.0 ms | 1.11x slower |
-
-Node 24.22.1 and Bun 1.4.4 canary (`11c367163`) on an Apple M5 Pro, median of 3 runs. Run it yourself:
+Node 24.21.0 on an Apple M5 Pro. Run it yourself:
 
 ```bash
 pnpm install
 pnpm --dir mdastic build
 cd conformance && NODE_ENV=production pnpm exec tsx src/bench.ts
 ```
-
-### Bun AOT
-
-`bun build --compile --aot` ([oven-sh/bun#45631](https://github.com/oven-sh/bun/pull/45631)) compiles TypeScript to **machine code** at build time, with no JIT. The benchmark builds into one executable, so remark, markdown-it and mdastic are all compiled. Sätteri stays native.
-
-```bash
-bun upgrade --canary  # --aot needs Bun 1.4.4 canary or later
-cd conformance
-bun build --compile --aot --compile-in-place --production \
-  --define 'process.env.NODE_ENV="production"' src/bench.ts --outfile ../tmp/bench-aot
-../tmp/bench-aot
-```
-
-AOT makes mdastic parse **1.3x faster** on markdown and **1.6x faster** on MDX than Node 24. Stringify gains less: 1.1x over Node, and plain `bun` (JIT) is faster at 33.3 ms. The AOT build gives byte-identical trees and strings on the whole corpus.
 
 ### Bundle size
 
