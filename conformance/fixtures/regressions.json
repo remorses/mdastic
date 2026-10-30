@@ -2476,5 +2476,29 @@
       "mdx",
       "gfm"
     ]
+  },
+  {
+    "name": "quoted blank line ending a nested list inside flow JSX does not spread the item",
+    "input": ">- <A>\n>   *\n>\n>   </A>",
+    "syntax": [
+      "mdx",
+      "gfm"
+    ]
+  },
+  {
+    "name": "quoted blank line ending a nested ordered list inside flow JSX does not spread the item",
+    "input": ">-\n>   <A b=\"\">\n>   2.\n>\n>   </A>",
+    "syntax": [
+      "mdx",
+      "gfm"
+    ]
+  },
+  {
+    "name": "blank line inside unclosed code of a nested list in flow JSX does not spread the item",
+    "input": "- <A>\n  2) ```\n\n  </A>",
+    "syntax": [
+      "mdx",
+      "gfm"
+    ]
   }
 ]
