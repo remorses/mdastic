@@ -333,7 +333,8 @@ function destinationEnd(source: string, start: number, end: number): number {
   for (; i < end; i++) {
     const c = source.charCodeAt(i)
     if ((c !== 0 && c <= Char.Space) || c === Char.Delete) break
-    if (c === Char.Backslash && isPunctuation(source.charCodeAt(i + 1))) {
+    // A backslash at the end of the source escapes nothing.
+    if (c === Char.Backslash && i + 1 < source.length && isPunctuation(source.charCodeAt(i + 1))) {
       i++
       continue
     }

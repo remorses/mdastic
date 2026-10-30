@@ -2375,5 +2375,6 @@
   {"name": "MDX containers whose last child kept its line ending close after the next line's prefixes", "input": "- - ```\n  > b\n\nx\n\n- > ```\n  - b\n\nx\n\n> - ```\n>\n4.\n\nx\n\n> <A>\n> 1) >\n> +\n> </A>\n", "syntax": ["mdx", "frontmatter", "gfm"]},
   {"name": "a quoted list ending on a lazy line closes with its quote after the next prefix", "input": ">> * a\n b\n> - c\n\nx\n\n>> * a\n b\n>", "syntax": ["gfm"]},
   {"name": "whitespace after a quote prefix at EOF is a lazy chunk that ends the inner quote early", "input": "> > a\n>   ", "syntax": []},
-  {"name": "tab after a quote prefix at EOF ends the inner quote early", "input": ">>\n>\t", "syntax": ["gfm"]}
+  {"name": "tab after a quote prefix at EOF ends the inner quote early", "input": ">>\n>\t", "syntax": ["gfm"]},
+  {"name": "a definition destination ending in a backslash at the end of input", "input": "[a]: b\\\n\n[c]:\\", "syntax": ["gfm"]}
 ]
