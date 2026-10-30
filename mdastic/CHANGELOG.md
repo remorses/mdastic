@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.3
+
+1. **Fixed container end positions** for nested block quotes, list items, and other blocks to match remark.
+2. **Fixed MDX flow lines in containers**, including paragraph interruption and JSX list item spread.
+3. **Fixed fenced code endings and tables in nested containers** to match remark across line endings and container boundaries.
+4. **Fixed escaping at the end of link destinations** to match remark.
+
+Thanks @rgodha24 for #44, #45 and #46!
+
 ## 0.3.2
 
 1. **Fixed multi-line MDX tags in containers.** A JSX tag that spans lines now follows every tag and expression on its line, inside the container's own view, like remark. These inputs parsed as errors before:
