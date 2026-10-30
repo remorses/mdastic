@@ -645,7 +645,11 @@ function nestedTable(context: BlockContext, opener: Line, header: Line, delimite
   if (row.lazy) return false
   const head = within(source, opener, header).line
   // A blank line is no head row: `- a\n\n  -:\nb` is a paragraph that takes `b`.
-  return !blank(source, head) && !!tableStart(context, [head, row.line], 0)
+  if (blank(source, head)) return false
+  // MDX flow tags and expressions are tried before tables, so `> <a>\n> -|` is no table and
+  // the paragraph `-|` still takes lazy lines.
+  if (context.interrupt?.(head)) return false
+  return !!tableStart(context, [head, row.line], 0)
 }
 
 // Whether `line` continues the table in the containers `opener` opened.
@@ -656,7 +660,19 @@ function tableRow(context: BlockContext, opener: Line, line: Line): boolean {
 
 // The line that opens the paragraph `line` leaves open, given the current one's opener.
 function paragraphOpener(context: BlockContext, opener: Line, line: Line, open: boolean): Line {
-  return !open || interrupts(context, within(context.source, opener, line).line) ? line : opener
+  const source = context.source
+  if (!open) {
+    // An empty list item takes an indented next line as its first content, so the paragraph
+    // that line opens is inside the item: `> 1.\n>    a|\n> -|\nb` keeps `-|` lazy.
+    if (
+      opener !== line &&
+      blank(source, within(source, opener, opener).line) &&
+      !within(source, opener, line).lazy
+    )
+      return opener
+    return line
+  }
+  return interrupts(context, within(source, opener, line).line) ? line : opener
 }
 
 // What a container line leaves open for the next line, seen through the containers it starts.
