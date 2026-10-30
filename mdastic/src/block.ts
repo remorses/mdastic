@@ -66,6 +66,8 @@ export interface BlockContext extends InlineContext {
 interface Marker {
   start: number
   content: number
+  // End of micromark's listItemPrefix: a blank item's prefix stops at its marker.
+  prefix: number
   indent: number
   ordered: boolean
   number: number
@@ -311,9 +313,10 @@ function marker(source: string, line: Line, mdx = mdxMode): Marker | undefined {
     i++
   }
   let remaining = 0
+  const blankItem = i === line.end
   // Oversized padding consumes just one separator; the remainder belongs to content.
   // MDX has no indented code, so there the item keeps all of it.
-  if ((!mdx && padding > MAX_LIST_PADDING) || i === line.end) {
+  if ((!mdx && padding > MAX_LIST_PADDING) || blankItem) {
     remaining = source.charCodeAt(markerEnd) === 9 ? tabWidth(source, markerEnd) - 1 : 0
     i = markerEnd < line.end ? markerEnd + 1 : markerEnd
     padding = 1
@@ -321,6 +324,7 @@ function marker(source: string, line: Line, mdx = mdxMode): Marker | undefined {
   return {
     start: scan.start,
     content: i,
+    prefix: blankItem ? markerEnd : i,
     indent: scan.indent + markerEnd - scan.start + (padding || 1),
     ordered,
     number,
@@ -576,7 +580,7 @@ function closeFootnoteItem(
   if (!footnoteLines) return false
   const source = context.source
   const exit = nextSibling
-    ? footnoteIndented(source, input[j]) && nextSibling.content
+    ? footnoteIndented(source, input[j]) && nextSibling.prefix
     : closesQuotedContainer(context, input, j, boundary)
       ? footnoteIndented(source, input[j] ?? boundary) && (input[j] ?? boundary!).start
       : j > lastContent + 1 &&
@@ -1825,7 +1829,7 @@ export function parseBlocks(
           (tree.end[tree.last[item]] === input[j].start ||
             tree.end[tree.last[item]] === input[j - 1].next)
         )
-          tree.end[item] = nextMark.content
+          tree.end[item] = nextMark.prefix
         if (
           closeFootnoteItem(
             context,
