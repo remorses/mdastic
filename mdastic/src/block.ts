@@ -66,6 +66,8 @@ export interface BlockContext extends InlineContext {
 interface Marker {
   start: number
   content: number
+  // End of micromark's listItemPrefix: a blank item's prefix stops at its marker.
+  prefix: number
   indent: number
   ordered: boolean
   number: number
@@ -311,9 +313,10 @@ function marker(source: string, line: Line, mdx = mdxMode): Marker | undefined {
     i++
   }
   let remaining = 0
+  const blankItem = i === line.end
   // Oversized padding consumes just one separator; the remainder belongs to content.
   // MDX has no indented code, so there the item keeps all of it.
-  if ((!mdx && padding > MAX_LIST_PADDING) || i === line.end) {
+  if ((!mdx && padding > MAX_LIST_PADDING) || blankItem) {
     remaining = source.charCodeAt(markerEnd) === 9 ? tabWidth(source, markerEnd) - 1 : 0
     i = markerEnd < line.end ? markerEnd + 1 : markerEnd
     padding = 1
@@ -321,6 +324,7 @@ function marker(source: string, line: Line, mdx = mdxMode): Marker | undefined {
   return {
     start: scan.start,
     content: i,
+    prefix: blankItem ? markerEnd : i,
     indent: scan.indent + markerEnd - scan.start + (padding || 1),
     ordered,
     number,
@@ -536,9 +540,7 @@ function closesQuotedContainer(
 ): boolean {
   const source = context.source
   const line = j < input.length ? input[j] : boundary
-  // A parent that ended on a lazy line does not hand its boundary down as a container start.
-  if (!line || line === siblingLine || line.lazy || (j >= input.length && input[j - 1]?.lazy))
-    return false
+  if (!line || line === siblingLine || line.lazy) return false
   if (!quotePrefix(source, line) && !footnoteIndented(source, line)) return false
   if (blank(source, line))
     return line.start === line.end && !line.padding && line.end === source.length
@@ -576,7 +578,7 @@ function closeFootnoteItem(
   if (!footnoteLines) return false
   const source = context.source
   const exit = nextSibling
-    ? footnoteIndented(source, input[j]) && nextSibling.content
+    ? footnoteIndented(source, input[j]) && nextSibling.prefix
     : closesQuotedContainer(context, input, j, boundary)
       ? footnoteIndented(source, input[j] ?? boundary) && (input[j] ?? boundary!).start
       : j > lastContent + 1 &&
@@ -608,13 +610,15 @@ function lazyLine(context: BlockContext, line: Line): LazyLine {
 // What is left of `line` inside the block quotes, list items and footnote definitions `opener`
 // opened, and whether `line` is lazy there. micromark rejects a lazy table delimiter row, so
 // `- > a\n  b|c\n  -|-` is one quoted paragraph, while `- > a|b\n  > -|-` is a table.
-function within(context: BlockContext, opener: Line, line: Line): { line: Line; lazy: boolean } {
+function within(context: BlockContext, opener: Line, line: Line): { line: Line; lazy: boolean; list: boolean } {
   const source = context.source
+  let list = false
   for (let depth = 0; depth < MAX_LAZY_CONTAINER_PROBES; depth++) {
     const q = quote(source, opener)
     const m = q < 0 ? marker(source, opener) : undefined
     const f = q < 0 && !m && context.config.gfm ? footnoteLabel(source, opener) : undefined
     if (q < 0 && !m && !f) break
+    list = !!m
     const next: Line = m
       ? { start: m.content, end: opener.end, next: opener.next, padding: m.padding }
       : f
@@ -623,16 +627,16 @@ function within(context: BlockContext, opener: Line, line: Line): { line: Line; 
     if (line.start === opener.start) line = { ...next, end: line.end, next: line.next }
     else if (m || f) {
       const indent = m ? m.indent : FOOTNOTE_INDENT
-      if (indentation(source, line).indent < indent) return { line, lazy: true }
+      if (indentation(source, line).indent < indent) return { line, lazy: true, list }
       line = stripIndent(source, line, indent)
     } else {
       const r = quote(source, line)
-      if (r < 0) return { line, lazy: true }
+      if (r < 0) return { line, lazy: true, list }
       line = { start: r, end: line.end, next: line.next, padding: quotePadding(source, r) }
     }
     opener = next
   }
-  return { line, lazy: false }
+  return { line, lazy: false, list }
 }
 
 function quotePadding(source: string, content: number): number {
@@ -701,12 +705,10 @@ function paragraphOpener(context: BlockContext, opener: Line, line: Line, open: 
   if (!open) {
     // An empty list item takes an indented next line as its first content, so the paragraph
     // that line opens is inside the item: `> 1.\n>    a|\n> -|\nb` keeps `-|` lazy.
-    if (
-      opener !== line &&
-      blank(source, within(context, opener, opener).line) &&
-      !within(context, opener, line).lazy
-    )
-      return opener
+    if (opener !== line) {
+      const inner = within(context, opener, opener)
+      if (inner.list && blank(source, inner.line) && !within(context, opener, line).lazy) return opener
+    }
     return line
   }
   return interrupts(context, within(context, opener, line).line) ? line : opener
@@ -1556,13 +1558,16 @@ function quoteLines(
 function extendBlankContainer(source: string, input: Line[], i: number, parent: number): void {
   const line = input[i]
   const previous = tree.last[parent]
-  // Quirk: EOF after a quote prefix does not emit a blank line-ending token.
+  // Quirk: EOF after a quote prefix does not emit a blank line-ending token. Whitespace after
+  // the prefix is a lazy flow chunk, which ends the quote before its line ending.
   if (
     !previous ||
     !quotePrefix(source, line) ||
     !((tree.kind[previous] === Kind.Blockquote &&
       line.next === source.length &&
       line.end === line.next &&
+      line.start === line.end &&
+      !line.padding &&
       i > 0 &&
       !blank(source, input[i - 1])) ||
       tree.kind[previous] === Kind.List ||
@@ -1686,13 +1691,18 @@ export function parseBlocks(
       // A lazy line closes every container up to the one that accepted it.
       if (input[j]?.lazy) return j
       // Quirk: a line opening a new container after a quote prefix or footnote indent closes
-      // the quote at that prefix.
+      // the quote at that prefix, also when that line follows the quote's parent. So does any
+      // container start when the last child kept its line ending (unclosed code): no trailing
+      // line ending is left to end the quote at.
+      const last = tree.last[n]
       if (
-        j < input.length &&
-        (quotePrefix(source, input[j]) || footnoteIndented(source, input[j])) &&
-        startsContainer(context, input[j])
+        closesQuotedContainer(context, input, j, boundary) ||
+        (last &&
+          (input[j] ?? boundary) &&
+          (input[j] ?? boundary) !== siblingLine &&
+          tree.end[last] > input[j - 1].end)
       )
-        tree.end[n] = input[j].start
+        tree.end[n] = (input[j] ?? boundary!).start
       if (tree.last[n]) tree.end[n] = Math.max(tree.end[n], tree.end[tree.last[n]])
       pendingLazy = j < input.length && !blank(source, input[j])
       residual = InterruptState.None
@@ -1939,7 +1949,7 @@ export function parseBlocks(
           (tree.end[tree.last[item]] === input[j].start ||
             tree.end[tree.last[item]] === input[j - 1].next)
         )
-          tree.end[item] = nextMark.content
+          tree.end[item] = nextMark.prefix
         if (
           closeFootnoteItem(
             context,
@@ -1976,6 +1986,14 @@ export function parseBlocks(
           // to end the item at, so the item ends with the list.
           else if (tree.end[item] > input[lastContent].end) tree.end[item] = tree.end[list]
         }
+        // Without that trailing ending, the next line's new container closes the list after the
+        // prefixes that line continued.
+        const exit = input[j] ?? boundary
+        if (
+          !sibling && exit && exit !== siblingLine &&
+          tree.end[item] > input[j - 1].end && exit.start > tree.end[list]
+        )
+          tree.end[list] = tree.end[item] = exit.start
         if (!sibling) break
       }
       tree.extra[list] = spread
