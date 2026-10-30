@@ -2418,6 +2418,130 @@
     "syntax": ["mdx", "gfm"]
   },
   {
+    "name": "fenced code drops a lone CR and the LF after an empty first line as one leading ending",
+    "input": " ```\r \na\n```\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "fenced code in a block quote drops a lone CR and the LF after an empty first line",
+    "input": ">```\r>\n>a\n>```",
+    "syntax": [
+      "mdx",
+      "gfm"
+    ]
+  },
+  {
+    "name": "fenced code drops a lone CR and the LF before an empty last line as one trailing ending",
+    "input": ">- ```\n>a\r>\n>   ```",
+    "syntax": [
+      "mdx",
+      "gfm"
+    ]
+  },
+  {
+    "name": "fenced code ended by a new container drops a lone CR and LF across an empty last line",
+    "input": "-\n  >```\n  >\r  >\n>",
+    "syntax": [
+      "mdx",
+      "gfm"
+    ]
+  },
+  {
+    "name": "math flow drops a lone CR and LF across an empty first line",
+    "input": "-\n  >$$\r  >\n  >a",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "math"
+    ]
+  },
+  {
+    "name": "MDX expression line continues a quoted paragraph when text follows it without the prefix",
+    "input": ">a\n>{\n>};",
+    "syntax": [
+      "mdx",
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX tag line continues a paragraph in a list quote when its attribute spans prefixed lines",
+    "input": "-\n  >a\n  ><b c={{\n  >}}>d</b>",
+    "syntax": [
+      "mdx",
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX tag spanning prefixed lines interrupts a quoted paragraph",
+    "input": ">a\n><b\n>/>",
+    "syntax": [
+      "mdx",
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX tag spanning prefixed lines interrupts a paragraph in a nested list item",
+    "input": "-\n  >1. ={}\n  >    <b\n  >    />",
+    "syntax": [
+      "mdx",
+      "gfm"
+    ]
+  },
+  {
+    "name": "quoted blank line ending a nested list inside flow JSX does not spread the item",
+    "input": ">- <A>\n>   *\n>\n>   </A>",
+    "syntax": [
+      "mdx",
+      "gfm"
+    ]
+  },
+  {
+    "name": "quoted blank line ending a nested ordered list inside flow JSX does not spread the item",
+    "input": ">-\n>   <A b=\"\">\n>   2.\n>\n>   </A>",
+    "syntax": [
+      "mdx",
+      "gfm"
+    ]
+  },
+  {
+    "name": "blank line inside unclosed code of a nested list in flow JSX does not spread the item",
+    "input": "- <A>\n  2) ```\n\n  </A>",
+    "syntax": [
+      "mdx",
+      "gfm"
+    ]
+  },
+  {
+    "name": "an empty list item after a quoted table ends the table so its paragraph takes lazy lines",
+    "input": ">a|b\n>-|-\n>-\n>   c\nd",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "a lazy definition line right after a quoted table cannot open a table",
+    "input": ">a|a\n>-|-\n[a]:\n-|",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "a delimiter row lazy in a footnote definition opens no table, so the paragraph takes lazy lines",
+    "input": ">- [^a]:|\n|||\n>   -|-\n|",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "a quote in a nested list item cannot head a table in a later sibling quote",
+    "input": "+ -\n    >a||\n  >-|-\n|",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
     "name": "an empty blockquote does not make a later paragraph part of an empty list item",
     "input": ">\n>>{\n{\n>-|\nb",
     "syntax": ["gfm"]
