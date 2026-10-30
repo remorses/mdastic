@@ -1226,6 +1226,28 @@ function parseFencedCode(
     else if (value.charCodeAt(value.length - 1) === Char.CarriageReturn)
       tree.value[n] = value.slice(0, -1)
   }
+  // Quirk: micromark buffers the opening line ending, every content line ending and (when the
+  // code keeps it) the last one, then strips one leading and one trailing `\r?\n|\r`. A lone CR
+  // and an LF become adjacent across an empty stripped line, so `\r\n` goes as one ending.
+  const head = content[0]
+  if (
+    head &&
+    head.start === head.end &&
+    !head.padding &&
+    source.charCodeAt(line.end) === Char.CarriageReturn &&
+    line.next === line.end + 1 &&
+    tree.value[n]!.charCodeAt(0) === Char.LineFeed
+  )
+    tree.value[n] = tree.value[n]!.slice(1)
+  if (
+    (closed || keepEnding) &&
+    content.length > 1 &&
+    tail.start === tail.end &&
+    !tail.padding &&
+    source.charCodeAt(tail.end) === Char.LineFeed &&
+    tree.value[n]!.charCodeAt(tree.value[n]!.length - 1) === Char.CarriageReturn
+  )
+    tree.value[n] = tree.value[n]!.slice(0, -1)
   return j - i + (closed ? 1 : 0)
 }
 

@@ -2404,5 +2404,45 @@
     "name": "a multi-line attribute expression in a quoted paragraph reads continuation lines without their quote markers",
     "input": "> a<>\n> <a b={{\n> }}>c<d></d></a></>\n",
     "syntax": ["mdx", "gfm"]
+  },
+  {
+    "name": "fenced code drops a lone CR and the LF after an empty first line as one leading ending",
+    "input": " ```\r \na\n```\n",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "fenced code in a block quote drops a lone CR and the LF after an empty first line",
+    "input": ">```\r>\n>a\n>```",
+    "syntax": [
+      "mdx",
+      "gfm"
+    ]
+  },
+  {
+    "name": "fenced code drops a lone CR and the LF before an empty last line as one trailing ending",
+    "input": ">- ```\n>a\r>\n>   ```",
+    "syntax": [
+      "mdx",
+      "gfm"
+    ]
+  },
+  {
+    "name": "fenced code ended by a new container drops a lone CR and LF across an empty last line",
+    "input": "-\n  >```\n  >\r  >\n>",
+    "syntax": [
+      "mdx",
+      "gfm"
+    ]
+  },
+  {
+    "name": "math flow drops a lone CR and LF across an empty first line",
+    "input": "-\n  >$$\r  >\n  >a",
+    "syntax": [
+      "mdx",
+      "gfm",
+      "math"
+    ]
   }
 ]
