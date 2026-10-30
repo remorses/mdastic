@@ -608,26 +608,28 @@ function lazyLine(context: BlockContext, line: Line): LazyLine {
 // What is left of `line` inside the block quotes and list items `opener` opened, and
 // whether `line` is lazy there. micromark rejects a lazy table delimiter row, so
 // `- > a\n  b|c\n  -|-` is one quoted paragraph, while `- > a|b\n  > -|-` is a table.
-function within(source: string, opener: Line, line: Line): { line: Line; lazy: boolean } {
+function within(source: string, opener: Line, line: Line): { line: Line; lazy: boolean; list: boolean } {
+  let list = false
   for (let depth = 0; depth < MAX_LAZY_CONTAINER_PROBES; depth++) {
     const q = quote(source, opener)
     const m = q < 0 ? marker(source, opener) : undefined
     if (q < 0 && !m) break
+    list = !!m
     const next: Line = m
       ? { start: m.content, end: opener.end, next: opener.next, padding: m.padding }
       : { start: q, end: opener.end, next: opener.next, padding: quotePadding(source, q) }
     if (line.start === opener.start) line = { ...next, end: line.end, next: line.next }
     else if (m) {
-      if (indentation(source, line).indent < m.indent) return { line, lazy: true }
+      if (indentation(source, line).indent < m.indent) return { line, lazy: true, list }
       line = stripIndent(source, line, m.indent)
     } else {
       const r = quote(source, line)
-      if (r < 0) return { line, lazy: true }
+      if (r < 0) return { line, lazy: true, list }
       line = { start: r, end: line.end, next: line.next, padding: quotePadding(source, r) }
     }
     opener = next
   }
-  return { line, lazy: false }
+  return { line, lazy: false, list }
 }
 
 function quotePadding(source: string, content: number): number {
@@ -664,12 +666,10 @@ function paragraphOpener(context: BlockContext, opener: Line, line: Line, open: 
   if (!open) {
     // An empty list item takes an indented next line as its first content, so the paragraph
     // that line opens is inside the item: `> 1.\n>    a|\n> -|\nb` keeps `-|` lazy.
-    if (
-      opener !== line &&
-      blank(source, within(source, opener, opener).line) &&
-      !within(source, opener, line).lazy
-    )
-      return opener
+    if (opener !== line) {
+      const inner = within(source, opener, opener)
+      if (inner.list && blank(source, inner.line) && !within(source, opener, line).lazy) return opener
+    }
     return line
   }
   return interrupts(context, within(source, opener, line).line) ? line : opener

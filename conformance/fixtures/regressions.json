@@ -2404,5 +2404,10 @@
     "name": "a multi-line attribute expression in a quoted paragraph reads continuation lines without their quote markers",
     "input": "> a<>\n> <a b={{\n> }}>c<d></d></a></>\n",
     "syntax": ["mdx", "gfm"]
+  },
+  {
+    "name": "an empty blockquote does not make a later paragraph part of an empty list item",
+    "input": ">\n>>{\n{\n>-|\nb",
+    "syntax": ["gfm"]
   }
 ]
