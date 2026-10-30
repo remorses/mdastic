@@ -605,21 +605,26 @@ function lazyLine(context: BlockContext, line: Line): LazyLine {
   return line.next === line.end ? LazyLine.Stop : LazyLine.TakeLast
 }
 
-// What is left of `line` inside the block quotes and list items `opener` opened, and
-// whether `line` is lazy there. micromark rejects a lazy table delimiter row, so
+// What is left of `line` inside the block quotes, list items and footnote definitions `opener`
+// opened, and whether `line` is lazy there. micromark rejects a lazy table delimiter row, so
 // `- > a\n  b|c\n  -|-` is one quoted paragraph, while `- > a|b\n  > -|-` is a table.
-function within(source: string, opener: Line, line: Line): { line: Line; lazy: boolean } {
+function within(context: BlockContext, opener: Line, line: Line): { line: Line; lazy: boolean } {
+  const source = context.source
   for (let depth = 0; depth < MAX_LAZY_CONTAINER_PROBES; depth++) {
     const q = quote(source, opener)
     const m = q < 0 ? marker(source, opener) : undefined
-    if (q < 0 && !m) break
+    const f = q < 0 && !m && context.config.gfm ? footnoteLabel(source, opener) : undefined
+    if (q < 0 && !m && !f) break
     const next: Line = m
       ? { start: m.content, end: opener.end, next: opener.next, padding: m.padding }
-      : { start: q, end: opener.end, next: opener.next, padding: quotePadding(source, q) }
+      : f
+        ? { start: f.end, end: opener.end, next: opener.next }
+        : { start: q, end: opener.end, next: opener.next, padding: quotePadding(source, q) }
     if (line.start === opener.start) line = { ...next, end: line.end, next: line.next }
-    else if (m) {
-      if (indentation(source, line).indent < m.indent) return { line, lazy: true }
-      line = stripIndent(source, line, m.indent)
+    else if (m || f) {
+      const indent = m ? m.indent : FOOTNOTE_INDENT
+      if (indentation(source, line).indent < indent) return { line, lazy: true }
+      line = stripIndent(source, line, indent)
     } else {
       const r = quote(source, line)
       if (r < 0) return { line, lazy: true }
@@ -635,15 +640,21 @@ function quotePadding(source: string, content: number): number {
 }
 
 // A table row pair inside the paragraph `opener` opened: the delimiter row must not be lazy.
-function nestedTable(context: BlockContext, opener: Line, header: Line, delimiter: Line): boolean {
+function nestedTable(
+  context: BlockContext,
+  previous: Line | undefined,
+  opener: Line,
+  header: Line,
+  delimiter: Line,
+): boolean {
   const source = context.source
   // Every delimiter row has a dash.
   let dash = delimiter.start
   while (dash < delimiter.end && source.charCodeAt(dash) !== 45) dash++
   if (dash === delimiter.end) return false
-  const row = within(source, opener, delimiter)
+  const row = withinOpener(context, previous, opener, delimiter)
   if (row.lazy) return false
-  const head = within(source, opener, header).line
+  const head = withinOpener(context, previous, opener, header).line
   // A blank line is no head row: `- a\n\n  -:\nb` is a paragraph that takes `b`.
   if (blank(source, head)) return false
   // MDX flow tags and expressions are tried before tables, so `> <a>\n> -|` is no table and
@@ -653,9 +664,35 @@ function nestedTable(context: BlockContext, opener: Line, header: Line, delimite
 }
 
 // Whether `line` continues the table in the containers `opener` opened.
-function tableRow(context: BlockContext, opener: Line, line: Line): boolean {
-  const row = within(context.source, opener, line)
-  return !row.lazy && !blank(context.source, row.line) && !interrupts(context, row.line)
+function tableRow(
+  context: BlockContext,
+  previous: Line | undefined,
+  opener: Line,
+  line: Line,
+): boolean {
+  const row = withinOpener(context, previous, opener, line)
+  // A table never takes a list item as a body row, even one that cannot interrupt.
+  return (
+    !row.lazy &&
+    !blank(context.source, row.line) &&
+    !interrupts(context, row.line) &&
+    !marker(context.source, row.line)
+  )
+}
+
+// A cheap prefilter: whether `line` may start a block quote, list item or footnote definition.
+function mayOpenContainer(source: string, line: Line): boolean {
+  let i = line.start
+  while (space(source.charCodeAt(i))) i++
+  const c = source.charCodeAt(i)
+  return (
+    c === Char.GreaterThan ||
+    c === Char.Hyphen ||
+    c === Char.Asterisk ||
+    c === Char.Plus ||
+    c === Char.LeftBracket ||
+    (c >= 48 && c <= 57)
+  )
 }
 
 // The line that opens the paragraph `line` leaves open, given the current one's opener.
@@ -666,13 +703,32 @@ function paragraphOpener(context: BlockContext, opener: Line, line: Line, open: 
     // that line opens is inside the item: `> 1.\n>    a|\n> -|\nb` keeps `-|` lazy.
     if (
       opener !== line &&
-      blank(source, within(source, opener, opener).line) &&
-      !within(source, opener, line).lazy
+      blank(source, within(context, opener, opener).line) &&
+      !within(context, opener, line).lazy
     )
       return opener
     return line
   }
-  return interrupts(context, within(source, opener, line).line) ? line : opener
+  return interrupts(context, within(context, opener, line).line) ? line : opener
+}
+
+// `within` for an opener that may continue containers the previous opener opened: it stays
+// inside them, so a later line lazy in those containers is lazy here too.
+function withinOpener(
+  context: BlockContext,
+  previous: Line | undefined,
+  opener: Line,
+  line: Line,
+): { line: Line; lazy: boolean } {
+  if (previous && previous !== opener && mayOpenContainer(context.source, previous)) {
+    const inner = within(context, previous, opener)
+    if (!inner.lazy && inner.line.start !== opener.start) {
+      const outer = within(context, previous, line)
+      if (outer.lazy || !mayOpenContainer(context.source, inner.line)) return outer
+      return within(context, inner.line, outer.line)
+    }
+  }
+  return within(context, opener, line)
 }
 
 // What a container line leaves open for the next line, seen through the containers it starts.
@@ -1038,7 +1094,7 @@ function tableStart(
   i: number,
   paragraph = false,
 ): AlignType[] | undefined {
-  if (!context.config.gfm || !input[i + 1] || input[i + 1].lazy) return
+  if (!context.config.gfm || !input[i + 1] || input[i + 1].lazy || input[i] === afterTable) return
   const source = context.source
   const align = tableAlign(source, input[i + 1])
   if (!align) return
@@ -1082,7 +1138,6 @@ function parseTable(
   parent: number,
   paragraph: boolean,
 ): number {
-  if (input[i] === afterTable) return 0
   const align = tableStart(context, input, i, paragraph)
   // The paragraph this line may interrupt has ended, so HTML blocks win here.
   if (!align || (!mdxMode && htmlBlock(context.source, input[i], false))) return 0
@@ -1314,6 +1369,7 @@ function parseFootnoteDefinition(
   let open = lazyState(context, content[0], residual > 0)
   let listed = lazyListed
   let opener = content[0]
+  let previous: Line | undefined
   let table = false
   let rejected: Line | undefined
   for (; j < input.length; j++) {
@@ -1333,16 +1389,22 @@ function parseFootnoteDefinition(
       const stripped =
         indent >= FOOTNOTE_INDENT ? stripIndent(source, input[j], FOOTNOTE_INDENT) : input[j]
       if (table) {
-        table = tableRow(context, opener, stripped)
+        table = tableRow(context, previous, opener, stripped)
         // micromark tried the rejected row as a body row, so it cannot open a table.
         if (!table) rejected = stripped
       } else if (
         context.config.gfm &&
         content[content.length - 1] !== rejected &&
-        nestedTable(context, opener, content[content.length - 1], stripped)
+        nestedTable(context, previous, opener, content[content.length - 1], stripped)
       )
         table = true
-      if (!table) opener = paragraphOpener(context, opener, stripped, open === InterruptState.Paragraph)
+      if (!table) {
+        const next = paragraphOpener(context, opener, stripped, open === InterruptState.Paragraph)
+        if (next !== opener) {
+          previous = opener
+          opener = next
+        }
+      }
       content.push(stripped)
       last = j
       open = table ? InterruptState.None : lazyState(context, stripped, open === InterruptState.Paragraph, open, listed)
@@ -1437,6 +1499,7 @@ function quoteLines(
   let table = false
   let rejected: Line | undefined
   let opener: Line | undefined
+  let previous: Line | undefined
   for (; j < input.length; j++) {
     const current = input[j]
     const stripped = quote(source, current)
@@ -1449,17 +1512,23 @@ function quoteLines(
         lazy: current.lazy,
       }
       if (table && opener) {
-        table = tableRow(context, opener, item)
+        table = tableRow(context, previous, opener, item)
         // micromark tried the rejected row as a body row, so it cannot open a table.
         if (!table) rejected = item
       } else if (
         context.config.gfm &&
         opener &&
         content[content.length - 1] !== rejected &&
-        nestedTable(context, opener, content[content.length - 1], item)
+        nestedTable(context, previous, opener, content[content.length - 1], item)
       )
         table = true
-      if (!table) opener = paragraphOpener(context, opener ?? item, item, open === InterruptState.Paragraph)
+      if (!table) {
+        const next = paragraphOpener(context, opener ?? item, item, open === InterruptState.Paragraph)
+        if (next !== opener) {
+          previous = opener
+          opener = next
+        }
+      }
       content.push(item)
       // Tables cannot receive ordinary lazy paragraph continuation.
       // Open paragraphs, indented code and the first line's inherited state reject markers that
@@ -1706,6 +1775,7 @@ export function parseBlocks(
         let open = lazyState(context, content[0], residual > 0)
         let listed = lazyListed
         let opener = content[0]
+        let previous: Line | undefined
         let sawBlank = false
         let lastContent = itemStart
         let itemSpread = false
@@ -1736,16 +1806,22 @@ export function parseBlocks(
           if (!current.lazy && scan.indent >= mark.indent) {
             const stripped = stripIndent(source, current, mark.indent)
             if (table) {
-              table = tableRow(context, opener, stripped)
+              table = tableRow(context, previous, opener, stripped)
               // micromark tried the rejected row as a body row, so it cannot open a table.
               if (!table) rejected = stripped
             } else if (
               context.config.gfm &&
               content[content.length - 1] !== rejected &&
-              nestedTable(context, opener, content[content.length - 1], stripped)
+              nestedTable(context, previous, opener, content[content.length - 1], stripped)
             )
               table = true
-            if (!table) opener = paragraphOpener(context, opener, stripped, open === InterruptState.Paragraph)
+            if (!table) {
+              const next = paragraphOpener(context, opener, stripped, open === InterruptState.Paragraph)
+              if (next !== opener) {
+                previous = opener
+                opener = next
+              }
+            }
             content.push(stripped)
             lastContent = j
             const interrupted = open === InterruptState.Paragraph || residual > 0

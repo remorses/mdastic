@@ -2500,5 +2500,33 @@
       "mdx",
       "gfm"
     ]
+  },
+  {
+    "name": "an empty list item after a quoted table ends the table so its paragraph takes lazy lines",
+    "input": ">a|b\n>-|-\n>-\n>   c\nd",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "a lazy definition line right after a quoted table cannot open a table",
+    "input": ">a|a\n>-|-\n[a]:\n-|",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "a delimiter row lazy in a footnote definition opens no table, so the paragraph takes lazy lines",
+    "input": ">- [^a]:|\n|||\n>   -|-\n|",
+    "syntax": [
+      "gfm"
+    ]
+  },
+  {
+    "name": "a quote in a nested list item cannot head a table in a later sibling quote",
+    "input": "+ -\n    >a||\n  >-|-\n|",
+    "syntax": [
+      "gfm"
+    ]
   }
 ]
