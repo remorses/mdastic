@@ -2444,5 +2444,37 @@
       "gfm",
       "math"
     ]
+  },
+  {
+    "name": "MDX expression line continues a quoted paragraph when text follows it without the prefix",
+    "input": ">a\n>{\n>};",
+    "syntax": [
+      "mdx",
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX tag line continues a paragraph in a list quote when its attribute spans prefixed lines",
+    "input": "-\n  >a\n  ><b c={{\n  >}}>d</b>",
+    "syntax": [
+      "mdx",
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX tag spanning prefixed lines interrupts a quoted paragraph",
+    "input": ">a\n><b\n>/>",
+    "syntax": [
+      "mdx",
+      "gfm"
+    ]
+  },
+  {
+    "name": "MDX tag spanning prefixed lines interrupts a paragraph in a nested list item",
+    "input": "-\n  >1. ={}\n  >    <b\n  >    />",
+    "syntax": [
+      "mdx",
+      "gfm"
+    ]
   }
 ]
