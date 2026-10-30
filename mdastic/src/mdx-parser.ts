@@ -676,7 +676,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
     hasImports: () => imports.length > 0,
     // micromark tries a flow tag or expression on every paragraph continuation line, so its
     // scan fails on the first lazy line it reads. Raw source probes cannot see laziness, and
-    // read across container prefixes, so containers with lazy lines decide here instead.
+    // read across container prefixes, so lines inside containers decide here instead.
     continuation(
       context: BlockContext,
       input: Line[],
@@ -693,6 +693,12 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
         const scanned = flowLine(view, starts[at] + begin - line.start)
         if (scanned.error) throw scanned.error
         return scanned.complete
+      }
+      // A tag that continues on the next container line reads that line without its prefix:
+      // in `> a\n> <b\n> >`, the second `>` closes the tag, not the quote marker before it.
+      if (view !== rawView) {
+        const scanned = flowLine(view, starts[at] + begin - line.start)
+        return !!scanned.error || scanned.complete
       }
     },
     interrupt(line: Line) {
