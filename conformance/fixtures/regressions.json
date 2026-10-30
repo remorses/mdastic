@@ -2364,5 +2364,50 @@
     "name": "MDX chained flow attempt keeps the list-ending line break in EOF errors",
     "input": "- {}<b\n  >*\n  <b\n>a",
     "syntax": ["mdx", "gfm"]
+  },
+  {
+    "name": "MDX flow tags are not table head rows, so a lazy line continues the paragraph under them in a block quote",
+    "input": "> <A>\n> -|\n|\n> </A>\n",
+    "syntax": ["mdx", "gfm"]
+  },
+  {
+    "name": "MDX flow tags are not table head rows in list items either",
+    "input": "- <A>\n  :-\n|\n  </A>\n",
+    "syntax": ["mdx", "gfm"]
+  },
+  {
+    "name": "a paragraph opening an empty list item in a block quote keeps a lazy table delimiter row",
+    "input": "> 1.\n>    a|\n> -|\nb\n",
+    "syntax": ["gfm"]
+  },
+  {
+    "name": "a lazy delimiter row after an empty list item stays paragraph text inside MDX flow tags",
+    "input": "> <A>\n> 1.\n>    a|||\n> -|-|-\n|\n> </A>\n",
+    "syntax": ["mdx", "gfm"]
+  },
+  {
+    "name": "a lazy delimiter row after an empty nested list item stays paragraph text inside MDX flow tags",
+    "input": "- <A>\n  -\n    ||||\n  -|-|-\n`\n  </A>\n",
+    "syntax": ["mdx", "gfm"]
+  },
+  {
+    "name": "a multi-line MDX flow tag interrupting a quoted paragraph reads the next line without its quote marker",
+    "input": "> a\n> <A\n> >\n> </A>\n",
+    "syntax": ["mdx", "gfm"]
+  },
+  {
+    "name": "the same with a bare carriage return before the closing tag",
+    "input": ">a\n><A\n>>\r></A>",
+    "syntax": ["mdx", "gfm"]
+  },
+  {
+    "name": "a multi-line attribute expression in a quoted paragraph reads continuation lines without their quote markers",
+    "input": "> a<>\n> <a b={{\n> }}>c<d></d></a></>\n",
+    "syntax": ["mdx", "gfm"]
+  },
+  {
+    "name": "an empty blockquote does not make a later paragraph part of an empty list item",
+    "input": ">\n>>{\n{\n>-|\nb",
+    "syntax": ["gfm"]
   }
 ]
