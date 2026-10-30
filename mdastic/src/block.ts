@@ -540,9 +540,7 @@ function closesQuotedContainer(
 ): boolean {
   const source = context.source
   const line = j < input.length ? input[j] : boundary
-  // A parent that ended on a lazy line does not hand its boundary down as a container start.
-  if (!line || line === siblingLine || line.lazy || (j >= input.length && input[j - 1]?.lazy))
-    return false
+  if (!line || line === siblingLine || line.lazy) return false
   if (!quotePrefix(source, line) && !footnoteIndented(source, line)) return false
   if (blank(source, line))
     return line.start === line.end && !line.padding && line.end === source.length
@@ -1583,13 +1581,15 @@ export function parseBlocks(
       // A lazy line closes every container up to the one that accepted it.
       if (input[j]?.lazy) return j
       // Quirk: a line opening a new container after a quote prefix or footnote indent closes
-      // the quote at that prefix.
+      // the quote at that prefix, also when that line follows the quote's parent. So does any
+      // container start when the last child kept its line ending (unclosed code): no trailing
+      // line ending is left to end the quote at.
+      const last = tree.last[n]
       if (
-        j < input.length &&
-        (quotePrefix(source, input[j]) || footnoteIndented(source, input[j])) &&
-        startsContainer(context, input[j])
+        closesQuotedContainer(context, input, j, boundary) ||
+        (last && (input[j] ?? boundary) && tree.end[last] > input[j - 1].end)
       )
-        tree.end[n] = input[j].start
+        tree.end[n] = (input[j] ?? boundary!).start
       if (tree.last[n]) tree.end[n] = Math.max(tree.end[n], tree.end[tree.last[n]])
       pendingLazy = j < input.length && !blank(source, input[j])
       residual = InterruptState.None
@@ -1866,6 +1866,11 @@ export function parseBlocks(
           // to end the item at, so the item ends with the list.
           else if (tree.end[item] > input[lastContent].end) tree.end[item] = tree.end[list]
         }
+        // Without that trailing ending, the next line's new container closes the list after the
+        // prefixes that line continued.
+        const exit = input[j] ?? boundary
+        if (!sibling && exit && tree.end[item] > input[j - 1].end && exit.start > tree.end[list])
+          tree.end[list] = tree.end[item] = exit.start
         if (!sibling) break
       }
       tree.extra[list] = spread
