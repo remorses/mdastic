@@ -1451,13 +1451,16 @@ function quoteLines(
 function extendBlankContainer(source: string, input: Line[], i: number, parent: number): void {
   const line = input[i]
   const previous = tree.last[parent]
-  // Quirk: EOF after a quote prefix does not emit a blank line-ending token.
+  // Quirk: EOF after a quote prefix does not emit a blank line-ending token. Whitespace after
+  // the prefix is a lazy flow chunk, which ends the quote before its line ending.
   if (
     !previous ||
     !quotePrefix(source, line) ||
     !((tree.kind[previous] === Kind.Blockquote &&
       line.next === source.length &&
       line.end === line.next &&
+      line.start === line.end &&
+      !line.padding &&
       i > 0 &&
       !blank(source, input[i - 1])) ||
       tree.kind[previous] === Kind.List ||

@@ -2373,5 +2373,7 @@
   {"name": "a list item ending in kept code ends at a blank sibling marker, not its whitespace", "input": "+ ```\n+ \n\nx\n\n1. ```\n1. \n\nx\n\n> - ```\n> - \n\nx\n\n[^1]: -\n    - \n", "syntax": ["gfm"]},
   {"name": "containers whose last child kept its line ending close after the next line's prefixes", "input": "- - ```\n  > b\n\nx\n\n- > ```\n  - b\n\nx\n\n-\n  >```\n  1.\n\nx\n\n> - ```\n>\n4.\n\nx\n\n> 1) >\n> +\n\nx\n\n> 1) > a\n> +\n\nx\n\n- ```\n\nb\n", "syntax": ["gfm"]},
   {"name": "MDX containers whose last child kept its line ending close after the next line's prefixes", "input": "- - ```\n  > b\n\nx\n\n- > ```\n  - b\n\nx\n\n> - ```\n>\n4.\n\nx\n\n> <A>\n> 1) >\n> +\n> </A>\n", "syntax": ["mdx", "frontmatter", "gfm"]},
-  {"name": "a quoted list ending on a lazy line closes with its quote after the next prefix", "input": ">> * a\n b\n> - c\n\nx\n\n>> * a\n b\n>", "syntax": ["gfm"]}
+  {"name": "a quoted list ending on a lazy line closes with its quote after the next prefix", "input": ">> * a\n b\n> - c\n\nx\n\n>> * a\n b\n>", "syntax": ["gfm"]},
+  {"name": "whitespace after a quote prefix at EOF is a lazy chunk that ends the inner quote early", "input": "> > a\n>   ", "syntax": []},
+  {"name": "tab after a quote prefix at EOF ends the inner quote early", "input": ">>\n>\t", "syntax": ["gfm"]}
 ]
