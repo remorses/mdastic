@@ -2364,5 +2364,10 @@
     "name": "MDX chained flow attempt keeps the list-ending line break in EOF errors",
     "input": "- {}<b\n  >*\n  <b\n>a",
     "syntax": ["mdx", "gfm"]
-  }
+  },
+  {"name": "line endings read again after a failed code span, link or HTML attempt end after the next container prefix", "input": "> a `\\\n> b\n\nx\n\n- `\\\n  c\n\nx\n\n- `\\\n\td\n\nx\n\n> [e](\\\n> f\n\nx\n\n> [g](h\\\n> i\n\nx\n\n> [j][k\\\n> l\n\nx\n\n1) [[](\\\n   ]()\n\nx\n\n2. * `\\\n   **\n\nx\n\n> a `\n> b\n> ===\n", "syntax": []},
+  {"name": "GFM line endings read again after a failed attempt end after the next container prefix", "input": "> a `\\\n> b\n\nx\n\n- `\\\n  c\n\nx\n\n- `\\\n\td\n\nx\n\n> [e](\\\n> f\n\nx\n\n> [g](h\\\n> i\n\nx\n\n> [j][k\\\n> l\n\nx\n\n1) [[](\\\n   ]()\n\nx\n\n2. * `\\\n   **\n\nx\n\n> a `\n> b\n> ===\n\nx\n\n> a <!--\\\n> b\n\nx\n\n> a <?\\\n> b\n\nx\n\n> a <b c=\\\n> d\n\nx\n\n> a <b c\n> =\"\\\n> d\n\nx\n\n> a <b\n> \\\n> d\n\nx\n\n[^1]: `\n    http://a\n\n- $\n  []()\n", "syntax": ["gfm"]},
+  {"name": "HTML text that fails across a line ending re-reads it after the container prefix", "input": "> a <!--\\\n> b\n\nx\n\n> a <?\\\n> b\n\nx\n\n> a <b c=\\\n> d\n\nx\n\n> a <b c\n> =\"\\\n> d\n\nx\n\n> a <b\n> \\\n> d\n", "syntax": []},
+  {"name": "math line endings read again after an unclosed dollar end after the next container prefix", "input": "> a $\\\n> b\n\nx\n\n> a $  \n> b\n\nx\n\n* $\n  *c*\n\nx\n\n[^1]: $\\\n    d\n\nx\n\n> a `\\\n> b\n\nx\n\n- `\\\n  c\n\nx\n\n- `\\\n\td\n\nx\n\n> [e](\\\n> f\n\nx\n\n> [g](h\\\n> i\n\nx\n\n> [j][k\\\n> l\n\nx\n\n1) [[](\\\n   ]()\n\nx\n\n2. * `\\\n   **\n\nx\n\n> a `\n> b\n> ===\n", "syntax": ["gfm", "math"]},
+  {"name": "MDX line endings read again after a failed attempt end after the next container prefix", "input": "- <A>\n  [](\n  []()\n  </A>\n\nx\n\n<B>\n* `\\\n  \\\n</B>\n\nx\n\n> `\n> <c>d</c>\n\nx\n\n> a `\\\n> b\n\nx\n\n- `\\\n  c\n\nx\n\n- `\\\n\td\n\nx\n\n> [e](\\\n> f\n\nx\n\n> [g](h\\\n> i\n\nx\n\n> [j][k\\\n> l\n\nx\n\n1) [[](\\\n   ]()\n\nx\n\n2. * `\\\n   **\n\nx\n\n> a `\n> b\n> ===\n", "syntax": ["mdx", "frontmatter", "gfm", "math"]}
 ]

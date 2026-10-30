@@ -133,6 +133,16 @@ let labelEnd = -1
 
 // Container views write a tab's unconsumed columns as spaces mapped to the tab.
 let documentSource = ''
+// Ranges [from, to) that a failed micromark attempt read through, per top-level content.
+// Micromark quirk: a line ending consumed again after such a backtrack ends after the next
+// line's container prefix, because that prefix skip is only defined once the line is written.
+// Only container views have prefixes. Line endings are queried in source order, so passed
+// ranges are dropped.
+let replayFrom: number[] = []
+let replayTo: number[] = []
+// Start of the earliest range that reads to the end of the content.
+let replayRest = Infinity
+let contentEnd = 0
 
 export function resetInline(config: Config, source: string): void {
   documentSource = source
@@ -636,14 +646,17 @@ function virtualSpace(view: View, i: number): boolean {
   )
 }
 
+// Where the last failed htmlEnd stopped reading.
+let htmlReach = 0
+
 function attributeValueEnd(source: string, at: number, end: number, loose: boolean): number {
   let i = at
   for (;;) {
     const c = source.charCodeAt(i)
-    if (i >= end || c === 60 || c === 61 || c === 62 || c === 96) return -1
+    if (i >= end || c === 60 || c === 61 || c === 62 || c === 96) return htmlFailure(i)
     if (c === 34 || c === 39) {
       const stop = source.indexOf(source[i], i + 1)
-      return stop < 0 || stop >= end ? -1 : stop + 1
+      return stop < 0 || stop >= end ? htmlFailure(end) : stop + 1
     }
     const begin = i
     // Micromark quirk: only the first unquoted character can be a slash.
@@ -654,35 +667,41 @@ function attributeValueEnd(source: string, at: number, end: number, loose: boole
       !'"\'=/<>`'.includes(source[i])
     )
       i++
-    if (i === begin) return -1
+    if (i === begin) return htmlFailure(i)
     if (!loose || source.charCodeAt(i) !== 61) return i
     i++
     while (space(source.charCodeAt(i))) i++
   }
 }
 
+function htmlFailure(at: number): number {
+  htmlReach = at
+  return -1
+}
+
 export function htmlEnd(source: string, start: number, end: number, loose = false): number {
   let i = start + 1
+  htmlReach = i
   if (source.startsWith('<!--', start)) {
     // Micromark accepts the short comment endings <!--> and <!--->.
     if (source.charCodeAt(start + 4) === 62) return start + 5
     if (source.charCodeAt(start + 4) === 45 && source.charCodeAt(start + 5) === 62)
       return start + 6
     const stop = source.indexOf('-->', start + 4)
-    return stop < 0 || stop + 3 > end ? -1 : stop + 3
+    return stop < 0 || stop + 3 > end ? htmlFailure(end) : stop + 3
   }
   if (source.startsWith('<![CDATA[', start)) {
     const stop = source.indexOf(']]>', start + 9)
-    return stop < 0 || stop + 3 > end ? -1 : stop + 3
+    return stop < 0 || stop + 3 > end ? htmlFailure(end) : stop + 3
   }
   if (source.charCodeAt(i) === 63) {
     const stop = source.indexOf('?>', i + 1)
-    return stop < 0 || stop + 2 > end ? -1 : stop + 2
+    return stop < 0 || stop + 2 > end ? htmlFailure(end) : stop + 2
   }
   if (source.charCodeAt(i) === 33) {
     if (!alpha(source.charCodeAt(i + 1))) return -1
     const stop = source.indexOf('>', i + 2)
-    return stop < 0 || stop >= end ? -1 : stop + 1
+    return stop < 0 || stop >= end ? htmlFailure(end) : stop + 1
   }
   const closing = source.charCodeAt(i) === 47
   if (closing) i++
@@ -698,9 +717,9 @@ export function htmlEnd(source: string, start: number, end: number, loose = fals
     i = skipWhitespace(source, i, end)
     if (source.charCodeAt(i) === 62) return i + 1
     if (source.charCodeAt(i) === 47 && source.charCodeAt(i + 1) === 62 && !closing) return i + 2
-    if (closing || i === before) return -1
+    if (closing || i === before) return htmlFailure(i)
     const c = source.charCodeAt(i)
-    if (!alpha(c) && c !== 95 && c !== 58) return -1
+    if (!alpha(c) && c !== 95 && c !== 58) return htmlFailure(i)
     i++
     while (
       i < end &&
@@ -717,7 +736,7 @@ export function htmlEnd(source: string, start: number, end: number, loose = fals
     i = attributeValueEnd(source, i, end, loose)
     if (i < 0) return -1
   }
-  return -1
+  return htmlFailure(end)
 }
 
 function autolink(
@@ -798,11 +817,79 @@ function plainText(
   const n = node(
     Kind.Text,
     offset(view, start),
-    last === 10 || last === 13 ? offset(view, end - 1) + 1 : offset(view, end),
+    last === 10 || last === 13 ? lineEndingEnd(view, end) : offset(view, end),
     parent,
   )
   tree.value[n] = value ?? decode(view.source.slice(start, end))
   return n
+}
+
+function replay(from: number, to: number): void {
+  if (to >= contentEnd) replayRest = Math.min(replayRest, from)
+  else {
+    replayFrom.push(from)
+    replayTo.push(to)
+  }
+}
+
+/** Source offset after the line ending that ends before virtual index `stop`. */
+function lineEndingEnd(view: View, stop: number): number {
+  if (!view.map || !replayed(stop)) return offset(view, stop - 1) + 1
+  const at = offset(view, stop)
+  // A partly consumed tab belongs to the prefix: the skip lands after it.
+  return view.source.charCodeAt(stop) === Char.Space && documentSource.charCodeAt(at) === Char.Tab
+    ? at + 1
+    : at
+}
+
+function replayed(stop: number): boolean {
+  if (replayRest < stop) return true
+  let live = 0
+  let hit = false
+  for (let k = 0; k < replayFrom.length; k++) {
+    if (replayTo[k] < stop) continue
+    if (replayFrom[k] < stop) hit = true
+    replayFrom[live] = replayFrom[k]
+    replayTo[live++] = replayTo[k]
+  }
+  replayFrom.length = replayTo.length = live
+  return hit
+}
+
+/** Where micromark rejects the resource at `start` that `resource` did not accept. */
+function resourceFailure(source: string, start: number, end: number): number {
+  let i = skipWhitespace(source, start + 1, end)
+  const dest = destinationEnd(source, i, end)
+  if (dest < 0) {
+    if (source.charCodeAt(i) === Char.LessThan) {
+      for (i++; i < end; i++) {
+        const c = source.charCodeAt(i)
+        if (c === Char.LessThan || c === Char.LineFeed || c === Char.CarriageReturn) return i
+        if (c === Char.Backslash && isPunctuation(source.charCodeAt(i + 1))) i++
+      }
+      return end
+    }
+    let depth = 0
+    for (; i < end; i++) {
+      const c = source.charCodeAt(i)
+      if ((c !== 0 && c <= Char.Space) || c === Char.Delete) return i
+      if (c === Char.Backslash && isPunctuation(source.charCodeAt(i + 1))) i++
+      else if (c === Char.LeftParen && ++depth > MAX_DESTINATION_PAREN_DEPTH) return i
+      else if (c === Char.RightParen) depth--
+    }
+    return end
+  }
+  i = skipWhitespace(source, dest, end)
+  if (i > dest && source.charCodeAt(i) !== Char.RightParen) {
+    const t = titleEnd(source, i, end)
+    if (t < 0) return titleOpener(source.charCodeAt(i)) ? end : i
+    i = skipWhitespace(source, t, end)
+  }
+  return i
+}
+
+function titleOpener(c: number): boolean {
+  return c === Char.DoubleQuote || c === Char.SingleQuote || c === Char.LeftParen
 }
 
 function mergeText(parent: number): void {
@@ -842,7 +929,12 @@ export function parseInline(
   // ── Reserve this inline scope and select its candidate scanner ──
   const source = view.source
   const delimiterBegin = delimiterCount
-  if (trim) firstRun = 0
+  if (trim) {
+    firstRun = 0
+    replayFrom.length = replayTo.length = 0
+    replayRest = Infinity
+    contentEnd = end
+  }
   let textStart = start
   const emailAt = context.config.gfm && literals ? source.indexOf('@', start) : -1
   const email = emailAt >= 0 && emailAt < end
@@ -923,7 +1015,7 @@ export function parseInline(
         if (textStart < i) plainText(view, textStart, i, parent)
         let stop = i + 2
         if (next === 13 && source.charCodeAt(stop) === 10) stop++
-        node(Kind.Break, offset(view, i), offset(view, stop - 1) + 1, parent)
+        node(Kind.Break, offset(view, i), lineEndingEnd(view, stop), parent)
         while (space(source.charCodeAt(stop))) stop++
         i = textStart = stop
         continue
@@ -943,7 +1035,7 @@ export function parseInline(
         source.charCodeAt(i - 2) === 32
       ) {
         if (textStart < trim) plainText(view, textStart, trim, parent)
-        node(Kind.Break, offset(view, trim), offset(view, stop - 1) + 1, parent)
+        node(Kind.Break, offset(view, trim), lineEndingEnd(view, stop), parent)
         while (space(source.charCodeAt(stop))) stop++
         i = textStart = stop
       } else {
@@ -968,6 +1060,7 @@ export function parseInline(
         i = textStart = stop
         continue
       }
+      replay(i, Infinity)
       i = run
       continue
     }
@@ -984,6 +1077,8 @@ export function parseInline(
         i = textStart = stop
         continue
       }
+      // A run shorter than the math opener is never attempted.
+      if (run - i >= mathRun) replay(i, Infinity)
       i = run
       continue
     }
@@ -1058,7 +1153,10 @@ export function parseInline(
           data = { label: decode(raw.slice(1)), identifier: normalizeIdentifier(raw.slice(1)) }
           footnote = true
         } else if (image || !inLink) {
-          if (source.charCodeAt(stop) === 40) data = resource(source, stop, end)
+          if (source.charCodeAt(stop) === 40) {
+            data = resource(source, stop, end)
+            if (!data && view.map) replay(stop, resourceFailure(source, stop, end))
+          }
           if (data) stop = data.end
           else {
             let label = raw
@@ -1077,6 +1175,7 @@ export function parseInline(
                 if (context.definitions.has(normalizeIdentifier(label))) stop = r + 1
                 else label = ''
               }
+              if (stop <= r) replay(stop, source.charCodeAt(r) === 93 ? r + 1 : r)
             }
             if (label && context.definitions.has(normalizeIdentifier(label))) {
               data = {
@@ -1087,6 +1186,9 @@ export function parseInline(
               reference = true
             }
           }
+        } else if (view.map && source.charCodeAt(stop) === 40) {
+          // micromark still tries, and rejects, the resource of a label inside a link label.
+          replay(stop, resourceFailure(source, stop, end))
         }
         // Reject actual nested links, not brackets belonging to embedded syntax.
         if (data && !image && !footnote && containsLink(view, labelStart, close, context))
@@ -1138,6 +1240,7 @@ export function parseInline(
         i = textStart = stop
         continue
       }
+      if (!auto) replay(i, htmlReach)
     }
     i++
   }
