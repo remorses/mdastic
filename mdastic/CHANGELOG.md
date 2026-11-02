@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0
+
+1. **New `createProcessor({ syntax, transforms, stringify })`.** One syntax list for `parse` and `stringify`, plus `(tree) => void` transforms that run after every parse.
+2. **`createStreamParser({ transforms })`.** Block-local transforms run once on each settled block and on the live tail; every result equals `createProcessor(...).parse(text)`.
+3. **New `unravel(tree)` in `mdastic/mdx`.** Unwraps paragraphs of only JSX and expressions into flow nodes, like `@mdx-js/mdx`'s remark-mark-and-unravel.
+4. **`visit` accepts `[SKIP, index]`**, like unist-util-visit: skip the node's children and continue at `index`.
+5. **Types assign to `@types/mdast`.** `MdxjsEsm` is now only in `RootContent`, not `FlowContent`, matching mdast-util-mdxjs-esm, so mdastic trees are assignable to mdast trees.
+
 ## 0.3.4
 
 1. **MDX errors now match remark's VFileMessage fully.** `MdxParseError` has the same `url` as micromark, and errors from mdast-util-mdx-jsx and `non-esm` errors have a range `place`, so `name` and `String(error)` match remark:
