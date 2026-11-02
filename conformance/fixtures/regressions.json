@@ -2547,5 +2547,13 @@
     "syntax": ["gfm"]
   },
   {"name": "a nested list ending in HTML closes before its parent list sibling", "input": "> - * <!--\n> - a", "syntax": ["gfm"]},
-  {"name": "a nested quote ending in HTML closes before its parent list sibling", "input": "> - > <!--\n> - a", "syntax": ["gfm"]}
+  {"name": "a nested quote ending in HTML closes before its parent list sibling", "input": "> - > <!--\n> - a", "syntax": ["gfm"]},
+  {"name": "MDX closing tag attribute error is a range after the missing-opening-tag error", "input": "a </a b> c", "syntax": ["mdx", "frontmatter", "gfm"]},
+  {"name": "MDX closing tag attribute error is a range", "input": "<a></a {...x}>", "syntax": ["mdx", "frontmatter", "gfm"]},
+  {"name": "MDX self-closing slash in a closing tag is a range", "input": "<a></a/>", "syntax": ["mdx", "frontmatter", "gfm"]},
+  {"name": "MDX closing tag attribute loses to a later micromark error", "input": "a <b></b c> d\n\n<e", "syntax": ["mdx", "frontmatter", "gfm"]},
+  {"name": "MDX end-tag mismatch error is the closing tag range", "input": "<Heading>text</Cards>", "syntax": ["mdx", "frontmatter", "gfm"]},
+  {"name": "MDX non-ESM error is the statement range", "input": "export const a = 1\nlet b = 2", "syntax": ["mdx", "frontmatter", "gfm"]},
+  {"name": "MDX unclosed fence in an open flow tag keeps the list item end", "input": "- <A>\n  ```\n  x\n- b", "syntax": ["mdx", "frontmatter", "gfm"]},
+  {"name": "MDX unclosed fence in a list in an open flow tag in a footnote", "input": "[^a]:<A>\n    - ```\n      x\n", "syntax": ["mdx", "frontmatter", "gfm"]}
 ]

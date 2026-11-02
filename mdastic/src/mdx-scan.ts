@@ -50,13 +50,16 @@ function empty(value: string): boolean {
   return true
 }
 
+/** Throw at `at`, or at the range `at`..`end` like mdast-util-mdx-jsx token errors. */
 export function mdxError(
   reason: string,
   at: number,
   ruleId: string,
   source = 'micromark-extension-mdx-expression',
+  end?: number,
 ): never {
-  throw new MdxParseError({ reason, place: point(at), ruleId, source })
+  const place = end === undefined ? point(at) : { start: point(at), end: point(end) }
+  throw new MdxParseError({ reason, place, ruleId, source })
 }
 
 function remap(value: any, map: (i: number) => number): void {

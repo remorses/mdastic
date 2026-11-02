@@ -31,11 +31,14 @@ export type StringifyTreeFixture = {
 
 export type OracleError = {
   message: string
+  name?: string
   line?: number
   column?: number
   offset?: number
+  endOffset?: number
   ruleId?: string
   source?: string
+  url?: string
 }
 
 // Same order remark-mdx + remark-frontmatter(['yaml','toml']) + remark-gfm register them in safe-mdx,
@@ -94,11 +97,15 @@ export function toOracleError(error: any): OracleError {
   const point = place && 'start' in place ? place.start : place
   return {
     message: error?.reason ?? String(error?.message ?? error),
+    // `name` is the stringified place, so it also checks the end of a range place
+    name: error?.name,
     line: point?.line ?? error?.line,
     column: point?.column ?? error?.column,
     offset: point?.offset,
+    endOffset: place && 'end' in place ? place.end?.offset : undefined,
     ruleId: error?.ruleId,
     source: error?.source,
+    url: error?.url,
   }
 }
 

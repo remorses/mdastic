@@ -9,6 +9,14 @@ import { blank, type BlockContext, inQuote, type Line, startsContainer } from '.
 import type { MdxJsxAttribute, MdxJsxExpressionAttribute } from './types.ts'
 import { acornProgram, expression, lineOffset, mdxError, setExpressionSource } from './mdx-scan.ts'
 
+/** A closing-tag token that mdast-util-mdx-jsx rejects, as source offsets. */
+interface Rejected {
+  reason: string
+  ruleId: string
+  start: number
+  end: number
+}
+
 interface Tag {
   type: 'tag'
   start: number
@@ -17,6 +25,13 @@ interface Tag {
   attributes: (MdxJsxAttribute | MdxJsxExpressionAttribute)[]
   close: boolean
   selfClosing: boolean
+  // Thrown when the tag is matched, in mdast-util-mdx-jsx token order, not while scanning:
+  // micromark accepts the tag, and a missing opening tag is reported first.
+  rejected: Rejected | undefined
+}
+
+function reject({ reason, ruleId, start, end }: Rejected): never {
+  mdxError(reason, start, ruleId, 'mdast-util-mdx-jsx', end)
 }
 const nameStart = (c: number) =>
   alpha(c) ||
@@ -177,18 +192,19 @@ function tag(view: View, start: number, end: number, syntax: MdxSyntax): Tag | u
   // ── Attributes and the optional self-closing suffix ──
   const attributes: Tag['attributes'] = []
   let selfClosing = false
+  let rejected: Rejected | undefined
   while (i < end && source.charCodeAt(i) !== Char.GreaterThan) {
     skip()
     const c = source.charCodeAt(i)
     if (c === Char.GreaterThan) break
     if (c === Char.Slash) {
       if (close)
-        mdxError(
-          'Unexpected self-closing slash `/` in closing tag, expected the end of the tag',
-          offset(view, i),
-          'unexpected-self-closing-slash',
-          'mdast-util-mdx-jsx',
-        )
+        rejected ??= {
+          reason: 'Unexpected self-closing slash `/` in closing tag, expected the end of the tag',
+          ruleId: 'unexpected-self-closing-slash',
+          start: offset(view, i),
+          end: offset(view, i + 1),
+        }
       selfClosing = true
       i++
       skip()
@@ -203,16 +219,19 @@ function tag(view: View, start: number, end: number, syntax: MdxSyntax): Tag | u
       break
     }
     const attributeStart = i
-    if (close)
-      mdxError(
-        'Unexpected attribute in closing tag, expected the end of the tag',
-        offset(view, i),
-        'unexpected-attribute',
-        'mdast-util-mdx-jsx',
-      )
+    const rejectAttribute = (attributeEnd: number) => {
+      if (close)
+        rejected ??= {
+          reason: 'Unexpected attribute in closing tag, expected the end of the tag',
+          ruleId: 'unexpected-attribute',
+          start: offset(view, attributeStart),
+          end: offset(view, attributeEnd),
+        }
+    }
     if (c === Char.LeftBrace) {
       const result = expression(view, i, end, syntax, true, false)
       i = result.end
+      rejectAttribute(i)
       const attribute: MdxJsxExpressionAttribute = {
         type: 'mdxJsxExpressionAttribute',
         value: result.value,
@@ -316,6 +335,7 @@ function tag(view: View, start: number, end: number, syntax: MdxSyntax): Tag | u
       !nameStart(source.charCodeAt(i))
     )
       crash(local ? 'after local attribute name' : 'after attribute name', afterAttribute)
+    rejectAttribute(attributeEnd)
     const p = position(offset(view, attributeStart), offset(view, attributeEnd))
     const attribute: MdxJsxAttribute = { type: 'mdxJsxAttribute', name: attributeName, value }
     if (p) attribute.position = p
@@ -328,7 +348,7 @@ function tag(view: View, start: number, end: number, syntax: MdxSyntax): Tag | u
       name === null ? 'before name' : 'before attribute name',
       name === null ? beforeName : beforeAttribute,
     )
-  return { type: 'tag', start, end: i + 1, name, attributes, close, selfClosing }
+  return { type: 'tag', start, end: i + 1, name, attributes, close, selfClosing, rejected }
 }
 
 function abbreviated(tag: Tag, closing = tag.close): string {
@@ -438,12 +458,14 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
         offset(view, closing.start),
         'end-tag-mismatch',
         'mdast-util-mdx-jsx',
+        offset(view, closing.end),
       )
     mdxError(
       'Unexpected closing slash `/` in tag, expected an open tag first',
       offset(view, closing.start + 1),
       'unexpected-closing-slash',
       'mdast-util-mdx-jsx',
+      offset(view, closing.start + 2),
     )
   }
   function inline(
@@ -515,6 +537,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
             statement.start,
             'non-esm',
             'micromark-extension-mdxjs-esm',
+            statement.end,
           )
         if (statement.type === 'ImportDeclaration')
           for (const specifier of statement.specifiers) imports.push(specifier.local.name)
@@ -633,7 +656,11 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
           }
           continue
         }
-        if (open.tag.name !== item.name && !mismatched) {
+        const rejected = item.rejected
+        if (rejected && !mismatched) {
+          mismatched = () => reject(rejected)
+          mismatchedAt = rejected.start
+        } else if (open.tag.name !== item.name && !mismatched) {
           mismatched = () => mismatch(item, open.tag, view)
           mismatchedAt = offset(view, item.end)
         }
@@ -738,7 +765,9 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
           return source.length
         }
         if (view.source.charCodeAt(scanned.end) === Char.LeftBrace) return source.length
-        return Math.max(scanned.error.place?.offset ?? offset(view, scanned.end), line.end)
+        const place = scanned.error.place
+        const at = place && ('start' in place ? place.start : place).offset
+        return Math.max(at ?? offset(view, scanned.end), line.end)
       }
       return Math.max(offset(view, scanned.end), line.end)
     },
@@ -790,6 +819,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
               if (!open) {
                 earlier(t.end)
                 if (active) {
+                  if (t.rejected) reject(t.rejected)
                   // mdast-util-mdx-jsx checks the closing name before the boundary.
                   if (active.name !== t.name) mismatch(t, active, { source, base: 0 })
                   // Active JSX cannot close across a Markdown container boundary.
@@ -809,9 +839,14 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
                     t.start,
                     'end-tag-mismatch',
                     'mdast-util-mdx-jsx',
+                    t.end,
                   )
                 }
                 mismatch(t, undefined, { source, base: 0 })
+              }
+              if (t.rejected) {
+                earlier(t.rejected.start)
+                reject(t.rejected)
               }
               if (open.tag.name !== t.name) {
                 earlier(t.end)
@@ -836,6 +871,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
                     attributes: e.attributes,
                     close: false,
                     selfClosing: false,
+                    rejected: undefined,
                   }
                 : undefined
             // Cells in a table's first row are header cells.
@@ -864,6 +900,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
             tree.start[parent],
             'end-tag-mismatch',
             'mdast-util-mdx-jsx',
+            tree.end[parent],
           )
         }
         const flowOpen = stacks.get(parent)?.at(-1)
@@ -890,6 +927,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
             tree.start[parent],
             'end-tag-mismatch',
             'mdast-util-mdx-jsx',
+            tree.end[parent],
           )
         }
       }

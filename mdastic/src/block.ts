@@ -1203,6 +1203,8 @@ function parseFencedCode(
   input: Line[],
   i: number,
   parent: number,
+  // The container, not an open MDX flow tag routed through `flowParent`.
+  container: number,
   opening: NonNullable<ReturnType<typeof fence>>,
   boundary?: Line,
 ): number {
@@ -1234,9 +1236,9 @@ function parseFencedCode(
   const nextContainer = !input[j]?.lazy && boundary && startsContainer(context, boundary)
   // Unclosed root/EOF fences retain the ending; closed fences end at their marker.
   const keepEnding =
-    tree.kind[parent] === Kind.Root ||
+    tree.kind[container] === Kind.Root ||
     !!nextContainer ||
-    ((tree.kind[parent] === Kind.ListItem || tree.kind[parent] === Kind.FootnoteDefinition) &&
+    ((tree.kind[container] === Kind.ListItem || tree.kind[container] === Kind.FootnoteDefinition) &&
       last.next === source.length &&
       !quoteDepth)
   // A last EOF line of only container prefixes is outside the code but inside its parent.
@@ -1443,8 +1445,18 @@ function parseFootnoteDefinition(
     tree.end[n] = input[j - 1].end
   }
   if (tableStart(context, input, j) && endsWithTable(n, input[j - 1].end)) afterTable = input[j]
-  if (tree.last[n]) tree.end[n] = Math.max(tree.end[n], tree.end[tree.last[n]])
+  if (tree.last[n]) tree.end[n] = Math.max(tree.end[n], lastChildEnd(n))
   return j - i
+}
+
+/**
+ * End of the last child of a container. An open MDX flow tag still has its opening tag's end,
+ * but micromark's container token spans the tag's content, like code that kept its line ending.
+ */
+function lastChildEnd(n: number): number {
+  let end = 0
+  for (let child = tree.last[n]; child; child = tree.last[child]) end = Math.max(end, tree.end[child])
+  return end
 }
 
 // prepareList only skips blank line endings inside nested lists and quotes, so blank lines
@@ -1648,7 +1660,7 @@ export function parseBlocks(
     // ── Fenced code consumes its own closing marker or container boundary ──
     const opening = fence(source, line)
     if (opening) {
-      i += parseFencedCode(context, input, i, parent, opening, boundary)
+      i += parseFencedCode(context, input, i, parent, owner, opening, boundary)
       // A lazy line closes every container up to the one that accepted it.
       if (input[i]?.lazy) return i
       residual = InterruptState.None
@@ -1700,10 +1712,10 @@ export function parseBlocks(
         (last &&
           (input[j] ?? boundary) &&
           (input[j] ?? boundary) !== siblingLine &&
-          tree.end[last] > input[j - 1].end)
+          lastChildEnd(n) > input[j - 1].end)
       )
         tree.end[n] = (input[j] ?? boundary!).start
-      if (tree.last[n]) tree.end[n] = Math.max(tree.end[n], tree.end[tree.last[n]])
+      if (last) tree.end[n] = Math.max(tree.end[n], lastChildEnd(n))
       pendingLazy = j < input.length && !blank(source, input[j])
       residual = InterruptState.None
       i = j
@@ -1941,13 +1953,11 @@ export function parseBlocks(
         )
           itemSpread = true
         tree.a[item] = itemSpread ? 1 : 0
-        if (tree.last[item])
-          tree.end[item] = Math.max(tree.end[item], tree.end[tree.last[item]])
+        if (tree.last[item]) tree.end[item] = Math.max(tree.end[item], lastChildEnd(item))
         if (
           sibling &&
           tree.last[item] &&
-          (tree.end[tree.last[item]] === input[j].start ||
-            tree.end[tree.last[item]] === input[j - 1].next)
+          (lastChildEnd(item) === input[j].start || lastChildEnd(item) === input[j - 1].next)
         )
           tree.end[item] = nextMark.prefix
         if (

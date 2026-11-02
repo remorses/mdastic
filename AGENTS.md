@@ -83,8 +83,9 @@ remark parses them as plain text, and mdastic must too. Math changes nothing unl
    Results must stay within noise. Hot loops use `charCodeAt`, typed tables, native `indexOf` /
    global-regex `lastIndex` jumps. No closures per character, no per-line string copies.
 7. **Errors are returned, not thrown.** `parse` returns `MdxParseError`. Its `name`, `message`,
-   `reason`, `place`, `line`, `column`, `ruleId`, `source` and `String(error)` match micromark's
-   `VFileMessage`. A thrown error from `parse` is always a bug; the harness reports it as a crash.
+   `reason`, `place`, `line`, `column`, `ruleId`, `source`, `url` and `String(error)` match
+   micromark's `VFileMessage`. mdast-util-mdx-jsx and `non-esm` errors have a range `place`
+   (`name` is `1:4-1:8`). A thrown error from `parse` is always a bug; the harness reports it as a crash.
 8. **No runtime dependencies** except `acorn` and `acorn-jsx`, injected by `mdastic/mdx` through
    `config.mdx.acorn`. Core files never import acorn, so markdown-only bundles stay small.
 9. **One `syntax` list** drives both `parse` and `stringify`. Built-in syntaxes are internal
