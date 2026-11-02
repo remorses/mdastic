@@ -1,4 +1,4 @@
-// Public API: parse, stringify, visit. Every node type is exported from ./types.ts.
+// Public API: parse, stringify, createProcessor, createStreamParser, visit. Node types are in ./types.ts.
 import { documentScoped, parseDocument } from './parser.ts'
 import { Char } from './scan.ts'
 import { toMarkdown, type StringifyOptions } from './stringify.ts'
@@ -37,9 +37,60 @@ function parseFrom({ source, config, from = 0 }: { source: string; config: Confi
   }
 }
 
-export interface StreamParser {
-  /** Parse all text received so far. Returns the same tree as `parse(source)`. */
+/** A tree transform: mutate the tree in place, like a remark transformer without `file`. */
+export type Transform = (tree: Root) => void
+
+function runTransforms(tree: Root, transforms: readonly Transform[]): Root {
+  for (const transform of transforms) transform(tree)
+  return tree
+}
+
+export interface ProcessorOptions extends ParseOptions {
+  /** Run in order on every parsed tree. */
+  transforms?: readonly Transform[]
+  /** Default options for `stringify`, merged under the options of each call. */
+  stringify?: StringifyOptions
+}
+
+export interface Processor {
+  /** Parse and run the transforms. Returns the MDX syntax error instead of throwing. */
   parse(source: string): Root | MdxParseError
+  /** Serialize with the same syntax list used to parse. */
+  stringify(tree: Nodes, options?: StringifyOptions): string
+}
+
+/**
+ * One syntax list for parse and stringify, plus transforms. Use it instead of passing `syntax`
+ * to each call, so a tree is never serialized without a syntax it was parsed with.
+ */
+export function createProcessor(options: ProcessorOptions = {}): Processor {
+  const parseConfig = resolveConfig(options.syntax, options.positions ?? true)
+  const stringifyConfig = resolveConfig(options.syntax)
+  const transforms = options.transforms ?? []
+  return {
+    parse(source) {
+      const tree = parseFrom({ source, config: parseConfig })
+      return tree instanceof Error ? tree : runTransforms(tree, transforms)
+    },
+    stringify(tree, callOptions) {
+      return toMarkdown(tree, stringifyConfig, callOptions ? { ...options.stringify, ...callOptions } : options.stringify ?? {})
+    },
+  }
+}
+
+export interface StreamParser {
+  /** Parse all text received so far. Returns the same tree as `parse(source)` plus the transforms. */
+  parse(source: string): Root | MdxParseError
+}
+
+export interface StreamParserOptions {
+  syntax?: readonly Syntax[]
+  /**
+   * Run on each newly parsed group of top-level blocks, never twice on a cached block. Transforms
+   * must be block-local (like `unravel` from `mdastic/mdx`): each call gets a root holding only
+   * some top-level blocks, without the document `position`.
+   */
+  transforms?: readonly Transform[]
 }
 
 /**
@@ -48,8 +99,11 @@ export interface StreamParser {
  * object identity, so renderers can skip them. Returned trees share those nodes; do not mutate them.
  * Link or footnote definitions and MDX imports resolve across blocks, so they force full reparses.
  */
-export function createStreamParser(options: { syntax?: readonly Syntax[] } = {}): StreamParser {
+export function createStreamParser(options: StreamParserOptions = {}): StreamParser {
   const config = resolveConfig(options.syntax, true)
+  const transforms = options.transforms ?? []
+  const transformBlocks = (children: RootContent[]): RootContent[] =>
+    transforms.length ? runTransforms({ type: 'root', children }, transforms).children : children
   // `stable` are the top-level nodes before `from`, a line start in the BOM-stripped text.
   // `checked` is the raw text that decided the cut, through the next block's first line.
   let checked = ''
@@ -72,22 +126,26 @@ export function createStreamParser(options: { syntax?: readonly Syntax[] } = {})
         checked = ''
         from = 0
         stable = []
-        return full
+        return full instanceof Error ? full : runTransforms(full, transforms)
       }
       const tail = tree.children
-      tree.children = stable.length ? stable.concat(tail) : tail
       // An opening frontmatter fence reads ahead to a closing fence that may not have arrived yet.
       const first = tail[0]?.type
       if (!from && config.frontmatter && /^(---|\+\+\+)/.test(text) && first !== 'yaml' && first !== 'toml')
-        return tree
+        return runTransforms(tree, transforms)
+      // Cuts are found on untransformed blocks, whose positions follow the source exactly.
+      let live = tail
       for (let i = tail.length - 1; i > 0; i--) {
         const cut = blockCut({ source: text, previous: tail[i - 1], next: tail[i] })
         if (!cut) continue
         from = cut.start
         checked = source.slice(0, cut.end + bom)
-        stable = tree.children.slice(0, stable.length + i)
+        stable = stable.concat(transformBlocks(tail.slice(0, i)))
+        live = tail.slice(i)
         break
       }
+      live = transformBlocks(live)
+      tree.children = stable.length ? stable.concat(live) : live
       return tree
     },
   }
@@ -141,8 +199,11 @@ export const SKIP = 'skip'
 /** Stop the whole traversal. */
 export const EXIT = false
 
-/** Return SKIP, EXIT, or the index of the next sibling to visit (after inserting/removing siblings). */
-export type VisitResult = void | typeof SKIP | typeof EXIT | number
+/**
+ * Return SKIP, EXIT, or the index of the next sibling to visit (after inserting/removing siblings).
+ * `[SKIP, index]` does both: skip the children and continue at `index`, like unist-util-visit.
+ */
+export type VisitResult = void | typeof SKIP | typeof EXIT | number | readonly [typeof SKIP | typeof EXIT, number?]
 export type Visitor<T extends Nodes = Nodes> = (node: T, index: number | undefined, parent: Parents | undefined) => VisitResult
 
 /**
@@ -159,13 +220,15 @@ export function visit(tree: Nodes, typeOrVisitor: NodeType | readonly NodeType[]
 
 function walk(node: Nodes, index: number | undefined, parent: Parents | undefined, types: readonly string[] | undefined, visitor: Visitor): VisitResult {
   const result = !types || types.includes(node.type) ? visitor(node, index, parent) : undefined
-  if (result === EXIT || result === SKIP || !('children' in node)) return result
+  const action = Array.isArray(result) ? result[0] : result
+  if (action === EXIT || action === SKIP || !('children' in node)) return result
   const children = node.children as Nodes[]
   let i = 0
   while (i < children.length) {
     const child = walk(children[i]!, i, node as Parents, types, visitor)
-    if (child === EXIT) return EXIT
-    i = typeof child === 'number' ? child : i + 1
+    if ((Array.isArray(child) ? child[0] : child) === EXIT) return EXIT
+    const next = Array.isArray(child) ? child[1] : child
+    i = typeof next === 'number' ? next : i + 1
   }
   return result
 }

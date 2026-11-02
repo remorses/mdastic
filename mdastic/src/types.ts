@@ -243,10 +243,11 @@ export type PhrasingContent =
 export type FlowContent =
   | Paragraph | Heading | ThematicBreak | Blockquote | List | Html | Code
   | Definition | Table | FootnoteDefinition
-  | MdxJsxFlowElement | MdxFlowExpression | MdxjsEsm | Math
+  | MdxJsxFlowElement | MdxFlowExpression | Math
 
+// ESM and frontmatter only appear at the top level, like mdast-util-mdxjs-esm's RootContentMap.
 export type RootContent =
-  | FlowContent | PhrasingContent | ListItem | TableRow | TableCell | Yaml | Toml
+  | FlowContent | PhrasingContent | ListItem | TableRow | TableCell | Yaml | Toml | MdxjsEsm
 
 export type Nodes = Root | RootContent
 

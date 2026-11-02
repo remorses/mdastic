@@ -1,7 +1,7 @@
 // Stream parser parity: every streamed prefix must give the same tree as a full `parse` of it.
 import { describe, expect, test } from 'vitest'
-import { createStreamParser, parse, type Root } from 'mdastic/src'
-import { mdx } from 'mdastic/src/mdx'
+import { createProcessor, createStreamParser, parse, type Root, type Transform } from 'mdastic/src'
+import { mdx, unravel } from 'mdastic/src/mdx'
 import { gfm } from 'mdastic/src/gfm'
 import { loadFixtureFiles, toSyntax } from './harness.ts'
 import { toOracleError, type SyntaxName } from './oracle.ts'
@@ -28,14 +28,15 @@ function prefixLengths(length: number): number[] {
   return result
 }
 
-/** First streamed prefix whose tree differs from `parse(prefix)`, or null. */
-function firstMismatch(input: string, names: SyntaxName[]) {
+/** First streamed prefix whose tree differs from a full parse of it with the same transforms, or null. */
+function firstMismatch(input: string, names: SyntaxName[], transforms: Transform[] = []) {
   const syntax = toSyntax(names)
-  const stream = createStreamParser({ syntax })
+  const stream = createStreamParser({ syntax, transforms })
+  const processor = createProcessor({ syntax, transforms })
   for (const length of prefixLengths(input.length)) {
     const prefix = input.slice(0, length)
     const actual = snapshot(stream.parse(prefix))
-    const expected = snapshot(parse(prefix, { syntax }))
+    const expected = snapshot(processor.parse(prefix))
     if (actual !== expected) return { prefix, actual, expected }
   }
   return null
@@ -101,6 +102,21 @@ See [the docs][docs].
 test('chat answer streamed char by char matches parse at every step', () => {
   for (const names of [['mdx', 'gfm'], ['gfm']] as SyntaxName[][]) {
     expect(firstMismatch(CHAT_ANSWER, names)).toBeNull()
+  }
+})
+
+// Block-local transforms run once per settled block and on the live tail, never on the whole tree.
+describe('MDX fixtures, streamed with unravel', () => {
+  for (const { file, fixtures } of loadFixtureFiles()) {
+    if (SLOW_FILES.has(file)) continue
+    const mdxFixtures = fixtures.filter((fixture) => fixture.syntax.includes('mdx') && fixture.input.length < SLOW_INPUT_LENGTH)
+    if (!mdxFixtures.length) continue
+    test(file, () => {
+      const failures = mdxFixtures
+        .map((fixture) => ({ name: fixture.name, mismatch: firstMismatch(fixture.input, fixture.syntax, [unravel]) }))
+        .filter((failure) => failure.mismatch)
+      expect(failures.slice(0, 3)).toEqual([])
+    })
   }
 })
 

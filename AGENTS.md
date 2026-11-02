@@ -126,6 +126,10 @@ line start. `checked` is the text that decided the cut, through the next block's
 change in it drops the cache. It calls `parseDocument({ source, config, from })`, which parses
 only lines from `from` on. Line index, positions, estree and errors stay document-relative.
 
+`transforms` run per group of blocks: once on blocks that settle at a new cut, and on the live tail
+every call. Cuts are found on untransformed blocks, so transforms must be block-local. The contract
+becomes: every result deep-equals `createProcessor({ syntax, transforms }).parse(text)`.
+
 ```text
 text so far ──► checked unchanged? ──no──► drop cache
                       │ yes

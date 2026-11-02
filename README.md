@@ -31,7 +31,7 @@ const markdown = stringify(tree, { syntax }) // same string as remark-stringify
 
 - **Exact remark output.** 9,854 of 9,854 conformance fixtures match the real remark stack, including positions and estree.
 - **Fast.** 28x faster than remark on markdown, 17x on MDX, 6x on stringify. Faster than markdown-it, close to native Rust.
-- **One syntax list.** The same `syntax` array drives `parse` and `stringify`. No separate micromark, from-markdown and to-markdown extension arrays.
+- **One syntax list.** The same `syntax` array drives `parse` and `stringify`, and `createProcessor` holds it with your transforms. No separate micromark, from-markdown and to-markdown extension arrays.
 - **MDX built in.** JSX, ESM and `{expressions}` with `data.estree`. Only `mdastic/mdx` imports Acorn, so plain markdown bundles stay small.
 - **Streaming parsing.** `createStreamParser()` parses LLM output as it arrives. Closed blocks are not parsed again and keep object identity, and every result still equals `parse(text)`.
 - **Errors as values.** `parse` returns `MdxParseError` instead of throwing. It has the same fields as micromark's `VFileMessage`.
@@ -112,6 +112,31 @@ if (tree instanceof MdxParseError) {
 }
 ```
 
+### `createProcessor(options)`
+
+One `syntax` list for `parse` and `stringify`, plus **transforms** that run after every parse. Use it so a tree is never serialized without a syntax it was parsed with:
+
+```ts
+import { createProcessor, visit } from 'mdastic'
+import { mdx, unravel } from 'mdastic/mdx'
+import { gfm } from 'mdastic/gfm'
+
+const processor = createProcessor({
+  syntax: [mdx(), gfm()],
+  transforms: [
+    unravel,
+    (tree) => visit(tree, 'text', (node) => { node.value = node.value.trim() }),
+  ],
+  stringify: { bullet: '-' }, // defaults for every stringify call
+})
+
+const tree = processor.parse(source) // Root | MdxParseError
+if (tree instanceof Error) throw tree
+const markdown = processor.stringify(tree)
+```
+
+A transform is `(tree: Root) => void` and mutates the tree. `remarkTransform(plugin)` from `mdastic/remark` turns a sync, tree-only remark plugin into one.
+
 ### `createStreamParser(options)`
 
 Parse text that grows at the end, like an LLM response. Pass the **whole text so far** on every chunk:
@@ -127,6 +152,12 @@ for await (const chunk of response) {
   if (tree instanceof Error) continue // incomplete MDX, keep the last good tree
   render(tree)
 }
+```
+
+Pass `transforms` to run them on new blocks, like `createProcessor`. Each settled block is transformed once. Transforms must be **block-local**: each call gets a root with only some top-level blocks. `unravel` is.
+
+```ts
+const parser = createStreamParser({ syntax: [mdx(), gfm()], transforms: [unravel] })
 ```
 
 A top-level block followed by a blank line and a complete line can no longer change. The parser keeps those blocks and parses only the text after them. They are the **same objects** in every result, so a renderer can skip them:
@@ -215,6 +246,10 @@ parse('# Title {#custom-id}', { syntax: [headingId()] })
 With MDX, valid IDs win over text expressions. MDX flow expressions still take priority, so a
 standalone `{#id}` line fails. A failed ID attempt falls back to the ordinary MDX expression parser.
 
+**`unravel(tree)`** from `mdastic/mdx` unwraps paragraphs that hold only JSX, `{expressions}` and
+whitespace, so `<Card />` on its own line is a block, not `<p><Card /></p>`. It is the same as
+`@mdx-js/mdx`'s remark-mark-and-unravel, without the `_mdxExplicitJsx` mark. Every MDX renderer needs it.
+
 **Stringify difference:** `mdast-heading-id` has no to-markdown handler, so remark-stringify throws
 on `idString`. mdastic writes `{#value}`, with character references where needed for a round trip.
 
@@ -254,6 +289,10 @@ visit(tree, (node, index, parent) => {
     parent.children.splice(index, 1, ...node.children)
     return index // visit the sibling now at this index
   }
+  if (node.type === 'html' && parent && index !== undefined) {
+    parent.children.splice(index, 1)
+    return [SKIP, index] // skip its children and continue at index
+  }
   if (node.type === 'thematicBreak') return EXIT // stop the walk
 })
 ```
@@ -271,6 +310,8 @@ import type { Root, Nodes, Parents, NodeOf, MdxJsxFlowElement } from 'mdastic'
 
 type Heading = NodeOf<'heading'>
 ```
+
+mdastic trees are **assignable to `@types/mdast`** trees (with the `mdast-util-mdx`, `-gfm`, `-frontmatter` and `-math` type augmentations), so they go to mdast tools like `mdast-util-to-hast` without casts. mdastic types are stricter: `position.start.offset` is always set and `title` is never `undefined`. `idString` needs its own `declare module 'mdast'`, because mdast-heading-id does not publish its augmentation. MDX ESM is top-level only, like `mdast-util-mdxjs-esm`.
 
 ## How it works
 
