@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.4
+
+1. **MDX errors now match remark's VFileMessage fully.** `MdxParseError` has the same `url` as micromark, and errors from mdast-util-mdx-jsx and `non-esm` errors have a range `place`, so `name` and `String(error)` match remark:
+
+   ```ts
+   const error = parse('<a></a/>', { syntax: [mdx()] })
+   String(error) // '1:7-1:8: Unexpected self-closing slash `/` in closing tag, expected the end of the tag'
+   ```
+
+2. **Fixed MDX error order for closing tags.** An attribute or self-closing slash in a closing tag is reported after a missing opening tag and after later micromark errors, like remark (`a </a b> c`).
+3. **Fixed error ranges at container ends.** An unclosed code fence inside an open JSX tag in a list or footnote now reports remark's container end.
+4. **Tree-shakable.** `package.json` sets `"sideEffects": false`, so bundles that do not call `parse` or `stringify` drop mdastic and acorn.
+
 ## 0.3.3
 
 1. **Fixed container end positions** for nested block quotes, list items, and other blocks to match remark.
