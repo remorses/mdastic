@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1
+
+1. **Unclosed `<!--` comments with `htmlComments` follow CommonMark.** A comment that starts a block and never closes now runs to the end of its container, like a browser hides the rest of the page, instead of returning an MDX error.
+
 ## 0.5.0
 
 1. **`visit` takes one visitor per node type**, so several transforms share one walk:

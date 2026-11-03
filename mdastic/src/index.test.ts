@@ -245,3 +245,39 @@ test('mdx({ htmlComments: true }) parses <!-- --> as html nodes in flow and inli
   `)
   expect(parse(output, { syntax, positions: false })).toEqual(tree)
 })
+
+test('htmlComments: an unclosed comment that starts a block runs to the end of its container', () => {
+  const syntax = [mdx({ htmlComments: true })]
+  const values = (source: string) => {
+    const tree = parse(source, { syntax, positions: false })
+    if (tree instanceof Error) return String(tree)
+    const html: string[] = []
+    visit(tree, 'html', (node) => void html.push(node.value))
+    return { types: tree.children.map((node) => node.type), html }
+  }
+  expect(values('Before.\n\n<!-- unfinished\nhidden text\n')).toMatchInlineSnapshot(`
+    {
+      "html": [
+        "<!-- unfinished
+    hidden text",
+      ],
+      "types": [
+        "paragraph",
+        "html",
+      ],
+    }
+  `)
+  expect(values('> <!-- open\n> quoted\n\nAfter.\n')).toMatchInlineSnapshot(`
+    {
+      "html": [
+        "<!-- open
+    quoted",
+      ],
+      "types": [
+        "blockquote",
+        "paragraph",
+      ],
+    }
+  `)
+  expect(values('Inline <!-- open text\n')).toMatchInlineSnapshot(`"1:9: Unexpected character \`!\` (U+0021) before name, expected a character that can start a name, such as a letter, \`$\`, or \`_\` (note: to create a comment in MDX, use \`{/* text */}\`)"`)
+})

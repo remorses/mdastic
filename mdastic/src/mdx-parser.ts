@@ -569,11 +569,16 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
   function commentValue(value: string): string {
     return value.replace(/(\r\n|\r|\n)[\t ]+/g, '$1')
   }
-  // End of a `<!-- comment -->` at `i` when htmlComments is on, else 0.
-  function htmlComment(text: string, i: number, end: number): number {
+  // End of a `<!-- comment -->` at `i` when htmlComments is on, else 0. Like CommonMark, an
+  // unclosed comment that starts a block runs to the end of its container; inline it is not one.
+  function htmlComment(text: string, i: number, end: number, flow = false): number {
     if (!syntax.htmlComments || !text.startsWith('<!--', i)) return 0
     const close = text.indexOf('-->', i + 4)
-    return close >= 0 && close + 3 <= end ? close + 3 : 0
+    if (close >= 0 && close + 3 <= end) return close + 3
+    if (!flow) return 0
+    // The value ends before the last line ending, like any block.
+    while (end > i && (text.charCodeAt(end - 1) === Char.LineFeed || text.charCodeAt(end - 1) === Char.CarriageReturn)) end--
+    return end
   }
   // Scans tags and expressions from `i` to the end of their last line, as a flow attempt.
   function flowLine(view: View, i: number): {
@@ -587,7 +592,7 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
     for (;;) {
       const c = text.charCodeAt(i)
       try {
-        const commentEnd = c === Char.LessThan ? htmlComment(text, i, text.length) : 0
+        const commentEnd = c === Char.LessThan ? htmlComment(text, i, text.length, true) : 0
         if (commentEnd) {
           found.push({ type: 'comment', start: i, end: commentEnd })
           i = commentEnd
