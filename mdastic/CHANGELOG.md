@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.5.0
+
+1. **`visit` takes one visitor per node type**, so several transforms share one walk:
+
+   ```ts
+   visit(tree, {
+     heading: (node) => { node.depth },
+     code: (node) => { node.lang },
+   })
+   ```
+
+2. **JSX helpers in `mdastic/mdx`.** `isJsx(node, 'Card')`, `getAttribute`, `setAttribute`, `removeAttribute`, and `expression(source)`, which builds an attribute value with `data.estree`. `isParent(node)` from `mdastic` narrows to nodes with `children`.
+
+   ```ts
+   if (isJsx(node, 'Card')) {
+     setAttribute(node, 'target', '_blank')
+     setAttribute(node, 'title', expression('<Markdown inline children="**hi**" />'))
+   }
+   ```
+
+3. **New `mdx({ htmlComments: true })` option.** Parses `<!-- comments -->` as `html` nodes in flow and inline, instead of returning an MDX error. Off by default, so parsing still matches remark-mdx.
+4. **Single-line JSX after `unravel` stringifies on one line.** `` <Note>Use `x` here.</Note> `` is written back as written, and parses to the same tree. remark writes each child as its own paragraph, which changes the tree. This is a deliberate difference from remark.
+
 ## 0.4.0
 
 1. **New `createProcessor({ syntax, transforms, stringify })`.** One syntax list for `parse` and `stringify`, plus `(tree) => void` transforms that run after every parse.
