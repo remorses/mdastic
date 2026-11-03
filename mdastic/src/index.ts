@@ -206,16 +206,24 @@ export const EXIT = false
 export type VisitResult = void | typeof SKIP | typeof EXIT | number | readonly [typeof SKIP | typeof EXIT, number?]
 export type Visitor<T extends Nodes = Nodes> = (node: T, index: number | undefined, parent: Parents | undefined) => VisitResult
 
+/** One visitor per node type: `visit(tree, { heading(node) {}, code(node) {} })`. */
+export type Visitors = { [T in NodeType]?: Visitor<NodeOf<T>> }
+
 /**
  * Depth-first preorder walk, same semantics as unist-util-visit.
- * `visit(tree, fn)`, `visit(tree, 'heading', fn)` or `visit(tree, ['link', 'image'], fn)`.
+ * `visit(tree, fn)`, `visit(tree, 'heading', fn)`, `visit(tree, ['link', 'image'], fn)`, or
+ * `visit(tree, { heading, code })` to run several visitors in one walk.
  */
-export function visit(tree: Nodes, visitor: Visitor): void
+export function visit(tree: Nodes, visitor: Visitor | Visitors): void
 export function visit<T extends NodeType>(tree: Nodes, type: T | readonly T[], visitor: Visitor<NodeOf<T>>): void
-export function visit(tree: Nodes, typeOrVisitor: NodeType | readonly NodeType[] | Visitor, maybeVisitor?: Visitor<any>): void {
-  const visitor = typeof typeOrVisitor === 'function' ? typeOrVisitor : maybeVisitor!
-  const types = typeof typeOrVisitor === 'function' ? undefined : typeof typeOrVisitor === 'string' ? [typeOrVisitor] : typeOrVisitor
-  walk(tree, undefined, undefined, types, visitor)
+export function visit(tree: Nodes, typeOrVisitor: NodeType | readonly NodeType[] | Visitor | Visitors, maybeVisitor?: Visitor<any>): void {
+  if (typeof typeOrVisitor === 'function') return void walk(tree, undefined, undefined, undefined, typeOrVisitor)
+  if (typeof typeOrVisitor === 'string' || Array.isArray(typeOrVisitor)) {
+    const types = typeof typeOrVisitor === 'string' ? [typeOrVisitor] : typeOrVisitor
+    return void walk(tree, undefined, undefined, types, maybeVisitor!)
+  }
+  const visitors = typeOrVisitor as Record<string, Visitor | undefined>
+  walk(tree, undefined, undefined, undefined, (node, index, parent) => visitors[node.type]?.(node, index, parent))
 }
 
 function walk(node: Nodes, index: number | undefined, parent: Parents | undefined, types: readonly string[] | undefined, visitor: Visitor): VisitResult {
@@ -231,6 +239,11 @@ function walk(node: Nodes, index: number | undefined, parent: Parents | undefine
     i = typeof next === 'number' ? next : i + 1
   }
   return result
+}
+
+/** True for nodes with `children`, so a walk can recurse without casts. */
+export function isParent(node: Nodes): node is Parents {
+  return 'children' in node
 }
 
 /** Plain text content of a node, same as mdast-util-to-string (image alt and html included). */

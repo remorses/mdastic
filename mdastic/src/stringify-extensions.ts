@@ -577,15 +577,18 @@ function mdxJsxToMarkdown(options: StringifyOptions) {
     }
     value += tracker.move('>')
     // ── Inline children use phrasing; flow children use fixed JSX separation ──
+    // Intended difference: remark writes a flow element with only phrasing children (from
+    // unravel or built by hand) as one paragraph per child, which parses back as a different
+    // tree. mdastic writes it inline, `<Note>Use `x` here.</Note>`, which round-trips.
+    const inline = !flow || (!!node.children?.length && node.children.every((child) => PHRASING.has(child.type)))
     if (node.children && node.children.length > 0) {
-      if (node.type === 'mdxJsxTextElement') {
-        value += tracker.move(
-          state.containerPhrasing(node, {
-            ...tracker.current(),
-            before: '>',
-            after: '<',
-          }),
-        )
+      if (inline) {
+        const phrasing = state.containerPhrasing(node, {
+          ...tracker.current(),
+          before: '>',
+          after: '<',
+        })
+        value += tracker.move(flow && currentIndent ? phrasing.replace(/\n/g, '\n' + currentIndent) : phrasing)
       } else {
         tracker.shift(JSX_INDENT)
         value += tracker.move('\n')
@@ -594,12 +597,17 @@ function mdxJsxToMarkdown(options: StringifyOptions) {
       }
     }
     if (!selfClosing) {
-      value += tracker.move((flow ? currentIndent : '') + '</' + (node.name || '') + '>')
+      value += tracker.move((flow && !inline ? currentIndent : '') + '</' + (node.name || '') + '>')
     }
     exit()
     return value
   }
 }
+/** mdast phrasing content, except `html`, which is also flow content. */
+const PHRASING = new Set([
+  'text', 'emphasis', 'strong', 'delete', 'inlineCode', 'break', 'link', 'image', 'linkReference',
+  'imageReference', 'footnoteReference', 'mdxJsxTextElement', 'mdxTextExpression', 'idString', 'inlineMath',
+])
 function containerJsxFlow(parent: any, state: State, info: TrackerInfo) {
   // JSX flow has fixed blank separation and depth indentation, unlike Markdown joins.
   const indexStack = state.indexStack

@@ -14,6 +14,8 @@ export interface MdxSyntax {
   readonly acorn: typeof AcornParser
   /** Attach `data.estree` to ESM, expressions and expression attributes (like remark-mdx). Default true. */
   readonly estree: boolean
+  /** Parse `<!-- comments -->` as `html` nodes instead of failing. Not MDX: remark-mdx rejects them. */
+  readonly htmlComments: boolean
 }
 
 export interface FrontmatterSyntax {

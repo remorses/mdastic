@@ -196,8 +196,13 @@ per-scope candidate tables, so `safe()` scans each value once instead of running
 - Position tracking only runs when custom `handlers` or a finite MDX `printWidth` need it.
 - **Fragile:** escaping peeks at most one character into the next text node. This assumes the
   built-in unsafe rules never look further. Custom `unsafe` patterns take the full regex path.
-- **One intended difference:** `idString` serializes as `{#value}`. remark-stringify throws,
-  because mdast-heading-id has no to-markdown handler.
+- **Intended differences:** `idString` serializes as `{#value}`; remark-stringify throws, because
+  mdast-heading-id has no to-markdown handler. A flow JSX element with only phrasing children
+  (made by `unravel`) serializes inline, `` <Note>a `b`</Note> ``; remark writes one paragraph per
+  child, which parses back to a different tree.
+- **Opt-in non-remark parsing:** `mdx({ htmlComments: true })` parses `<!-- -->` as `html` nodes in
+  `mdx-parser.ts` (a flow item next to tags and expressions, and an inline hook case). Off by
+  default, so the oracle never sees it; it is covered by `mdastic/src/index.test.ts`.
 
 ## Tests
 

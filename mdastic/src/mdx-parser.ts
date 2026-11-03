@@ -483,6 +483,12 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
       return { end: result.end, node: n }
     }
     if (c !== Char.LessThan) return
+    const commentEnd = htmlComment(view.source, start, end)
+    if (commentEnd > 0) {
+      const n = node(Kind.Mdx, offset(view, start), offset(view, commentEnd))
+      tree.extra[n] = { type: 'html', value: commentValue(view.source.slice(start, commentEnd)) }
+      return { end: commentEnd, node: n }
+    }
     const opening = tag(view, start, end, syntax)
     if (!opening) return
     const n = node(Kind.Mdx, offset(view, start), offset(view, opening.end))
@@ -557,6 +563,18 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
   type FlowItem =
     | Tag
     | { type: 'expression'; start: number; end: number; result: ReturnType<typeof expression> }
+    | { type: 'comment'; start: number; end: number }
+  // Continuation indent is JSX nesting, not content: strip it like paragraph text, so stringify
+  // (which indents by depth) round-trips.
+  function commentValue(value: string): string {
+    return value.replace(/(\r\n|\r|\n)[\t ]+/g, '$1')
+  }
+  // End of a `<!-- comment -->` at `i` when htmlComments is on, else 0.
+  function htmlComment(text: string, i: number, end: number): number {
+    if (!syntax.htmlComments || !text.startsWith('<!--', i)) return 0
+    const close = text.indexOf('-->', i + 4)
+    return close >= 0 && close + 3 <= end ? close + 3 : 0
+  }
   // Scans tags and expressions from `i` to the end of their last line, as a flow attempt.
   function flowLine(view: View, i: number): {
     found: FlowItem[]
@@ -569,7 +587,11 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
     for (;;) {
       const c = text.charCodeAt(i)
       try {
-        if (c === Char.LessThan) {
+        const commentEnd = c === Char.LessThan ? htmlComment(text, i, text.length) : 0
+        if (commentEnd) {
+          found.push({ type: 'comment', start: i, end: commentEnd })
+          i = commentEnd
+        } else if (c === Char.LessThan) {
           const t = tag(view, i, text.length, syntax)
           if (!t) break
           found.push(t)
@@ -624,6 +646,11 @@ export function mdxHooks(source: string, syntax: MdxSyntax) {
     const { found, end: i } = scanned
     // ── Apply the committed tokens to this Markdown container's JSX stack ──
     for (const item of found) {
+      if (item.type === 'comment') {
+        const n = node(Kind.Mdx, offset(view, item.start), offset(view, item.end), current(parent))
+        tree.extra[n] = { type: 'html', value: commentValue(view.source.slice(item.start, item.end)) }
+        continue
+      }
       if (item.type === 'expression') {
         const n = node(
           Kind.Mdx,

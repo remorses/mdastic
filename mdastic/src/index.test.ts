@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 import { EXIT, MdxParseError, SKIP, createProcessor, parse, stringify, toString, visit, type Root } from './index.ts'
 import { gfm } from './gfm.ts'
 import { headingId } from './heading-id.ts'
-import { mdx, unravel } from './mdx.ts'
+import { expression, getAttribute, isJsx, mdx, removeAttribute, setAttribute, unravel } from './mdx.ts'
 
 test('visit: typed filter, SKIP, splice with returned index, EXIT', () => {
   const tree = parse('# A *b*\n\n- x ~~y~~\n- z\n\n> q\n', { syntax: [gfm()], positions: false }) as Root
@@ -137,4 +137,111 @@ test('unravel: paragraphs of only JSX, expressions and whitespace become flow no
       "paragraph(text,mdxJsxTextElement)",
     ]
   `)
+})
+
+test('visit with a visitor per type runs them all in one walk', () => {
+  const tree = parse('# A\n\n```js\nx\n```\n\n## B\n', { positions: false }) as Root
+  const seen: string[] = []
+  visit(tree, {
+    heading: (node) => void seen.push(`h${node.depth}`),
+    code: (node) => void seen.push(`code:${node.lang}`),
+  })
+  expect(seen).toEqual(['h1', 'code:js', 'h2'])
+})
+
+test('JSX helpers read, write and remove attributes; expression() builds estree values', () => {
+  const syntax = [mdx()]
+  const tree = createProcessor({ syntax, transforms: [unravel], positions: false }).parse('<Card href="/a" open {...rest}>x</Card>\n') as Root
+  const card = tree.children[0]!
+  expect(isJsx(card, 'Card')).toBe(true)
+  expect(isJsx(card, 'Note')).toBe(false)
+  if (!isJsx(card)) throw new Error('expected JSX')
+  expect(getAttribute(card, 'href')?.value).toBe('/a')
+  expect(getAttribute(card, 'open')?.value).toBe(null)
+  expect(getAttribute(card, 'rest')).toBeUndefined()
+
+  setAttribute(card, 'href', '/b')
+  setAttribute(card, 'title', expression('<Markdown inline children="**hi**" />'))
+  removeAttribute(card, 'open')
+  expect(stringify(tree, { syntax })).toMatchInlineSnapshot(`
+    "<Card href="/b" {...rest} title={<Markdown inline children="**hi**" />}>x</Card>
+    "
+  `)
+  const title = getAttribute(card, 'title')?.value
+  expect(typeof title === 'object' && title?.data?.estree?.body[0]?.type).toBe('ExpressionStatement')
+  expect(() => expression('a b')).toThrow()
+})
+
+test('flow JSX with only phrasing children stringifies inline and round-trips through unravel', () => {
+  const processor = createProcessor({ syntax: [mdx()], transforms: [unravel], positions: false })
+  const source = '<Note>Use `Note` for *info*.</Note>\n\n<Steps>\n  <Step>Run **it**.</Step>\n</Steps>\n'
+  const tree = processor.parse(source) as Root
+  expect(tree.children[0]!.type).toBe('mdxJsxFlowElement')
+  const output = processor.stringify(tree)
+  expect(output).toMatchInlineSnapshot(`
+    "<Note>Use \`Note\` for *info*.</Note>
+
+    <Steps>
+      <Step>Run **it**.</Step>
+    </Steps>
+    "
+  `)
+  expect(processor.parse(output)).toEqual(tree)
+})
+
+test('mdx({ htmlComments: true }) parses <!-- --> as html nodes in flow and inline', () => {
+  const source = [
+    '<!-- top -->',
+    '',
+    'Text <!-- inline --> and `<!-- code -->`.',
+    '',
+    '<Note>',
+    '  <!-- multi',
+    '  line -->',
+    '',
+    '  Body.',
+    '</Note>',
+    '',
+    '```md',
+    '<!-- fenced -->',
+    '```',
+    '',
+    '> <!-- quoted -->',
+    '',
+  ].join('\n')
+  expect(parse(source, { syntax: [mdx()] })).toBeInstanceOf(MdxParseError)
+  const syntax = [mdx({ htmlComments: true })]
+  const tree = parse(source, { syntax, positions: false }) as Root
+  const html: string[] = []
+  visit(tree, 'html', (node) => void html.push(node.value))
+  expect(html).toMatchInlineSnapshot(`
+    [
+      "<!-- top -->",
+      "<!-- inline -->",
+      "<!-- multi
+    line -->",
+      "<!-- quoted -->",
+    ]
+  `)
+  const output = stringify(tree, { syntax })
+  expect(output).toMatchInlineSnapshot(`
+    "<!-- top -->
+
+    Text <!-- inline --> and \`<!-- code -->\`.
+
+    <Note>
+      <!-- multi
+      line -->
+
+      Body.
+    </Note>
+
+    \`\`\`md
+    <!-- fenced -->
+    \`\`\`
+
+    > <!-- quoted -->
+    "
+  `)
+  expect(parse(output, { syntax, positions: false })).toEqual(tree)
 })

@@ -231,7 +231,7 @@ Each syntax is a subpath export. Pass the same list to `parse` and `stringify`.
 | Import | Adds | Options |
 | --- | --- | --- |
 | `gfm()` from `mdastic/gfm` | tables, strikethrough, footnotes, task lists, autolink literals | `singleTilde` (default `true`) |
-| `mdx()` from `mdastic/mdx` | JSX, ESM, `{expressions}` | `estree` (default `true`) attaches `data.estree` |
+| `mdx()` from `mdastic/mdx` | JSX, ESM, `{expressions}` | `estree` (default `true`) attaches `data.estree`; `htmlComments` (default `false`) |
 | `frontmatter()` from `mdastic/frontmatter` | `---` yaml and `+++` toml blocks | `['yaml', 'toml']` |
 | `headingId()` from `mdastic/heading-id` | `{#custom-id}` text nodes, also outside headings | none |
 | `math()` from `mdastic/math` | `$$` math blocks and `$x$` inline math, like remark-math | `singleDollarTextMath` (default `true`) |
@@ -252,6 +252,37 @@ whitespace, so `<Card />` on its own line is a block, not `<p><Card /></p>`. It 
 
 **Stringify difference:** `mdast-heading-id` has no to-markdown handler, so remark-stringify throws
 on `idString`. mdastic writes `{#value}`, with character references where needed for a round trip.
+
+**HTML comments in MDX.** MDX has no `<!-- -->` comments: remark-mdx fails on them. Markdown
+authors still write them, so `mdx({ htmlComments: true })` parses them as `html` nodes, in flow and
+inline. Renderers that skip `html` nodes (safe-mdx) drop them, and `stringify` writes them back.
+
+```ts
+parse('Text <!-- todo --> more', { syntax: [mdx({ htmlComments: true })] }) // html node, no error
+```
+
+**Stringify difference:** a flow JSX element whose children are all inline content is written on
+one line, `` <Note>Use `x` here.</Note> ``. `unravel` makes these elements from single-line JSX.
+remark writes each child as its own paragraph, which parses back to a different tree.
+
+### JSX helpers
+
+`mdastic/mdx` exports small helpers for JSX nodes, so transforms need no casts:
+
+```ts
+import { expression, getAttribute, isJsx, removeAttribute, setAttribute } from 'mdastic/mdx'
+
+visit(tree, (node) => {
+  if (!isJsx(node, 'Card')) return
+  const href = getAttribute(node, 'href')?.value // string, null for `<Card href>`, or an expression
+  setAttribute(node, 'target', '_blank')
+  setAttribute(node, 'title', expression('<Markdown inline children="**hi**" />'))
+  removeAttribute(node, 'legacy')
+})
+```
+
+`expression(source)` builds an attribute value with `data.estree`, like a parsed `title={...}`.
+`isParent(node)` from `mdastic` narrows a node to one with `children`.
 
 ### `remarkTransform(plugin, ...options)`
 
@@ -275,6 +306,14 @@ attachment. Use the built-in syntax descriptors instead.
 ### `visit(tree, filter?, visitor)`
 
 Same semantics as `unist-util-visit`: depth first, preorder. The filter narrows the node type.
+Pass an object with one visitor per node type to run several in **one walk**:
+
+```ts
+visit(tree, {
+  heading: (node) => { node.depth },
+  code: (node) => { node.lang },
+})
+```
 
 ```ts
 import { visit, SKIP, EXIT } from 'mdastic'
