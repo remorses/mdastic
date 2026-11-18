@@ -1,2 +1,5 @@
 packages:
   - ./*
+
+overrides:
+  mdast-util-to-markdown: 2.2.3
