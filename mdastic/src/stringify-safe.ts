@@ -1,7 +1,7 @@
 // Compile unsafe syntax patterns into cached, scope-specific escape rules.
 // Built-ins scan candidates; custom patterns retain regex matching semantics.
 import type { Config } from './syntax.ts'
-import { ASCII_SIZE, Char } from './scan.ts'
+import { ASCII_SIZE, AsciiFlag, Char, ascii } from './scan.ts'
 
 const enum SyntaxMask {
   Gfm = 1,
@@ -17,6 +17,11 @@ const enum EscapeFlag {
   Match = 4,
 }
 const HEX_ESCAPE_WIDTH = 4
+const PERCENT_WIDTH = 2
+export const enum CharacterKind {
+  Whitespace = 1,
+  Punctuation = 2,
+}
 
 export interface Unsafe {
   character: string
@@ -25,12 +30,17 @@ export interface Unsafe {
   atBreak?: boolean
   inConstruct?: string | string[]
   notInConstruct?: string | string[]
+  beforeNode?: string | string[]
+  afterNode?: string | string[]
+  unicode?: boolean
 }
 
 export interface SafeConfig {
   before?: string
   after?: string
   encode?: string[]
+  beforeNode?: { type: string }
+  afterNode?: { type: string }
 }
 
 interface Condition {
@@ -50,10 +60,15 @@ interface Rule {
 export interface ScopedRules {
   characters: (Rule[] | undefined)[]
   expression: RegExp
+  percentEncode: boolean
+}
+interface ScopeNode {
+  next: Map<string, ScopeNode>
+  rules?: ScopedRules
 }
 export interface RuleTable {
   characters: (Rule[] | undefined)[]
-  scopes: Map<string, ScopedRules>
+  scopes: ScopeNode
   breaks: RegExp[]
   next: Int32Array
   custom?: { pattern: Unsafe; expression: RegExp }[]
@@ -83,11 +98,15 @@ function condition(source: string): Condition {
         if (expression.test(String.fromCharCode(code))) result.characters[code] = 1
       }
     } else {
-      result.literal = value.replace(/\\(.)/g, '$1')
+      result.literal = value.replace(/\\(.)/g, unescapeLiteral)
     }
   }
   conditions.set(source, result)
   return result
+}
+
+function unescapeLiteral(_: string, character: string) {
+  return character === 'n' ? '\n' : character === 'r' ? '\r' : character === 't' ? '\t' : character
 }
 
 export function prepareRules(config: Config, patterns: Unsafe[], custom = false): RuleTable {
@@ -105,7 +124,7 @@ export function prepareRules(config: Config, patterns: Unsafe[], custom = false)
     table = {
       characters: [],
       next: new Int32Array(patterns.length),
-      scopes: new Map(),
+      scopes: { next: new Map() },
       breaks: patterns.filter((pattern) => pattern.atBreak).map(compilePattern),
     }
     // Syntax-equivalent built-ins share tables; user patterns must bypass that cache.
@@ -140,12 +159,12 @@ export function compilePattern(pattern: Unsafe): RegExp {
     const before =
       (pattern.atBreak ? '[\\r\\n][\\t ]*' : '') +
       (pattern.before ? '(?:' + pattern.before + ')' : '')
-    const character = pattern.character.replace(/[|\\{}()[\]^$+*?.-]/g, '\\$&')
+    const character = pattern.character.replace(/[$()*+.?[\\\]^{|}]/g, '\\$&')
     expression = new RegExp(
-      (before ? '(' + before + ')' : '') +
+      (pattern.beforeNode ? '^' : before ? '(' + before + ')' : '') +
         character +
-        (pattern.after ? '(?:' + pattern.after + ')' : ''),
-      'g',
+        (pattern.afterNode ? '$' : pattern.after ? '(?:' + pattern.after + ')' : ''),
+      pattern.unicode ? 'gu' : 'g',
     )
     expressions.set(pattern, expression)
   }
@@ -154,9 +173,17 @@ export function compilePattern(pattern: Unsafe): RegExp {
 }
 
 function scopedRules(table: RuleTable, stack: string[]): ScopedRules {
-  const key = stack.join('/')
+  let node = table.scopes
+  for (const name of stack) {
+    let child = node.next.get(name)
+    if (!child) {
+      child = { next: new Map() }
+      node.next.set(name, child)
+    }
+    node = child
+  }
   // Construct scope determines which unsafe candidates the native regex can skip to.
-  let result = table.scopes.get(key)
+  let result = node.rules
   if (!result) {
     const characters = table.characters.map((rules) =>
       rules?.filter((rule) => patternInScope(stack, rule.pattern)),
@@ -170,22 +197,26 @@ function scopedRules(table: RuleTable, stack: string[]): ScopedRules {
       if (rules.some((rule) => !rule.before && !rule.after && !rule.pattern.atBreak)) {
         codes.push(character)
       } else {
+        const conditions: string[] = []
         for (const { pattern } of rules) {
-          const before = (pattern.atBreak ? '[\\r\\n][\\t ]*' : '') + (pattern.before || '')
-          alternatives.push(
-            (before ? '(?<=' + before + ')' : '') +
-              character +
+          const before =
+            (pattern.atBreak ? '[\\r\\n][\\t ]*' : '') +
+            (pattern.before ? '(?:' + pattern.before + ')' : '')
+          conditions.push(
+            (before ? '(?<=' + before + character + ')' : '') +
               (pattern.after ? '(?=' + pattern.after + ')' : ''),
           )
         }
+        alternatives.push(character + '(?:' + conditions.join('|') + ')')
       }
     }
     if (codes.length) alternatives.unshift('[' + codes.join('') + ']')
     result = {
       characters,
       expression: new RegExp(alternatives.join('|') || '(?!)', 'g'),
+      percentEncode: stack.includes('autolink'),
     }
-    table.scopes.set(key, result)
+    node.rules = result
   }
   return result
 }
@@ -256,6 +287,34 @@ function escapeBackslashes(value: string, after = ''): string {
   return result + value.slice(start)
 }
 
+const unicodePunctuation = /\p{P}|\p{S}/u
+const unicodeWhitespace = /\s/
+
+export function classifyCharacter(code: number): CharacterKind | undefined {
+  if (code < ASCII_SIZE) {
+    const flags = ascii[code]
+    return flags & AsciiFlag.Whitespace
+      ? CharacterKind.Whitespace
+      : flags & AsciiFlag.Punctuation
+        ? CharacterKind.Punctuation
+        : undefined
+  }
+  if (code !== code) return undefined
+  const character = String.fromCharCode(code)
+  if (unicodeWhitespace.test(character)) return CharacterKind.Whitespace
+  if (unicodePunctuation.test(character)) return CharacterKind.Punctuation
+}
+
+function nodeInScope(types: string | string[] | undefined, node: { type: string } | undefined) {
+  if (!types) return true
+  if (!node) return false
+  return typeof types === 'string' ? types === node.type : types.includes(node.type)
+}
+
+function attentionMarker(code: number) {
+  return code === Char.Asterisk || code === Char.Underscore
+}
+
 export function safe(
   state: {
     rules: RuleTable
@@ -273,27 +332,37 @@ export function safe(
   const table = state.rules
   const scope = state.scopedRules || scopedRules(table, state.stack)
   if (!state.customHandlers) state.scopedRules = scope
-  const { characters, expression } = scope
+  const { characters, expression, percentEncode } = scope
   expression.lastIndex = 0
   let candidate = table.custom ? null : expression.exec(value)
-  if (!table.custom && !candidate) return escapeBackslashes(input || '', suffix)
+  if (!table.custom && !candidate)
+    return percentEncode ? input || '' : escapeBackslashes(input || '', suffix)
   const next = table.next
   next.fill(0)
   const matches: number[] = []
   const positions: number[] = []
+  const offset = prefix.length
+  const end = value.length - suffix.length
   // ── Custom patterns keep regex-style nonoverlapping matches ──
   if (table.custom) {
     for (const { pattern, expression } of table.custom) {
-      if (!patternInScope(state.stack, pattern)) continue
+      if (
+        !patternInScope(state.stack, pattern) ||
+        !nodeInScope(pattern.beforeNode, config.beforeNode) ||
+        !nodeInScope(pattern.afterNode, config.afterNode)
+      )
+        continue
+      const from = pattern.beforeNode ? offset : 0
+      const subject = value.slice(from, pattern.afterNode ? end : undefined)
       expression.lastIndex = 0
       let match: RegExpExecArray | null
-      while ((match = expression.exec(value))) {
-        const before = 'before' in pattern || Boolean(pattern.atBreak)
-        const position = match.index + (before ? match[1].length : 0)
+      while ((match = expression.exec(subject))) {
+        const before = Boolean(pattern.before || pattern.atBreak)
+        const position = from + match.index + (before ? match[1].length : 0)
         const flags =
           EscapeFlag.Match |
           (before ? EscapeFlag.Before : 0) |
-          ('after' in pattern ? EscapeFlag.After : 0)
+          (pattern.after ? EscapeFlag.After : 0)
         // Intersect restrictions: an unconditional rule wins over conditional rules.
         matches[position] = matches[position] ? matches[position] & flags : flags
       }
@@ -332,8 +401,8 @@ export function safe(
       next[rule.index] = end
       const match =
         EscapeFlag.Match |
-        ('before' in rule.pattern || rule.pattern.atBreak ? EscapeFlag.Before : 0) |
-        ('after' in rule.pattern ? EscapeFlag.After : 0)
+        (rule.pattern.before || rule.pattern.atBreak ? EscapeFlag.Before : 0) |
+        (rule.pattern.after ? EscapeFlag.After : 0)
       flags = flags ? flags & match : match
     }
     if (flags) {
@@ -342,27 +411,54 @@ export function safe(
     }
   }
   // ── Suppress redundant adjacent conditional escapes and emit the result ──
-  let start = prefix.length
-  const end = value.length - suffix.length
+  let start = offset
   let result = ''
-  for (const position of positions) {
+  for (let index = 0; index < positions.length; index++) {
+    const position = positions[index]
     if (position < start || position >= end) continue
+    if (
+      value.charCodeAt(position) === Char.Underscore &&
+      position > 0 &&
+      classifyCharacter(value.charCodeAt(position - 1)) === undefined &&
+      !matches[position - 1] &&
+      !(position - 1 === offset && attentionMarker(value.charCodeAt(offset - 1)))
+    ) {
+      let sequenceEnd = position + 1
+      while (sequenceEnd < end && value.charCodeAt(sequenceEnd) === Char.Underscore) sequenceEnd++
+      const skip = sequenceEnd - position - 1
+      if (
+        positions[index + skip] === sequenceEnd - 1 &&
+        sequenceEnd < value.length &&
+        classifyCharacter(value.charCodeAt(sequenceEnd)) === undefined &&
+        !matches[sequenceEnd] &&
+        !(sequenceEnd === end - 1 && attentionMarker(value.charCodeAt(end)))
+      ) {
+        index += skip
+        continue
+      }
+    }
     const flags = matches[position]
     if (
       (position + 1 < end &&
         flags & EscapeFlag.After &&
         matches[position + 1] === EscapeFlag.Match) ||
-      (flags & EscapeFlag.Before && position && matches[position - 1] === EscapeFlag.Match)
+      (flags & EscapeFlag.Before &&
+        position - 1 >= offset &&
+        matches[position - 1] === EscapeFlag.Match)
     )
       continue
-    if (start !== position) result += escapeBackslashes(value.slice(start, position), '\\')
-    start = position
-    const code = value.charCodeAt(position)
-    if (punctuation(code) && !config.encode?.includes(value[position])) result += '\\'
-    else {
-      result += '&#x' + code.toString(16).toUpperCase() + ';'
-      start++
+    if (start !== position) {
+      const slice = value.slice(start, position)
+      result += percentEncode ? slice : escapeBackslashes(slice, '\\')
     }
+    start = position + 1
+    const code = value.charCodeAt(position)
+    if (percentEncode)
+      result += '%' + code.toString(16).toUpperCase().padStart(PERCENT_WIDTH, '0')
+    else if (punctuation(code) && !config.encode?.includes(value[position]))
+      result += '\\' + value[position]
+    else result += '&#x' + code.toString(16).toUpperCase() + ';'
   }
-  return result + escapeBackslashes(value.slice(start, end), suffix)
+  const rest = value.slice(start, end)
+  return result + (percentEncode ? rest : escapeBackslashes(rest, suffix))
 }

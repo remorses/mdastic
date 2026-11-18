@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+1. **`stringify` matches `mdast-util-to-markdown` 2.2.3**, which is what `remark-stringify` 11 installs today. Before, it matched 2.1.2. Output changes where 2.2.3 changed:
+
+   ```ts
+   stringify(parse('snake_case and x86_64'))  // 'snake_case and x86_64\n', was 'snake\\_case and x86\\_64\n'
+   // strong > emphasis > text 'bold and italic'
+   stringify(tree)                            // '**_bold and italic_**\n', was '***bold and italic***\n'
+   ```
+
+2. **Attention picks its markers from its neighbors.** Emphasis, strong and GFM strikethrough switch between `*` and `_` (or `~~` and `~`) until every run parses back to the same node. Empty emphasis and strong are dropped.
+3. **Fewer and more precise escapes.** Intraword underscores are no longer escaped, line endings that would end a paragraph are encoded, `&` is escaped in code info, destinations and titles, and characters an autolink cannot hold are percent-encoded.
+4. **Tight lists keep blank lines where they are needed.** A paragraph followed by a list that cannot interrupt it, a setext-like rule, indented code, html or another block quote is separated by a blank line, so the list item parses back the same.
+5. **Links whose text could form a definition** at the start of a line get an empty title, so `[a]: b` style text no longer reparses as a definition.
+6. **Custom `unsafe` patterns support `beforeNode`, `afterNode` and `unicode`**, and treat an empty `before` or `after` as missing.
+
 ## 0.5.1
 
 1. **Unclosed `<!--` comments with `htmlComments` follow CommonMark.** A comment that starts a block and never closes now runs to the end of its container, like a browser hides the rest of the page, instead of returning an MDX error.

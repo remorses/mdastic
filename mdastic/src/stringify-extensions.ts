@@ -14,6 +14,7 @@ const FOOTNOTE_INDENT = 4
 const JSX_INDENT = 2
 const MIN_MATH_FENCE_LENGTH = 2
 import {
+  attentionSpec,
   breaksToSpaces,
   inlineCode,
   listItem,
@@ -24,6 +25,7 @@ import {
   type Info,
   type TrackerInfo,
   type Handler,
+  type AttentionSpec,
 } from './stringify.ts'
 function ccount(value: string, character: string) {
   const source = String(value)
@@ -127,7 +129,9 @@ const constructsWithoutStrikethrough = [
   'titleQuote',
   'titleApostrophe',
 ]
+handleDelete.attention = attentionDelete
 handleDelete.peek = peekDelete
+let deleteSpec: AttentionSpec | undefined
 function gfmStrikethroughToMarkdown() {
   return {
     handlers: { delete: handleDelete },
@@ -154,6 +158,9 @@ function handleDelete(node: M.Delete, _: any, state: State, info: Info) {
   value += tracker.move(sequence)
   exit()
   return value
+}
+function attentionDelete() {
+  return (deleteSpec ??= attentionSpec('strikethrough', ['~'], [2, 1]))
 }
 function peekDelete() {
   return '~'
@@ -685,7 +692,7 @@ export function mathToMarkdown(single: boolean) {
     unsafe: [
       { character: '\r', inConstruct: 'mathFlowMeta' },
       { character: '\n', inConstruct: 'mathFlowMeta' },
-      // Quirk: `after` stays present when undefined; `safe` checks `'after' in pattern`.
+      // `after: undefined` counts as missing, like an empty `after`.
       { character: '$', after: single ? undefined : '\\$', inConstruct: 'phrasing' },
       { character: '$', inConstruct: 'mathFlowMeta' },
       { atBreak: true, character: '$', after: '\\$' },
