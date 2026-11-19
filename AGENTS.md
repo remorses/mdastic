@@ -188,14 +188,25 @@ Do not recursively call `parseDocument` from a hook: the arena is reused. Use th
 
 ## Serializer architecture
 
-`stringify.ts` is a behavior port of `mdast-util-to-markdown@2.1.2` (switch dispatch, same
-handlers, `join`, `unsafe`, association). `stringify-extensions.ts` ports the gfm, mdx and
-frontmatter handlers. `stringify-safe.ts` compiles the `unsafe` patterns once per config into
-per-scope candidate tables, so `safe()` scans each value once instead of running every regex.
+`stringify.ts` is a behavior port of `mdast-util-to-markdown@2.2.3` (switch dispatch, same
+handlers, `join`, `unsafe`, association, attention). `stringify-extensions.ts` ports the gfm, mdx
+and frontmatter handlers. `stringify-safe.ts` compiles the `unsafe` patterns once per config into
+per-scope candidate tables (cached in a trie keyed by the construct stack), so `safe()` scans each
+value once instead of running every regex.
 
+- **Attention is chosen per phrasing container.** Handlers with an `attention` property (emphasis,
+  strong, gfm `delete`) become items whose sequence is picked later: `guess`, then `render` +
+  `check` (micromark's pairing, rule of 3) until every sequence forms its node. Plain phrasing
+  skips this and joins strings. Built-in specs come from `attentionSpec()`, which caches their
+  sequences.
+- `safe()` follows 2.2.3: escapes emit `\` + character, intraword `_` runs stay unescaped, autolinks
+  percent-encode, and an empty `before` / `after` counts as missing. Custom patterns may use
+  `beforeNode`, `afterNode` and `unicode`.
 - Position tracking only runs when custom `handlers` or a finite MDX `printWidth` need it.
 - **Fragile:** escaping peeks at most one character into the next text node. This assumes the
-  built-in unsafe rules never look further. Custom `unsafe` patterns take the full regex path.
+  built-in unsafe rules never look further. It still holds under 2.2.3: the intraword `_` check
+  scans a whole run, but never for the first character, and a peek has an empty `before`.
+  Custom `unsafe` patterns take the full regex path.
 - **Intended differences:** `idString` serializes as `{#value}`; remark-stringify throws, because
   mdast-heading-id has no to-markdown handler. A flow JSX element with only phrasing children
   (made by `unravel`) serializes inline, `` <Note>a `b`</Note> ``; remark writes one paragraph per
@@ -209,10 +220,13 @@ per-scope candidate tables, so `safe()` scans each value once instead of running
 ### The oracle
 
 `conformance/src/oracle.ts` runs the real remark stack, pinned to exact versions in
-`conformance/package.json` (mdast-util-from-markdown 2.0.3, mdast-util-to-markdown 2.1.2,
+`conformance/package.json` (mdast-util-from-markdown 2.0.3, mdast-util-to-markdown 2.2.3,
 micromark-extension-gfm 3.0.0, -mdxjs 3.0.0, -frontmatter 2.0.0, -math 3.1.0, mdast-util-math 3.0.0,
 micromark-heading-id 2.0.0). Extensions are registered in safe-mdx / holocron order: mdx,
-frontmatter `['yaml', 'toml']`, gfm, math (remark-math defaults), then headingId. Upgrading the
+frontmatter `['yaml', 'toml']`, gfm, math (remark-math defaults), then headingId. A pnpm
+override in `pnpm-workspace.yaml` makes remark-stringify and every to-markdown extension resolve
+the same mdast-util-to-markdown, and pins mdast-util-gfm-table 2.0.1 with markdown-table 3.1.0
+(rows keep their own cell count, `fillRows: false`). Upgrading the
 oracle means rerunning everything; differences become work.
 
 ```text
@@ -243,7 +257,7 @@ markdown inputs is useful, even suites that only assert HTML.
 | micromark-extension-math, mdast-util-math, remark-math, Sätteri and pulldown-cmark math tests; d2l-en; real documents with `$` | `scripts/extract-math.ts` |
 | hand-written bugs and edge cases | `conformance/fixtures/regressions.json`, `smoke.json` |
 
-`conformance/stringify-fixtures/` holds 838 hand-built trees with options, captured from the
+`conformance/stringify-fixtures/` holds 885 hand-built trees with options, captured from the
 upstream `toMarkdown` tests. Candidate suites not yet extracted are in `docs/test-suites.md`.
 
 ### Adding fixtures

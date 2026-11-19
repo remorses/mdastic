@@ -14,7 +14,9 @@ const FOOTNOTE_INDENT = 4
 const JSX_INDENT = 2
 const MIN_MATH_FENCE_LENGTH = 2
 import {
+  attentionSpec,
   breaksToSpaces,
+  formatHeadingAsSetext,
   inlineCode,
   listItem,
   longestStreak,
@@ -24,6 +26,7 @@ import {
   type Info,
   type TrackerInfo,
   type Handler,
+  type AttentionSpec,
 } from './stringify.ts'
 function ccount(value: string, character: string) {
   const source = String(value)
@@ -127,7 +130,9 @@ const constructsWithoutStrikethrough = [
   'titleQuote',
   'titleApostrophe',
 ]
+handleDelete.attention = attentionDelete
 handleDelete.peek = peekDelete
+let deleteSpec: AttentionSpec | undefined
 function gfmStrikethroughToMarkdown() {
   return {
     handlers: { delete: handleDelete },
@@ -155,6 +160,9 @@ function handleDelete(node: M.Delete, _: any, state: State, info: Info) {
   exit()
   return value
 }
+function attentionDelete() {
+  return (deleteSpec ??= attentionSpec('strikethrough', ['~'], [2, 1]))
+}
 function peekDelete() {
   return '~'
 }
@@ -168,6 +176,7 @@ interface TableOptions {
   padding?: boolean | null
   delimiterStart?: boolean
   delimiterEnd?: boolean
+  fillRows?: boolean | null
 }
 function markdownTable(table: string[][], options: TableOptions) {
   // ── Measure serialized cells once, collecting maximum width per column ──
@@ -253,9 +262,13 @@ function markdownTable(table: string[][], options: TableOptions) {
   while (++rowIndex < cellMatrix.length) {
     const cells = cellMatrix[rowIndex]
     const cellWidths = sizeMatrix[rowIndex]
+    const cellsInRow =
+      settings.fillRows === false
+        ? Math.max(1, cellMatrix[rowIndex === 1 ? 0 : rowIndex].length)
+        : mostCellsPerRow
     columnIndex = -1
     const line: string[] = []
-    while (++columnIndex < mostCellsPerRow) {
+    while (++columnIndex < cellsInRow) {
       const cell = cells[columnIndex] || ''
       let before = ''
       let after = ''
@@ -296,7 +309,7 @@ function markdownTable(table: string[][], options: TableOptions) {
       if (settings.padding !== false) {
         line.push(' ')
       }
-      if (settings.delimiterEnd !== false || columnIndex !== mostCellsPerRow - 1) {
+      if (settings.delimiterEnd !== false || columnIndex !== cellsInRow - 1) {
         line.push('|')
       }
     }
@@ -319,6 +332,19 @@ function toAlignment(value: string | null | undefined) {
         ? TableAlignment.Right
         : TableAlignment.None
 }
+function joinTable(left: M.Nodes, right: M.Nodes, parent: M.Nodes, state: State) {
+  if (
+    left.type === 'table' &&
+    parent.type === 'listItem' &&
+    parent.spread === false &&
+    (right.type === 'definition' ||
+      (right.type === 'heading' && formatHeadingAsSetext(right, state)) ||
+      right.type === 'paragraph' ||
+      right.type === 'table')
+  ) {
+    return 1
+  }
+}
 function gfmTableToMarkdown(options: StringifyOptions) {
   const settings = options || {}
   const padding = settings.tableCellPadding
@@ -340,9 +366,21 @@ function gfmTableToMarkdown(options: StringifyOptions) {
       tableCell: handleTableCell,
       tableRow: handleTableRow,
     },
+    join: [joinTable],
   }
   function handleTable(node: M.Table, _: any, state: State, info: Info) {
-    return serializeData(handleTableAsData(node, state, info), node.align)
+    const matrix = handleTableAsData(node, state, info)
+    const head = matrix[0]
+    if (head) {
+      let columns = node.align ? node.align.length : 0
+      if (!columns) {
+        for (const row of matrix) {
+          if (row.length > columns) columns = row.length
+        }
+      }
+      while (head.length < columns) head.push('')
+    }
+    return serializeData(matrix, node.align)
   }
   function handleTableRow(node: M.TableRow, _: any, state: State, info: Info) {
     const row = handleTableRowAsData(node, state, info)
@@ -365,6 +403,7 @@ function gfmTableToMarkdown(options: StringifyOptions) {
     return markdownTable(matrix, {
       align,
       alignDelimiters,
+      fillRows: false,
       padding,
       stringLength,
     })
@@ -392,11 +431,21 @@ function gfmTableToMarkdown(options: StringifyOptions) {
     return result
   }
   function inlineCodeWithTable(node: M.InlineCode, parent: any, state: State) {
-    let value = inlineCode(node, parent, state)
-    if (state.stack.includes('tableCell')) {
-      value = value.replace(/\|/g, '\\$&')
+    const value = inlineCode(node, parent, state)
+    if (!state.stack.includes('tableCell')) return value
+    const result: string[] = []
+    let start = 0
+    let index = value.indexOf('|')
+    while (index !== -1) {
+      let before = index
+      while (before > start && value.charCodeAt(before - 1) === Char.Backslash) before--
+      result.push(value.slice(start, index))
+      if ((index - before) % 2 === 0) result.push('\\')
+      start = index
+      index = value.indexOf('|', index + 1)
     }
-    return value
+    result.push(value.slice(start))
+    return result.join('')
   }
 }
 function gfmTaskListItemToMarkdown() {
@@ -685,7 +734,7 @@ export function mathToMarkdown(single: boolean) {
     unsafe: [
       { character: '\r', inConstruct: 'mathFlowMeta' },
       { character: '\n', inConstruct: 'mathFlowMeta' },
-      // Quirk: `after` stays present when undefined; `safe` checks `'after' in pattern`.
+      // `after: undefined` counts as missing, like an empty `after`.
       { character: '$', after: single ? undefined : '\\$', inConstruct: 'phrasing' },
       { character: '$', inConstruct: 'mathFlowMeta' },
       { atBreak: true, character: '$', after: '\\$' },

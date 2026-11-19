@@ -346,7 +346,7 @@ export function quote(source: string, line: Line, mdx = mdxMode): number {
   return i
 }
 
-const htmlBlocks = new Set([
+export const htmlBlocks = new Set([
   'address',
   'article',
   'aside',
