@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
 
 1. **`stringify` matches `mdast-util-to-markdown` 2.2.3**, which is what `remark-stringify` 11 installs today. Before, it matched 2.1.2. Output changes where 2.2.3 changed:
 
