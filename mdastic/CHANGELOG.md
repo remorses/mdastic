@@ -22,6 +22,16 @@
    stringify(tree)  // '| a | b |\n| - | - |\n| c | d | e |\n', was every row padded to 3 cells
    ```
 
+8. **GFM autolink literals match `mdast-util-gfm-autolink-literal` 2.1.0**, which `remark-gfm` installs today. Emails after punctuation such as `/` now link, `mailto:` and `xmpp:` addresses link with their scheme, and hosts that start with punctuation no longer link. This only affects text the tokenizer left alone, such as text after an escape or an entity.
+
+   ```ts
+   parse('\\/a@b.c', { syntax: [gfm()] })  // '/' + link 'a@b.c', was plain text
+   parse('mailto:a&#64;b.co', { syntax: [gfm()] })  // link 'mailto:a@b.co', was text 'mailto:' + link 'a@b.co'
+   ```
+
+9. **Task list checks match `mdast-util-gfm-task-list-item` 2.0.1.** A check after a definition stays on the first paragraph, an empty checked item prints `[x] &#x20;`, and checks work with `bulletOrdered: ")"` and wide markers with `listItemIndent: "tab"`.
+10. **Multi-line JSX attribute expressions are indented** like `mdast-util-mdx-jsx` 3.2.1: lines after the first get two spaces in flow elements.
+
 ## 0.5.1
 
 1. **Unclosed `<!--` comments with `htmlComments` follow CommonMark.** A comment that starts a block and never closes now runs to the end of its container, like a browser hides the rest of the page, instead of returning an MDX error.
