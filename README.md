@@ -9,6 +9,14 @@
 
 mdastic is **one package** for parsing and serializing markdown. It gives the **same mdast as remark**, byte for byte: positions, `data.estree` and MDX errors included. MDX, GFM and frontmatter are built in. It is written in plain TypeScript, so it runs in Node, Bun, Workers and the browser.
 
+<p align="center"><sub><b>POWERING MILLIONS OF WEBSITES ALREADY</b></sub></p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/figures/users-dark.svg">
+    <img alt="Mintlify and Holocron" src="docs/figures/users-light.svg" width="560">
+  </picture>
+</p>
+
 ```ts
 import { parse, stringify, visit } from 'mdastic'
 import { mdx } from 'mdastic/mdx'
