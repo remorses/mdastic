@@ -30,7 +30,7 @@ const markdown = stringify(tree, { syntax }) // same string as remark-stringify
 ## Features
 
 - **Exact remark output.** 9,854 of 9,854 conformance fixtures match the real remark stack, including positions and estree.
-- **Fast.** 28x faster than remark on markdown, 17x on MDX, 6x on stringify. Faster than markdown-it, close to native Rust.
+- **Fast.** 28x faster than remark on markdown, 17x on MDX, 7x on stringify. Faster than markdown-it, close to native Rust.
 - **One syntax list.** The same `syntax` array drives `parse` and `stringify`, and `createProcessor` holds it with your transforms. No separate micromark, from-markdown and to-markdown extension arrays.
 - **MDX built in.** JSX, ESM and `{expressions}` with `data.estree`. Only `mdastic/mdx` imports Acorn, so plain markdown bundles stay small.
 - **Streaming parsing.** `createStreamParser()` parses LLM output as it arrives. Closed blocks are not parsed again and keep object identity, and every result still equals `parse(text)`.
@@ -57,9 +57,9 @@ Real documents, each parsed on its own, like a docs site build. 342 markdown doc
 | --- | ---: | ---: | ---: |
 | Parse markdown + GFM | 703 ms | **24.7 ms** | 28.5x |
 | Parse MDX with estree | 289 ms | **16.8 ms** | 17.2x |
-| Stringify markdown + GFM | 253 ms | **42.7 ms** | 5.9x |
-| Stringify MDX | 101 ms | **16.7 ms** | 6.0x |
-| Round trip MDX | 402 ms | **33.9 ms** | 11.9x |
+| Stringify markdown + GFM | 296 ms | **39.0 ms** | 7.6x |
+| Stringify MDX | 115 ms | **15.0 ms** | 7.6x |
+| Round trip MDX | 440 ms | **34.7 ms** | 12.7x |
 
 ### Against other fast parsers
 

@@ -17,7 +17,7 @@ only after parity. Read this file top to bottom before changing `mdastic/src/`.
 - **Exact parity** with `mdast-util-from-markdown` + `micromark-extension-{gfm,mdxjs,frontmatter}`
   for parsing, and with `mdast-util-to-markdown` + `{gfm,mdx,frontmatter}ToMarkdown` for stringify.
   Not "close enough": deep equal JSON, including every `position` and acorn `data.estree`.
-- **Speed.** Real-document benchmark: 28x faster than remark on markdown, 17x on MDX, 6x on
+- **Speed.** Real-document benchmark: 28x faster than remark on markdown, 17x on MDX, 7x on
   stringify. Faster than markdown-it (which builds no tree), about 1.2x behind native Sätteri.
 - **Replace remark** in three of Tommy's projects:
 
@@ -329,8 +329,8 @@ remark accepts, 1 MB), median of 15 runs after warmup. Last numbers on an M5 Pro
 | --- | ---: | ---: |
 | Parse markdown + GFM | 703 ms | 24.7 ms |
 | Parse MDX with estree | 289 ms | 16.8 ms |
-| Stringify markdown + GFM | 253 ms | 42.7 ms |
-| Round trip MDX | 402 ms | 33.9 ms |
+| Stringify markdown + GFM | 296 ms | 39.0 ms |
+| Round trip MDX | 440 ms | 34.7 ms |
 
 Profile with `node --cpu-prof --cpu-prof-dir=tmp/profiles --import tsx <script>`, then
 `profano tmp/profiles/*.cpuprofile`. Host load moves numbers a few percent; rerun before
@@ -350,7 +350,6 @@ acorn was not dominant, so a hand-written JS brace scanner was never built.
   nested brackets, `![[]()`. See `docs/test-suites.md` for the full table.
 - **Allocation is not minimal.** Line and container views are objects, regex searches allocate
   match arrays, some strings decode before materialization, acorn allocates tokens.
-- **Stringify is 5.4x, not the 6x target.**
 - **Source vs dist.** The harness imports `mdastic/src`, but `heading-id.test.ts` and
   `remark.test.ts` import the built `mdastic`, so build before vitest. `const enum` inlines
   under `tsc` but not under isolated esbuild/tsx transforms, so benchmarks run slightly
