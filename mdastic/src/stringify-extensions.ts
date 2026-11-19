@@ -561,6 +561,7 @@ function mdxJsxToMarkdown(options: StringifyOptions) {
     const selfClosing = node.name ? !node.children || node.children.length === 0 : false
     const depth = inferDepth(state)
     const currentIndent = createIndent(depth)
+    const expressionIndent = flow || depth === 0 ? indent : ''
     const trackerOneLine = state.createTracker(info)
     const trackerMultiLine = state.createTracker(info)
     const serializedAttributes: string[] = []
@@ -578,7 +579,7 @@ function mdxJsxToMarkdown(options: StringifyOptions) {
         const attribute = node.attributes[index]
         let result: string
         if (attribute.type === 'mdxJsxExpressionAttribute') {
-          result = '{' + (attribute.value || '') + '}'
+          result = serializeExpression({ state, value: attribute.value || '', expressionIndent })
         } else {
           if (!attribute.name) {
             throw new Error('Cannot serialize attribute w/o name')
@@ -588,7 +589,7 @@ function mdxJsxToMarkdown(options: StringifyOptions) {
           let right = ''
           if (attributeValue === null || attributeValue === void 0) {
           } else if (typeof attributeValue === 'object') {
-            right = '{' + (attributeValue.value || '') + '}'
+            right = serializeExpression({ state, value: attributeValue.value || '', expressionIndent })
           } else {
             const appliedQuote =
               quoteSmart && ccount(attributeValue, quote) > ccount(attributeValue, alternative)
@@ -713,6 +714,22 @@ function createIndent(depth: number) {
 }
 function peekElement() {
   return '<'
+}
+function serializeExpression({
+  state,
+  value,
+  expressionIndent,
+}: {
+  state: State
+  value: string
+  expressionIndent: string
+}) {
+  // mdast-util-mdx-jsx 3.2.1 indents attribute expression lines after the first.
+  if (!expressionIndent) return '{' + value + '}'
+  const result = state.indentLines(value, function (line, index, blank) {
+    return (index === 0 || blank ? '' : expressionIndent) + line
+  })
+  return '{' + result + '}'
 }
 function mdxjsEsmToMarkdown() {
   return { handlers: { mdxjsEsm: handleMdxjsEsm } }
