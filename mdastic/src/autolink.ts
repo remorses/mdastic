@@ -210,137 +210,146 @@ function splitEnd(source: string, start: number, end: number): number {
   return result
 }
 
-function fallbackUrl(source: string, start: number): LiteralLink | undefined {
-  // This pass sees decoded text, unlike the source tokenizer above.
-  const previous = start ? source.charCodeAt(start - 1) : -1
-  if (start && !isWhitespace(previous) && !isPunctuation(previous)) return
-  const protocol = word(source, start, 'http://')
-    ? HTTP_PREFIX_LENGTH
-    : word(source, start, 'https://')
-      ? HTTPS_PREFIX_LENGTH
-      : word(source, start, 'www.')
-        ? WWW_MARKER_LENGTH // The fallback domain scan intentionally starts on the dot.
-        : 0
-  if (!protocol) return
-  let i = start + protocol
-  const begin = i
-  while (
-    i < source.length &&
-    (alpha(source.charCodeAt(i)) ||
-      digit(source.charCodeAt(i)) ||
-      source.charCodeAt(i) === 95 ||
-      source.charCodeAt(i) === 45 ||
-      source.charCodeAt(i) === 46)
-  )
-    i++
-  if (i === begin || !correctDomain(source, protocol === WWW_MARKER_LENGTH ? start : begin, i))
-    return
-  while (
-    i < source.length &&
-    source.charCodeAt(i) !== 32 &&
-    source.charCodeAt(i) !== 9 &&
-    source.charCodeAt(i) !== 10 &&
-    source.charCodeAt(i) !== 13
-  )
-    i++
-  const stop = splitEnd(source, start + protocol, i)
-  if (stop > start + protocol || (protocol === WWW_MARKER_LENGTH && stop === start + protocol))
-    return { end: stop, prefix: protocol === WWW_MARKER_LENGTH ? 'http://' : '' }
+// The fallback is a port of the find-and-replace transform in
+// mdast-util-gfm-autolink-literal@2.1.0: same regexes, same pass order, same retries.
+interface FallbackLink {
+  end: number
+  url: string
+}
+interface FallbackPass {
+  /** Cheap test that must pass whenever `pattern` can match, so most text skips the regex. */
+  guard(value: string): boolean
+  pattern: RegExp
+  find(match: RegExpExecArray): FallbackLink | false
+}
+interface Piece {
+  value: string
+  url: string | undefined
 }
 
-function fallbackEmail(source: string, start: number): LiteralLink | undefined {
-  const previous = start ? source.charCodeAt(start - 1) : -1
-  if (previous === 47 || (start && !isWhitespace(previous) && !isPunctuation(previous))) return
-  let i = start
-  while (i < source.length && atext(source.charCodeAt(i))) i++
-  if (i === start || source.charCodeAt(i) !== 64) return
-  const domainStart = ++i
-  let dot = false
-  let label = false
-  while (i < source.length) {
-    const c = source.charCodeAt(i)
-    if (alpha(c) || digit(c) || c === 95 || c === 45) {
-      label = true
-      i++
-    } else if (
-      c === 46 &&
-      label &&
-      (alpha(source.charCodeAt(i + 1)) ||
-        digit(source.charCodeAt(i + 1)) ||
-        source.charCodeAt(i + 1) === 95 ||
-        source.charCodeAt(i + 1) === 45)
-    ) {
-      dot = true
-      label = false
-      i++
-    } else break
-  }
-  if (dot && i > domainStart && alpha(source.charCodeAt(i - 1)))
-    return { end: i, prefix: 'mailto:' }
+function badLabel(label: string): boolean {
+  const c = label.charCodeAt(label.length - 1)
+  return digit(c) || c === Char.Hyphen || c === Char.Underscore
 }
 
-const fallbackUrlStart = /https?:\/\/|www\./gi
+const URL_HINT = /https?:\/\/|www\./i
 
-function emailStart(source: string, from: number): number {
-  const at = source.indexOf('@', from)
-  if (at < 0) return -1
-  let start = at
-  while (start > from && atext(source.charCodeAt(start - 1))) start--
-  return start
-}
+const PASSES: FallbackPass[] = [
+  {
+    guard: (value) => URL_HINT.test(value),
+    pattern: /(?<![\da-z])(https?:\/\/|www(?=\.))([\w-]*\.[\w\-.]*)([^\t\n\r ]*)/gi,
+    find(match) {
+      const { index, input } = match
+      const previous = input.charCodeAt(index - 1)
+      if (index && !isWhitespace(previous) && !isPunctuation(previous)) return false
+      const www = (match[1].charCodeAt(0) | ASCII_CASE_BIT) === Char.LowerW
+      const host = www ? index : index + match[1].length
+      const hostEnd = index + match[1].length + match[2].length
+      if (isPunctuation(input.charCodeAt(host)) || !correctDomain(input, host, hostEnd)) return false
+      const end = splitEnd(input, host, index + match[0].length)
+      return { end, url: (www ? 'http://' : '') + input.slice(index, end) }
+    },
+  },
+  {
+    guard: (value) => value.indexOf('@') >= 0 && value.indexOf('xmpp:') >= 0,
+    pattern:
+      /(?<![\w+\-.@])xmpp:([\w+\-.]+)@([\w-]+(?:\.[\w-]+)+)(\/(?:[\w\-/]|\.(?=[\dA-Za-z]))*)?/g,
+    find(match) {
+      const resource = match[3]
+      const end = match.index + match[0].length
+      if (
+        badLabel(match[2]) ||
+        (resource &&
+          (!alpha(resource.charCodeAt(resource.length - 1)) ||
+            match.input.charCodeAt(end) === Char.At))
+      )
+        return false
+      return { end, url: match[0] }
+    },
+  },
+  {
+    guard: (value) => value.indexOf('@') >= 0 && value.indexOf('mailto:') >= 0,
+    pattern: /(?<![\w+\-.@])mailto:([\w+\-.]+)@([\w-]+(?:\.[\w-]+)+)/g,
+    find(match) {
+      if (badLabel(match[2])) return false
+      return { end: match.index + match[0].length, url: match[0] }
+    },
+  },
+  {
+    guard: (value) => value.indexOf('@') >= 0,
+    pattern: /(?<![\w+\-.]|(?:^|[^\d@A-Za-z])(?:mailto|xmpp):)([\w+\-.]+)@([\w-]+(?:\.[\w-]+)+)/g,
+    find(match) {
+      if (badLabel(match[2])) return false
+      return { end: match.index + match[0].length, url: 'mailto:' + match[0] }
+    },
+  },
+]
 
-function replaceText(parent: number, n: number, email: boolean): void {
-  // Replacing any part drops positions for the whole original text segment, as remark does.
-  const value = tree.value[n] ?? ''
-  if (value.indexOf(email ? '@' : '.') < 0) return
+function splitPass(value: string, pass: FallbackPass): Piece[] | undefined {
+  if (!pass.guard(value)) return
+  const pattern = pass.pattern
+  pattern.lastIndex = 0
+  let pieces: Piece[] | undefined
   let segment = 0
-  let first = 0
-  let last = 0
-  fallbackUrlStart.lastIndex = 0
-  let candidate = email ? emailStart(value, 0) : (fallbackUrlStart.exec(value)?.index ?? -1)
-  while (candidate >= 0) {
-    const i = candidate
-    const link = email ? fallbackEmail(value, i) : fallbackUrl(value, i)
+  for (let match = pattern.exec(value); match; match = pattern.exec(value)) {
+    const link = pass.find(match)
     if (!link) {
-      candidate = email ? emailStart(value, i + 1) : (fallbackUrlStart.exec(value)?.index ?? -1)
+      // A rejected match retries one character later, like find-and-replace.
+      pattern.lastIndex = match.index + 1
       continue
     }
-    if (segment < i) {
-      const text = node(Kind.Text, 0, 0)
-      tree.value[text] = value.slice(segment, i)
-      tree.positionless[text] = 1
-      if (last) {
-        tree.next[last] = text
-        tree.prev[text] = last
-      } else first = text
-      last = text
-    }
-    const wrapper = node(Kind.Link, 0, 0)
-    tree.extra[wrapper] = { title: null, url: link.prefix + value.slice(i, link.end) }
-    tree.positionless[wrapper] = 1
-    const text = node(Kind.Text, 0, 0, wrapper)
-    tree.value[text] = value.slice(i, link.end)
-    tree.positionless[text] = 1
-    if (last) {
-      tree.next[last] = wrapper
-      tree.prev[wrapper] = last
-    } else first = wrapper
-    last = wrapper
+    pieces ??= []
+    if (segment < match.index)
+      pieces.push({ value: value.slice(segment, match.index), url: undefined })
+    pieces.push({ value: value.slice(match.index, link.end), url: link.url })
+    // URL trails stay outside the link but merge with the following text.
     segment = link.end
-    if (email) candidate = emailStart(value, link.end)
-    else {
-      fallbackUrlStart.lastIndex = link.end
-      candidate = fallbackUrlStart.exec(value)?.index ?? -1
-    }
   }
-  if (!first) return
-  if (segment < value.length) {
-    const text = node(Kind.Text, 0, 0)
-    tree.value[text] = value.slice(segment)
-    tree.positionless[text] = 1
-    tree.next[last] = text
-    tree.prev[text] = last
-    last = text
+  if (pieces && segment < value.length) pieces.push({ value: value.slice(segment), url: undefined })
+  return pieces
+}
+
+function replaceText(parent: number, n: number): void {
+  // Each pass runs over the text pieces left by the previous one, as remark runs
+  // one tree-wide find-and-replace per pattern. Replacing any part drops positions.
+  const value = tree.value[n] ?? ''
+  // Every pattern needs a dot in its domain.
+  if (value.indexOf('.') < 0) return
+  let pieces: Piece[] | undefined
+  for (const pass of PASSES) {
+    if (!pieces) {
+      pieces = splitPass(value, pass)
+      continue
+    }
+    const next: Piece[] = []
+    for (const piece of pieces) {
+      const split = piece.url === undefined ? splitPass(piece.value, pass) : undefined
+      if (split) next.push(...split)
+      else next.push(piece)
+    }
+    pieces = next
+  }
+  if (!pieces) return
+  let first = 0
+  let last = 0
+  for (const piece of pieces) {
+    let child: number
+    if (piece.url === undefined) {
+      child = node(Kind.Text, 0, 0)
+      tree.value[child] = piece.value
+    } else {
+      child = node(Kind.Link, 0, 0)
+      tree.extra[child] = { title: null, url: piece.url }
+      const text = node(Kind.Text, 0, 0, child)
+      tree.value[text] = piece.value
+      tree.positionless[text] = 1
+    }
+    tree.positionless[child] = 1
+    if (last) {
+      tree.next[last] = child
+      tree.prev[child] = last
+    } else first = child
+    last = child
   }
   const before = tree.prev[n]
   const after = tree.next[n]
@@ -353,17 +362,12 @@ function replaceText(parent: number, n: number, email: boolean): void {
 }
 
 export function transformLiteralLinks(parent: number): void {
-  // URL replacements precede emails; existing links must never be transformed again.
+  // Existing links and link references are never transformed again.
   for (let n = tree.child[parent]; n; ) {
     const next = tree.next[n]
-    if (tree.kind[n] === Kind.Text) replaceText(parent, n, false)
+    if (tree.kind[n] === Kind.Text) replaceText(parent, n)
     else if (tree.kind[n] !== Kind.Link && tree.kind[n] !== Kind.LinkReference && tree.child[n])
       transformLiteralLinks(n)
-    n = next
-  }
-  for (let n = tree.child[parent]; n; ) {
-    const next = tree.next[n]
-    if (tree.kind[n] === Kind.Text) replaceText(parent, n, true)
     n = next
   }
 }
