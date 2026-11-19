@@ -14,7 +14,7 @@
     "@types/mdast": "^4.0.4",
     "markdown-it": "^14.1.0",
     "mdast-heading-id": "2.0.0",
-    "mdast-util-from-markdown": "2.0.3",
+    "mdast-util-from-markdown": "2.1.0",
     "mdast-util-frontmatter": "2.0.1",
     "mdast-util-gfm": "3.1.0",
     "mdast-util-math": "3.0.0",

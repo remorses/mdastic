@@ -5,5 +5,7 @@
 {"name":"gfmTaskListItemFromMarkdown > should support a task list item after a definition","input":"* [x]: definition\n  [x] tasklist","syntax":["gfm"]},
 {"name":"gfmTaskListItemFromMarkdown > should not support a task list item when not in a list item","input":"[x] tasklist","syntax":["gfm"]},
 {"name":"gfmTaskListItemFromMarkdown > should support a text construct after the checkbox","input":"* [x] *b*","syntax":["gfm"]},
-{"name":"gfmTaskListItemFromMarkdown > should support further paragraphs after checkboxes","input":"* [x] a\n\n  b","syntax":["gfm"]}
+{"name":"gfmTaskListItemFromMarkdown > should support further paragraphs after checkboxes","input":"* [x] a\n\n  b","syntax":["gfm"]},
+{"name":"gfmTaskListItemFromMarkdown and gfmTaskListItemToMarkdown > should roundtrip a check w/ an encoded space","input":"* [x] &#x20;\n","syntax":["gfm"]},
+{"name":"gfmTaskListItemFromMarkdown and gfmTaskListItemToMarkdown > should roundtrip a check after a definition in a spread l...","input":"* [a]: b\n  [x] c\n\n  d\n","syntax":["gfm"]}
 ]
