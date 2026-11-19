@@ -225,7 +225,8 @@ micromark-extension-gfm 3.0.0, -mdxjs 3.0.0, -frontmatter 2.0.0, -math 3.1.0, md
 micromark-heading-id 2.0.0). Extensions are registered in safe-mdx / holocron order: mdx,
 frontmatter `['yaml', 'toml']`, gfm, math (remark-math defaults), then headingId. A pnpm
 override in `pnpm-workspace.yaml` makes remark-stringify and every to-markdown extension resolve
-the same mdast-util-to-markdown. Upgrading the
+the same mdast-util-to-markdown, and pins mdast-util-gfm-table 2.0.1 with markdown-table 3.1.0
+(rows keep their own cell count, `fillRows: false`). Upgrading the
 oracle means rerunning everything; differences become work.
 
 ```text

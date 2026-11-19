@@ -3,5 +3,8 @@
 {"name":"gfmTableFromMarkdown() > should support alignment","input":"| a | b | c | d |\n| - | :- | -: | :-: |","syntax":["gfm"]},
 {"name":"gfmTableFromMarkdown() > should support an escaped pipe in code in a table cell","input":"| `\\|` |\n | --- |","syntax":["gfm"]},
 {"name":"gfmTableFromMarkdown() > should not support an escaped pipe in code *not* in a table cell","input":"`\\|`","syntax":["gfm"]},
-{"name":"gfmTableFromMarkdown() > should not support an escaped escape in code in a table cell","input":"| `\\\\|`\\\\` b |\n | --- | --- |","syntax":["gfm"]}
+{"name":"gfmTableFromMarkdown() > should not support an escaped escape in code in a table cell","input":"| `\\\\|`\\\\` b |\n | --- | --- |","syntax":["gfm"]},
+{"name":"gfmTableToMarkdown > should not fill rows with fewer cells","input":"| a | b |\n| - | - |\n| c |\n","syntax":["gfm"]},
+{"name":"gfmTableToMarkdown > should not widen the header for rows with more cells than `align`","input":"| a |\n| - |\n| b | c |\n","syntax":["gfm"]},
+{"name":"gfmTableToMarkdown > should round trip backslashes and pipes in code in a table cell","input":"| a | b |\n| - | - |\n| `a\\|b` | c |\n\n| a | b |\n| - | - |\n| `a\\\\b` | c |\n\n| a | b |\n| - | - |\n| `a\\b\\|c` | d |\n\n| a | b |\n| - | - |\n| `a\\\\\\|b` | c |\n","syntax":["gfm"]}
 ]

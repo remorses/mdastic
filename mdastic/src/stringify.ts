@@ -408,7 +408,7 @@ function hasBreak(node: TraversableNode): boolean {
     Boolean(node.children?.some(hasBreak))
   )
 }
-function formatHeadingAsSetext(node: M.Heading, state: State) {
+export function formatHeadingAsSetext(node: M.Heading, state: State) {
   const literalWithBreak = hasBreak(node)
   return Boolean(
     (!node.depth || node.depth < 3) &&

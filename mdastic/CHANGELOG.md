@@ -15,6 +15,12 @@
 4. **Tight lists keep blank lines where they are needed.** A paragraph followed by a list that cannot interrupt it, a setext-like rule, indented code, html or another block quote is separated by a blank line, so the list item parses back the same.
 5. **Links whose text could form a definition** at the start of a line get an empty title, so `[a]: b` style text no longer reparses as a definition.
 6. **Custom `unsafe` patterns support `beforeNode`, `afterNode` and `unicode`**, and treat an empty `before` or `after` as missing.
+7. **GFM tables match `mdast-util-gfm-table` 2.0.1.** Rows keep their own cell count instead of being padded to the longest row, the header widens to `align` or the longest row, a table in a tight list item is followed by a blank line before a paragraph, definition, setext heading or table, and a pipe in inline code in a cell is only escaped when an even number of backslashes precede it.
+
+   ```ts
+   // header with 2 cells, a later row with 3, tablePipeAlign: false
+   stringify(tree)  // '| a | b |\n| - | - |\n| c | d | e |\n', was every row padded to 3 cells
+   ```
 
 ## 0.5.1
 
