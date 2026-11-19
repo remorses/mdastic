@@ -18,8 +18,8 @@ import {
   breaksToSpaces,
   formatHeadingAsSetext,
   inlineCode,
-  listItem,
   longestStreak,
+  paragraph,
   spanFence,
   type StringifyOptions,
   type State,
@@ -450,29 +450,38 @@ function gfmTableToMarkdown(options: StringifyOptions) {
 }
 function gfmTaskListItemToMarkdown() {
   return {
-    unsafe: [{ atBreak: true, character: '-', after: '[:|-]' }],
-    handlers: { listItem: listItemWithTaskListItem },
+    handlers: { paragraph: paragraphWithTaskListItem },
+    join: [joinDefinitionsBeforeTaskListItemParagraph],
   }
 }
-function listItemWithTaskListItem(node: M.ListItem, parent: any, state: State, info: Info) {
-  const head = node.children[0]
-  const checkable = typeof node.checked === 'boolean' && head && head.type === 'paragraph'
-  const checkbox = '[' + (node.checked ? 'x' : ' ') + '] '
+// mdast-util-gfm-task-list-item 2.0.1 puts the check on the first paragraph, after definitions.
+function paragraphWithTaskListItem(node: M.Paragraph, parent: any, state: State, info: Info) {
+  if (!parent || parent.type !== 'listItem' || taskListItemParagraph(parent) !== node) {
+    return paragraph(node, parent, state, info)
+  }
+  const checkbox = '[' + (parent.checked ? 'x' : ' ') + '] '
   const tracker = state.createTracker(info)
-  if (checkable) {
-    tracker.move(checkbox)
-  }
-  let value = listItem(node, parent, state, {
-    ...info,
-    ...tracker.current(),
-  })
-  if (checkable) {
-    // Inject after the serialized marker, using the same matching rule as upstream.
-    value = value.replace(/^(?:[*+-]|\d+\.)([\r\n]| {1,3})/, check)
-  }
-  return value
-  function check($0: any) {
-    return $0 + checkbox
+  tracker.move(checkbox)
+  // An empty checked paragraph gets a space, which `safe` encodes as `&#x20;`.
+  const value = paragraph(
+    node.children.length > 0 ? node : { type: 'paragraph', children: [{ type: 'text', value: ' ' }] },
+    parent,
+    state,
+    { ...info, ...tracker.current() },
+  )
+  return checkbox + value
+}
+function joinDefinitionsBeforeTaskListItemParagraph(left: any, _: any, parent: any) {
+  // A check only works at the start of the first content of a list item.
+  if (!(left.type === 'definition' && parent.type === 'listItem')) return
+  const target = taskListItemParagraph(parent)
+  if (target && parent.children.indexOf(left) < parent.children.indexOf(target)) return 0
+}
+function taskListItemParagraph(node: M.ListItem): M.Paragraph | undefined {
+  if (typeof node.checked !== 'boolean') return
+  for (const child of node.children) {
+    if (child.type === 'paragraph') return child
+    if (child.type !== 'definition') return
   }
 }
 export function gfmToMarkdown(options: StringifyOptions) {

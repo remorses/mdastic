@@ -873,7 +873,7 @@ export function listItem(node: M.ListItem, parent: any, state: State, info: Info
     return (blank ? bullet : bullet + ' '.repeat(size - bullet.length)) + line
   }
 }
-function paragraph(node: M.Paragraph, _: any, state: State, info: Info) {
+export function paragraph(node: M.Paragraph, _: any, state: State, info: Info) {
   const exit = state.enter('paragraph')
   const subexit = state.enter('phrasing')
   const value = state.containerPhrasing(node, info)
